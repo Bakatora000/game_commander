@@ -1313,14 +1313,41 @@ else
         warn "Aucun vhost Nginx trouvé pour ${DOMAIN}"
         warn "AMP semble gérer ce serveur — ajoutez manuellement le bloc location dans le vhost SSL d'AMP."
     fi
-    cat > "$NGINX_CONF" << NGEOF
+    # Si un cert Let's Encrypt existe déjà, créer directement le vhost HTTPS
+    _cert_path="/etc/letsencrypt/live/${DOMAIN}/fullchain.pem"
+    if [[ "$SSL_MODE" == "certbot" && -f "$_cert_path" ]]; then
+        cat > "$NGINX_CONF" << NGEOF
+server {
+    server_name ${DOMAIN};
+${LOC_BLOCK}
+    listen 443 ssl; # managed by Certbot
+    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem; # managed by Certbot
+    include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+}
+server {
+    if (\$host = ${DOMAIN}) {
+        return 301 https://\$host\$request_uri;
+    } # managed by Certbot
+
+    listen 80;
+    server_name ${DOMAIN};
+    return 404; # managed by Certbot
+}
+NGEOF
+        ok "Nouveau vhost HTTPS (cert existant réutilisé) : $NGINX_CONF"
+        SSL_MODE="existing"
+    else
+        cat > "$NGINX_CONF" << NGEOF
 server {
     listen 80;
     server_name ${DOMAIN};
 ${LOC_BLOCK}
 }
 NGEOF
-    ok "Nouveau vhost port 80 : $NGINX_CONF"
+        ok "Nouveau vhost port 80 : $NGINX_CONF"
+    fi
 fi
 
 nginx -t 2>/dev/null && { systemctl reload nginx; ok "Nginx reloadé"; } \
