@@ -89,6 +89,10 @@ Modules are conditionally imported at startup based on `features.*` flags. Missi
 
 Jinja2 context always has: `game` (full config dict), `prefix`, `game_id`.
 
+## Versioning
+
+At each milestone, create a git commit and push to `origin/main`. Bump the version in the `game_commander.sh` header (line 3, `v2.x`) accordingly.
+
 ## Adding a New Game
 
 1. Create `games/{id}/config.py` and/or `games/{id}/mods.py` with the expected function signatures
