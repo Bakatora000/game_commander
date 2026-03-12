@@ -1,0 +1,40 @@
+{
+  "id": "enshrouded",
+  "name": "Enshrouded",
+  "subtitle": "Mon Serveur Enshrouded",
+  "logo": "🌿",
+  "server": {
+    "binary": "enshrouded_server",
+    "service": "enshrouded-server",
+    "install_dir": "/home/gameserver/enshrouded_server",
+    "data_dir": "/home/gameserver/enshrouded_data",
+    "world_name": null,
+    "max_players": 16
+  },
+  "web": {
+    "url_prefix": "/enshrouded",
+    "flask_port": 5003,
+    "admin_user": "admin"
+  },
+  "features": {
+    "mods": false,
+    "config": true,
+    "console": true,
+    "players": false
+  },
+  "permissions": [
+    "start_server",
+    "stop_server",
+    "restart_server",
+    "manage_config",
+    "console",
+    "manage_users"
+  ],
+  "theme": {
+    "name": "enshrouded"
+  },
+  "steamcmd": {
+    "app_id": "2278520",
+    "path": "/home/gameserver/steamcmd/steamcmd.sh"
+  }
+}

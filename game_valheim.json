@@ -1,0 +1,47 @@
+{
+  "id": "valheim",
+  "name": "Valheim",
+  "subtitle": "Mon Serveur Valheim",
+  "logo": "⚔",
+  "server": {
+    "binary": "valheim_server.x86_64",
+    "service": "valheim-server",
+    "install_dir": "/home/gameserver/valheim_server",
+    "data_dir": "/home/gameserver/valheim_data",
+    "world_name": "Monde1",
+    "max_players": 10
+  },
+  "web": {
+    "url_prefix": "/valheim",
+    "flask_port": 5002,
+    "admin_user": "admin"
+  },
+  "features": {
+    "mods": true,
+    "config": true,
+    "console": true,
+    "players": false
+  },
+  "permissions": [
+    "start_server",
+    "stop_server",
+    "restart_server",
+    "install_mod",
+    "remove_mod",
+    "manage_config",
+    "console",
+    "manage_users"
+  ],
+  "theme": {
+    "name": "valheim"
+  },
+  "mods": {
+    "platform": "thunderstore",
+    "community": "valheim",
+    "bepinex_path": "/home/gameserver/valheim_server/BepInEx"
+  },
+  "steamcmd": {
+    "app_id": "896660",
+    "path": "/home/gameserver/steamcmd/steamcmd.sh"
+  }
+}

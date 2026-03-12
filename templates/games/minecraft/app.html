@@ -1,0 +1,85 @@
+{% extends "base/app_base.html" %}
+
+{% block fonts %}family=Inter:wght@400;500;600{% endblock %}
+{% block sidebar_logo %}⛏{% endblock %}
+
+{# ── CONFIG TAB ──────────────────────────────────────────────────────────── #}
+{% block config_tab %}
+<div class="panel config-panel" id="configPanel">
+  <div class="panel-header">
+    <span class="panel-title">server.properties</span>
+    <button class="btn-primary btn-sm" id="btnSaveConfig" data-requires-perm="manage_config">Enregistrer</button>
+  </div>
+  <div id="configFields" class="config-fields"></div>
+</div>
+{% endblock %}
+
+{# ── SCRIPTS ─────────────────────────────────────────────────────────────── #}
+{% block game_scripts %}
+<script>
+const CONFIG_SCHEMA = [
+  {section:'Server',   key:'max-players',       label:'Joueurs max',     type:'number'},
+  {section:'Server',   key:'difficulty',         label:'Difficulté',      type:'select', options:['peaceful','easy','normal','hard']},
+  {section:'Server',   key:'gamemode',           label:'Mode de jeu',     type:'select', options:['survival','creative','adventure','spectator']},
+  {section:'Server',   key:'pvp',                label:'PvP',             type:'select', options:['true','false']},
+  {section:'Server',   key:'allow-nether',       label:'Nether',          type:'select', options:['true','false']},
+  {section:'Server',   key:'enable-command-block',label:'Command blocks', type:'select', options:['true','false']},
+  {section:'Server',   key:'spawn-monsters',     label:'Monstres',        type:'select', options:['true','false']},
+  {section:'Server',   key:'spawn-animals',      label:'Animaux',         type:'select', options:['true','false']},
+  {section:'Server',   key:'view-distance',      label:'Distance de vue', type:'number', help:'2–32'},
+  {section:'Server',   key:'simulation-distance',label:'Distance simulation',type:'number'},
+  {section:'Server',   key:'motd',               label:'MOTD',            type:'text'},
+];
+let configData = {};
+
+async function loadConfig() {
+  const el = document.getElementById('configPanel');
+  const r = await fetch(`${PREFIX}/api/config`).catch(()=>null);
+  if (!r?.ok) {
+    const d = await r?.json()||{};
+    el.innerHTML += `<p class="config-notice">⚠ ${d.error||'Erreur'}</p>`;
+    return;
+  }
+  configData = await r.json();
+  renderConfigFields();
+}
+
+function renderConfigFields() {
+  const el = document.getElementById('configFields');
+  el.innerHTML = '';
+  let lastSection = null;
+  CONFIG_SCHEMA.forEach(f => {
+    if (f.section !== lastSection) {
+      const hdr = document.createElement('div');
+      hdr.className = 'config-section-header';
+      hdr.textContent = f.section;
+      el.appendChild(hdr);
+      lastSection = f.section;
+    }
+    const val = (configData[f.section]||{})[f.key] || '';
+    const row = document.createElement('div');
+    row.className = 'config-row';
+    let input;
+    if (f.type === 'select' && f.options) {
+      const opts = f.options.map(o => `<option value="${o}"${o===val?' selected':''}>${o}</option>`).join('');
+      input = `<select class="config-input" id="cfg_${f.key}">${opts}</select>`;
+    } else {
+      input = `<input class="config-input" type="${f.type}" id="cfg_${f.key}" value="${val}">`;
+    }
+    row.innerHTML = `<label class="config-label">${f.label}${f.help?`<span class="config-help">${f.help}</span>`:''}</label>${input}`;
+    el.appendChild(row);
+  });
+}
+
+document.getElementById('btnSaveConfig')?.addEventListener('click', async () => {
+  const payload = {'Server':{}};
+  CONFIG_SCHEMA.forEach(f => {
+    payload['Server'][f.key] = document.getElementById(`cfg_${f.key}`)?.value || '';
+  });
+  const r = await fetch(`${PREFIX}/api/config`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+  }).catch(()=>null);
+  showToast(r?.ok ? 'Configuration sauvegardée' : 'Erreur', r?.ok ? 'success' : 'error');
+});
+</script>
+{% endblock %}

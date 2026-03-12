@@ -1,0 +1,106 @@
+/* Enshrouded — Page de connexion */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Cinzel+Decorative:wght@400&display=swap');
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --color-bg:      #040a12;
+  --color-surface: #0a1220;
+  --color-border:  #172540;
+  --color-text:    #c8dce8;
+  --color-muted:   #3a5a6e;
+  --color-primary: #3eada8;
+  --color-danger:  #9e4858;
+  --font-main:     'Cinzel Decorative', 'Cinzel', Georgia, serif;
+  --font-ui:       'Cinzel', Georgia, serif;
+}
+
+body {
+  min-height:100vh;
+  background:var(--color-bg);
+  display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-ui);
+  background-image:
+    radial-gradient(ellipse 120% 80% at 50% 100%, rgba(62,173,168,0.06) 0%, transparent 60%),
+    radial-gradient(ellipse 100% 60% at 30% 0%,   rgba(112,88,168,0.10) 0%, transparent 55%),
+    radial-gradient(ellipse 80%  50% at 70% 10%,  rgba(62,173,168,0.04) 0%, transparent 50%);
+}
+
+.mist-layer {
+  position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(ellipse 200% 40% at 50% 110%, rgba(62,173,168,0.04)  0%, transparent 50%),
+    radial-gradient(ellipse 150% 30% at 20% 80%,  rgba(112,88,168,0.05) 0%, transparent 50%);
+}
+
+.login-wrap { position:relative; z-index:1; width:100%; max-width:400px; padding:1rem; }
+
+.card {
+  position:relative;
+  background:rgba(10,18,32,0.96);
+  border:1px solid rgba(62,173,168,0.15);
+  padding:2.5rem 2rem;
+  box-shadow: 0 0 60px rgba(62,173,168,0.08), 0 0 120px rgba(112,88,168,0.06), 0 40px 80px rgba(0,0,0,.85);
+  backdrop-filter:blur(8px);
+}
+.card::before {
+  content:''; position:absolute; top:0; left:50%; transform:translateX(-50%);
+  width:55%; height:1px;
+  background:linear-gradient(90deg,transparent,var(--color-primary),rgba(174,230,226,0.6),transparent);
+  opacity:.55;
+}
+.card-glow {
+  position:absolute; inset:0; pointer-events:none;
+  background:radial-gradient(ellipse 80% 40% at 50% 110%, rgba(62,173,168,0.05), transparent 60%);
+}
+
+.brand { text-align:center; margin-bottom:2rem; }
+.brand-icon {
+  font-size:1.8rem; display:flex; align-items:center; justify-content:center;
+  width:56px; height:56px; margin:0 auto .8rem;
+  background:radial-gradient(circle,rgba(62,173,168,0.14),rgba(112,88,168,0.08));
+  border:1px solid rgba(62,173,168,0.2); border-radius:50%;
+  box-shadow:0 0 20px rgba(62,173,168,0.12), inset 0 0 20px rgba(112,88,168,0.08);
+}
+.brand h1 { font-size:.85rem; color:var(--color-text); letter-spacing:.3em; text-transform:uppercase; font-weight:400; }
+.brand p  { font-size:.62rem; color:var(--color-muted); letter-spacing:.15em; margin-top:.35rem; text-transform:uppercase; }
+
+.error-box {
+  background:rgba(158,72,88,.1); border:1px solid rgba(158,72,88,.3);
+  color:#d09098; padding:.5rem .8rem; font-size:.78rem;
+  margin-bottom:1rem; display:none;
+}
+.field { margin-bottom:1rem; }
+label { display:block; font-size:.6rem; letter-spacing:.2em; text-transform:uppercase; color:var(--color-muted); margin-bottom:.35rem; }
+input {
+  width:100%; background:rgba(4,8,15,0.7); border:1px solid var(--color-border);
+  color:var(--color-text); padding:.65rem .9rem;
+  font-family:var(--font-ui); font-size:.82rem; letter-spacing:.04em;
+  outline:none; transition:all .2s;
+}
+input:focus { border-color:rgba(62,173,168,.5); box-shadow:0 0 0 2px rgba(62,173,168,.1),0 0 12px rgba(62,173,168,.06); }
+input::placeholder { color:var(--color-muted); }
+
+.btn-login {
+  width:100%; margin-top:.5rem; padding:.85rem;
+  background:transparent; border:1px solid rgba(62,173,168,.4);
+  color:var(--color-primary); font-family:var(--font-main); font-size:.68rem;
+  letter-spacing:.2em; text-transform:uppercase; cursor:pointer; transition:all .3s;
+  display:flex; align-items:center; justify-content:center; gap:.5rem;
+  position:relative; overflow:hidden;
+}
+.btn-login::before {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(135deg,rgba(62,173,168,0.1),rgba(112,88,168,0.1));
+  opacity:0; transition:opacity .3s;
+}
+.btn-login:hover { border-color:var(--color-primary); color:var(--color-text); box-shadow:0 0 20px rgba(62,173,168,.12); }
+.btn-login:hover::before { opacity:1; }
+.btn-login:disabled { opacity:.3; cursor:default; }
+
+.spinner {
+  display:none; width:10px; height:10px;
+  border:2px solid rgba(62,173,168,.25); border-top-color:var(--color-primary);
+  border-radius:50%; animation:spin .7s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }

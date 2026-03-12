@@ -1,0 +1,99 @@
+/* ════════════════════════════════════════════════════════
+   Parchment — Parchemin médiéval, clair et lisible
+   ════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Lato:wght@400;500;700&display=swap');
+
+:root {
+  --color-bg:        #f5f0e6;   /* parchemin clair             */
+  --color-surface:   #ede7d9;   /* vieux papier                */
+  --color-surface2:  #e5dcc8;   /* parchemin tanné             */
+  --color-border:    #c8b898;   /* bord parchemin              */
+  --color-text:      #2a1e10;   /* encre brun foncé            */
+  --color-muted:     #806848;   /* encre vieillie              */
+  --color-primary:   #8b3a0f;   /* rouge enluminure            */
+  --color-secondary: #a04820;   /* terracotta                  */
+  --color-success:   #3a6e28;   /* vert feuille                */
+  --color-danger:    #b82020;   /* rouge danger                */
+  --color-warning:   #a07010;   /* ocre avertissement          */
+  --color-accent:    #185888;   /* bleu enluminure             */
+
+  --font-main: 'Cinzel', 'Georgia', serif;
+  --font-ui:   'Lato', 'Segoe UI', sans-serif;
+
+  --glow-primary:   rgba(139, 58, 15, 0.12);
+  --glow-secondary: rgba(160, 72, 32, 0.10);
+  --color-chart-cpu: #8b3a0f;
+  --color-chart-ram: #4a8fc0;
+}
+
+body {
+  background-color: var(--color-bg);
+  background-image:
+    radial-gradient(ellipse 140% 50% at 50% 100%, rgba(139,58,15,0.05) 0%, transparent 55%),
+    repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(139,58,15,0.04) 28px, rgba(139,58,15,0.04) 29px);
+}
+
+.sidebar {
+  background: linear-gradient(180deg, #e8deca 0%, #ddd3bc 100%);
+  border-right-color: #c8b898;
+}
+.topbar { background: #e8deca; border-bottom-color: #c8b898; }
+
+.nav-btn.active {
+  background: rgba(139,58,15,0.10);
+  border-left: 2px solid var(--color-primary);
+  color: var(--color-primary);
+}
+.nav-btn:hover { background: rgba(139,58,15,0.07); }
+.nav-btn { color: var(--color-text); }
+
+.gauge-fill { stroke: var(--color-primary); filter: drop-shadow(0 0 4px rgba(139,58,15,0.35)); }
+.gauge-track { stroke: #c8b898; }
+.gauge-value { color: var(--color-text); }
+.gauge-label { color: var(--color-muted); }
+
+.panel { background: #ede7d9; border-color: #c8b898; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+.panel-title { color: var(--color-primary); border-bottom-color: #c8b898; letter-spacing: .12em; }
+
+.btn-primary { background: transparent; border-color: var(--color-primary); color: var(--color-primary); }
+.btn-primary:hover { background: var(--color-primary); color: #f5f0e6; box-shadow: 0 0 10px rgba(139,58,15,0.25); }
+
+.btn-danger { border-color: var(--color-danger); color: var(--color-danger); }
+.btn-danger:hover { background: var(--color-danger); color: #f5f0e6; }
+
+.btn-ghost { border-color: #c8b898; color: var(--color-text); }
+.btn-ghost:hover { background: var(--color-surface2); }
+
+.console-output { background: #e0d8c4; border-color: #c8b898; }
+.console-line   { color: #806848; }
+.console-line:last-child { color: var(--color-text); }
+.console-prompt { color: var(--color-primary); }
+
+input[type="text"], input[type="password"], input[type="number"], select, textarea {
+  background: #f0ebe0; border-color: #c8b898; color: var(--color-text);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(139,58,15,0.12);
+}
+
+.brand-text .brand-name { color: var(--color-primary); }
+.brand-sub  { color: var(--color-muted); }
+.sidebar-user { color: var(--color-muted); }
+
+.chart-cpu { color: var(--color-primary); }
+.chart-ram { color: #a04820; }
+.chart-plr { color: #185888; }
+
+.status-dot.running { background: var(--color-success); box-shadow: 0 0 6px rgba(58,110,40,0.5); }
+.chart-panel canvas { background: transparent; }
+
+::-webkit-scrollbar       { width: 4px; }
+::-webkit-scrollbar-track { background: var(--color-bg); }
+::-webkit-scrollbar-thumb { background: #c8b898; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
+
+.status-label { font-family: var(--font-main); letter-spacing: .06em; font-size: .8rem; }
+.action-btn   { font-family: var(--font-main); letter-spacing: .08em; font-size: .72rem; }
+.mod-icon     { border-color: #c8b898; }
+.perm-tag     { background: rgba(139,58,15,0.07); border-color: rgba(139,58,15,0.18); }

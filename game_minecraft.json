@@ -1,0 +1,35 @@
+{
+  "id": "minecraft",
+  "name": "Minecraft",
+  "subtitle": "Serveur",
+  "logo": "⛏",
+
+  "_placeholder": true,
+  "_note": "Non implémenté — templates et thème à créer",
+
+  "server": {
+    "binary":      "java",
+    "service":     "minecraft-server",
+    "install_dir": "/home/gameserver/minecraft_server",
+    "max_players": 20
+  },
+
+  "web": {
+    "url_prefix": "/minecraft",
+    "flask_port": 5004,
+    "admin_user": "admin"
+  },
+
+  "features": {
+    "mods":    false,
+    "config":  false,
+    "console": true,
+    "players": false
+  },
+
+  "permissions": [
+    "start_server", "stop_server", "restart_server", "console", "manage_users"
+  ],
+
+  "theme": { "name": "valheim" }
+}

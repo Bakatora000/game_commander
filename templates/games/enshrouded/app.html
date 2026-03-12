@@ -1,0 +1,98 @@
+{% extends "base/app_base.html" %}
+
+{% block fonts %}family=Cinzel:wght@400;600&family=Rajdhani:wght@400;500;600{% endblock %}
+{% block sidebar_logo %}🌿{% endblock %}
+
+{# ── CONFIG TAB ──────────────────────────────────────────────────────────── #}
+{% block config_tab %}
+<div class="panel config-panel">
+  <div class="panel-header">
+    <span class="panel-title">Configuration serveur</span>
+    <button class="btn-primary btn-sm" id="btnSaveConfig">Enregistrer</button>
+  </div>
+  <div id="configFields" class="config-fields"></div>
+  <p class="config-note">⚠ Redémarrez le serveur pour appliquer les changements.</p>
+</div>
+{% endblock %}
+
+{# ── DASHBOARD EXTRA — Joueurs connectés ────────────────────────────────── #}
+{% block dashboard_extra %}
+<div class="panel players-panel" id="playersPanel" style="display:none">
+  <div class="panel-header">
+    <span class="panel-title">Joueurs connectés</span>
+    <span class="panel-count" id="playersCount"></span>
+  </div>
+  <div class="players-list" id="playersList"></div>
+</div>
+{% endblock %}
+
+{# ── SCRIPTS ENSHROUDED ──────────────────────────────────────────────────── #}
+{% block game_scripts %}
+<script>
+const CONFIG_SCHEMA = [
+  {key:'name',          label:'Nom du serveur',  type:'text',     section:null},
+  {key:'password',      label:'Mot de passe',    type:'password', section:null},
+  {key:'slotCount',     label:'Joueurs max',     type:'number',   section:null, min:1, max:16},
+  {key:'gamePort',      label:'Port de jeu',     type:'number',   section:null},
+  {key:'queryPort',     label:'Port de requête', type:'number',   section:null},
+  {key:'saveDirectory', label:'Dossier saves',   type:'text',     section:null},
+];
+let configData = {};
+
+async function loadConfig() {
+  const r = await fetch(`${PREFIX}/api/config`).catch(()=>null);
+  if (!r?.ok) return;
+  configData = await r.json();
+  renderConfigFields();
+}
+
+function renderConfigFields() {
+  const el = document.getElementById('configFields');
+  el.innerHTML = '';
+  CONFIG_SCHEMA.forEach(f => {
+    const val = configData[f.key] ?? '';
+    const row = document.createElement('div');
+    row.className = 'config-row';
+    const extra = f.min != null ? `min="${f.min}" max="${f.max}"` : '';
+    row.innerHTML = `
+      <label class="config-label">${f.label}</label>
+      <input class="config-input" type="${f.type}" id="cfg_${f.key}" value="${val}" ${extra}>`;
+    el.appendChild(row);
+  });
+}
+
+document.getElementById('btnSaveConfig')?.addEventListener('click', async () => {
+  const payload = {};
+  CONFIG_SCHEMA.forEach(f => {
+    const inp = document.getElementById(`cfg_${f.key}`);
+    if (inp) payload[f.key] = f.type === 'number' ? parseInt(inp.value)||0 : inp.value;
+  });
+  const r = await fetch(`${PREFIX}/api/config`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
+  }).catch(()=>null);
+  showToast(r?.ok ? 'Configuration sauvegardée' : 'Erreur sauvegarde', r?.ok ? 'success' : 'error');
+});
+
+// ── JOUEURS ───────────────────────────────────────────────────────────────────
+async function loadPlayers() {
+  const r = await fetch(`${PREFIX}/api/players`).catch(() => null);
+  if (!r?.ok) return;
+  const {players} = await r.json();
+  const panel = document.getElementById('playersPanel');
+  const list  = document.getElementById('playersList');
+  const count = document.getElementById('playersCount');
+  if (!players?.length) { if (panel) panel.style.display = 'none'; return; }
+  if (panel) panel.style.display = '';
+  if (count) count.textContent = `${players.length} en ligne`;
+  if (list) {
+    list.innerHTML = players.map(p =>
+      `<div class="player-row">
+         <span class="player-dot">●</span>
+         <span class="player-name">${p.name}</span>
+       </div>`
+    ).join('');
+  }
+}
+setInterval(() => { if (typeof currentState !== 'undefined' && currentState === 20) loadPlayers(); }, 15000);
+</script>
+{% endblock %}

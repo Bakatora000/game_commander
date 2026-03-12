@@ -1,0 +1,26 @@
+# Config active (contient des chemins serveur spécifiques)
+game.json
+users.json
+
+# Métriques et logs runtime
+metrics.log
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Configs de déploiement sauvegardées
+deploy_config.env
+deploy_*.env
+
+# Backups
+*.bak
+*.bak.*
+
+# Fichiers Claude Code
+.claude/

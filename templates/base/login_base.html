@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ game.name }} — Connexion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?{% block fonts %}{% endblock %}&display=swap">
+  <link rel="stylesheet" href="{{ prefix }}/static/themes/{{ game_id }}/login.css">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="mist-layer"></div>
+{% block background_fx %}{% endblock %}
+<main class="login-wrap">
+  <div class="card">
+    <div class="card-glow"></div>
+    <header class="brand">
+      <div class="brand-icon">{% block brand_icon %}{{ game.logo }}{% endblock %}</div>
+      <h1>{% block brand_title %}{{ game.name }}{% endblock %}</h1>
+      <p>{% block brand_subtitle %}{{ game.subtitle }}{% endblock %}</p>
+    </header>
+    <div class="error-box" id="errorBox"></div>
+    <div class="field">
+      <label for="username">Identifiant</label>
+      <input type="text" id="username" autocomplete="username" placeholder="{% block user_placeholder %}admin{% endblock %}">
+    </div>
+    <div class="field">
+      <label for="password">Mot de passe</label>
+      <input type="password" id="password" autocomplete="current-password" placeholder="••••••••">
+    </div>
+    <button class="btn-login" id="btnLogin">
+      <span id="btnText">{% block btn_label %}Entrer{% endblock %}</span>
+      <span class="spinner" id="spinner"></span>
+    </button>
+  </div>
+</main>
+<script>
+const PREFIX = '{{ prefix }}';
+document.addEventListener('DOMContentLoaded', () => {
+  const btn  = document.getElementById('btnLogin');
+  const user = document.getElementById('username');
+  const pass = document.getElementById('password');
+  const err  = document.getElementById('errorBox');
+
+  async function doLogin() {
+    const u = user.value.trim(), p = pass.value;
+    if (!u || !p) { showError('Identifiants requis'); return; }
+    btn.disabled = true;
+    document.getElementById('spinner').style.display = 'inline-block';
+    err.style.display = 'none';
+    try {
+      const r = await fetch(`${PREFIX}/api/login`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username: u, password: p})
+      });
+      const d = await r.json();
+      if (r.ok) { location.href = d.redirect || `${PREFIX}/app`; return; }
+      showError(d.message || 'Identifiants incorrects');
+    } catch(e) { showError('Erreur de connexion'); }
+    btn.disabled = false;
+    document.getElementById('spinner').style.display = 'none';
+  }
+
+  function showError(msg) {
+    err.textContent = msg;
+    err.style.display = 'block';
+  }
+
+  btn.addEventListener('click', doLogin);
+  [user, pass].forEach(el => el.addEventListener('keydown', e => e.key === 'Enter' && doLogin()));
+  user.focus();
+});
+</script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

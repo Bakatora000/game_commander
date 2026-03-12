@@ -1,0 +1,92 @@
+/* Valheim — Page de connexion */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Cinzel+Decorative:wght@400&display=swap');
+
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --color-bg:      #060402;
+  --color-surface: #0d0906;
+  --color-border:  #2a1e10;
+  --color-text:    #d8c8a8;
+  --color-muted:   #5a4a30;
+  --color-primary: #c8622a;
+  --color-danger:  #b04040;
+  --font-main:     'Cinzel Decorative', 'Cinzel', Georgia, serif;
+  --font-ui:       'Cinzel', Georgia, serif;
+}
+
+body {
+  min-height: 100vh;
+  background: var(--color-bg);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-ui);
+  background-image:
+    radial-gradient(ellipse 160% 60% at 50% 110%, rgba(200,98,42,0.09) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 50% at 20% 20%,   rgba(184,144,64,0.04) 0%, transparent 50%),
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,.006) 2px, rgba(255,255,255,.006) 3px);
+}
+
+.mist-layer {
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: radial-gradient(ellipse 200% 30% at 50% 110%, rgba(200,98,42,0.04) 0%, transparent 50%);
+}
+
+.login-wrap { position: relative; z-index: 1; width: 100%; max-width: 400px; padding: 1rem; }
+
+.card {
+  position: relative;
+  background: rgba(13,9,6,0.97);
+  border: 1px solid rgba(200,98,42,0.2);
+  padding: 2.5rem 2rem;
+  box-shadow: 0 0 60px rgba(200,98,42,0.08), 0 40px 80px rgba(0,0,0,.9);
+}
+.card::before {
+  content:''; position:absolute; top:0; left:50%; transform:translateX(-50%);
+  width:50%; height:1px;
+  background: linear-gradient(90deg, transparent, var(--color-primary), transparent);
+  opacity:.5;
+}
+.card-glow {
+  position:absolute; bottom:-40px; left:50%; transform:translateX(-50%);
+  width:60%; height:40px;
+  background: radial-gradient(ellipse, rgba(200,98,42,0.15), transparent 70%);
+  pointer-events:none;
+}
+
+.brand { text-align:center; margin-bottom:2rem; }
+.brand-icon { font-size:2rem; display:block; margin-bottom:.75rem; }
+.brand h1 { font-size:.85rem; color:var(--color-text); letter-spacing:.3em; text-transform:uppercase; font-weight:400; }
+.brand p  { font-size:.62rem; color:var(--color-muted); letter-spacing:.15em; margin-top:.35rem; text-transform:uppercase; }
+
+.error-box {
+  background: rgba(176,64,64,.12); border:1px solid rgba(176,64,64,.3);
+  color:#c88080; padding:.5rem .8rem; font-size:.78rem;
+  margin-bottom:1rem; display:none; letter-spacing:.04em;
+}
+.field { margin-bottom:1rem; }
+label { display:block; font-size:.6rem; letter-spacing:.2em; text-transform:uppercase; color:var(--color-muted); margin-bottom:.35rem; }
+input {
+  width:100%; background:rgba(0,0,0,.5); border:1px solid var(--color-border);
+  color:var(--color-text); padding:.65rem .9rem;
+  font-family:var(--font-ui); font-size:.82rem; letter-spacing:.04em;
+  outline:none; transition:all .2s;
+}
+input:focus { border-color:rgba(200,98,42,.5); box-shadow:0 0 0 2px rgba(200,98,42,.1); }
+input::placeholder { color:var(--color-muted); }
+
+.btn-login {
+  width:100%; margin-top:.5rem; padding:.8rem;
+  background:transparent; border:1px solid rgba(200,98,42,.4);
+  color:var(--color-primary); font-family:var(--font-main); font-size:.7rem;
+  letter-spacing:.2em; text-transform:uppercase; cursor:pointer; transition:all .3s;
+  display:flex; align-items:center; justify-content:center; gap:.5rem;
+}
+.btn-login:hover { border-color:var(--color-primary); background:rgba(200,98,42,.08); color:var(--color-text); }
+.btn-login:disabled { opacity:.4; cursor:default; }
+
+.spinner {
+  display:none; width:10px; height:10px;
+  border:2px solid rgba(200,98,42,.3); border-top-color:var(--color-primary);
+  border-radius:50%; animation:spin .7s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }

@@ -1,0 +1,154 @@
+/* ════════════════════════════════════════════════════════
+   Valheim Theme — Forge & Braise
+   Ash noir, braises orangées, or nordique
+   ════════════════════════════════════════════════════════ */
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Rajdhani:wght@400;500;600&display=swap');
+
+:root {
+  /* Palette extraite de l'art officiel Valheim (Mats Minnhagen) */
+  --color-bg:        #1c1210;   /* terre sombre, ombre profonde         */
+  --color-surface:   #281814;   /* surface légèrement plus chaude       */
+  --color-surface2:  #341e18;   /* surface secondaire, panels           */
+  --color-border:    #4e2e1c;   /* contours bois brûlé                  */
+  --color-text:      #f0c898;   /* crème chaud — tons clairs de l'image */
+  --color-muted:     #8a6040;   /* ocre moyen, textes secondaires       */
+  --color-primary:   #e88840;   /* orange solaire vif — boutons         */
+  --color-secondary: #c87030;   /* ambre profond                        */
+  --color-success:   #608830;   /* vert créature                        */
+  --color-danger:    #c03828;   /* rouge lave                           */
+  --color-warning:   #c88018;   /* ambre avertissement                  */
+  --color-accent:    #28b0c8;   /* cyan des armes — accents             */
+
+  --font-main: 'Cinzel', 'Georgia', serif;
+  --font-ui:   'Rajdhani', 'Trebuchet MS', sans-serif;
+
+  --glow-primary:   rgba(232, 136, 64, 0.22);
+  --glow-secondary: rgba(200, 112, 48, 0.16);
+  --color-chart-cpu: #e88840;
+  --color-chart-ram: #28b0c8;
+}
+
+/* Corps — texture forgée */
+body {
+  background-color: var(--color-bg);
+  background-image:
+    radial-gradient(ellipse 180% 60% at 50% 110%, rgba(232,136,64,0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 100% 50% at 85% 15%,  rgba(200,112,48,0.10) 0%, transparent 50%),
+    radial-gradient(ellipse 60%  40% at 10% 30%,  rgba(180,60,30,0.08)  0%, transparent 50%),
+    repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,200,100,.01) 2px, rgba(255,200,100,.01) 3px);
+}
+
+/* Sidebar — bois sombre et terre */
+.sidebar {
+  background: linear-gradient(180deg, #2a1a12 0%, #221410 100%);
+  border-right-color: #4e2e1c;
+}
+
+/* Topbar */
+.topbar { background: #2a1a12; border-bottom-color: #4e2e1c; }
+
+/* Nav actif — lueur lave */
+.nav-btn.active {
+  background: rgba(232,136,64,0.15);
+  border-left: 2px solid var(--color-primary);
+  color: var(--color-primary);
+}
+.nav-btn:hover { background: rgba(232,136,64,0.08); }
+
+/* Gauges — anneau orange solaire */
+.gauge-fill { stroke: var(--color-primary); filter: drop-shadow(0 0 5px rgba(232,136,64,0.55)); }
+.gauge-track { stroke: #4e2e1c; }
+.gauge-value { color: var(--color-text); }
+.gauge-label { color: var(--color-muted); }
+
+/* Panels — surface chaude */
+.panel {
+  background: #281814;
+  border-color: #4e2e1c;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+}
+.panel-title {
+  color: var(--color-primary);
+  border-bottom-color: #4e2e1c;
+  letter-spacing: .12em;
+}
+
+/* Boutons principaux — orange vif image */
+.btn-primary {
+  background: transparent;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+.btn-primary:hover {
+  background: var(--color-primary);
+  color: #1c1210;
+  box-shadow: 0 0 14px rgba(232,136,64,0.45);
+}
+
+/* Bouton danger */
+.btn-danger {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+.btn-danger:hover {
+  background: var(--color-danger);
+  color: #f0c898;
+  box-shadow: 0 0 14px rgba(192,56,40,0.45);
+}
+
+/* Console — charbons */
+.console-output { background: #140c0a; border-color: #4e2e1c; }
+.console-line   { color: #8a6040; }
+.console-line:last-child { color: var(--color-text); }
+.console-prompt { color: var(--color-primary); }
+
+/* Inputs */
+input[type="text"], input[type="password"], input[type="number"], select, textarea {
+  background: #140c0a;
+  border-color: #4e2e1c;
+  color: var(--color-text);
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(232,136,64,0.18);
+}
+
+/* Chart — courbes */
+.chart-cpu   { color: var(--color-primary);  }
+.chart-ram   { color: #c87030;               }
+.chart-plr   { color: #28b0c8;               }
+
+/* Status dot */
+.status-dot.running { background: var(--color-success); box-shadow: 0 0 6px var(--color-success); }
+
+
+/* Chart area */
+.chart-panel canvas { background: transparent; }
+
+/* Inputs focus — lueur ambre */
+input:focus, select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(200,98,42,0.15), 0 0 8px rgba(200,98,42,0.08);
+}
+
+/* Scrollbars */
+::-webkit-scrollbar       { width: 4px; }
+::-webkit-scrollbar-track { background: var(--color-bg); }
+::-webkit-scrollbar-thumb { background: #2a1e10; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
+
+/* Topbar title font */
+.status-label { font-family: var(--font-main); letter-spacing: .06em; font-size: .8rem; }
+
+/* Action buttons — style runique */
+.action-btn {
+  font-family: var(--font-main);
+  letter-spacing: .08em;
+  font-size: .72rem;
+}
+
+/* Mod icons — bordure charbonneuse */
+.mod-icon { border-color: #2a1e10; }
+
+/* Permission tags */
+.perm-tag { background: rgba(200,98,42,0.08); border-color: rgba(200,98,42,0.2); }

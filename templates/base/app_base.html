@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ game.name }} Commander</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?{% block fonts %}{% endblock %}&display=swap">
+  <link rel="stylesheet" href="{{ prefix }}/static/common.css">
+  <link rel="stylesheet" id="themeLink" href="{{ prefix }}/static/themes/{{ game_id }}/theme.css">
+  <script>
+    // Appliquer le thème sauvegardé dès le chargement (évite le flash)
+    (function(){
+      const saved = localStorage.getItem('gc_theme_{{ game_id }}');
+      if (saved) document.getElementById('themeLink').href = '{{ prefix }}/static/themes/' + saved + '/theme.css';
+    })();
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="layout">
+
+  <!-- ── SIDEBAR ─────────────────────────────────────────────────────────── -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand-logo">{% block sidebar_logo %}{{ game.logo }}{% endblock %}</div>
+      <div class="brand-text">
+        <span class="brand-name">{{ game.name }}</span>
+        <span class="brand-sub">{{ game.subtitle }}</span>
+      </div>
+    </div>
+
+    <div class="nav-links">
+      <button class="nav-btn active" data-tab="dashboard"><span class="nav-icon">⬡</span><span>Dashboard</span></button>
+      {% if game.features.console %}
+      <button class="nav-btn" data-tab="console"><span class="nav-icon">▸</span><span>Console</span></button>
+      {% endif %}
+      {% if game.features.mods %}
+      <button class="nav-btn" data-tab="mods"><span class="nav-icon">⊕</span><span>Mods</span></button>
+      {% endif %}
+      {% if game.features.config %}
+      <button class="nav-btn" data-tab="config" id="navBtnConfig"><span class="nav-icon">◈</span><span>Config mods</span></button>
+      {% endif %}
+      <button class="nav-btn admin-only" data-tab="users" style="display:none"><span class="nav-icon">◉</span><span>Utilisateurs</span></button>
+      {% block extra_nav %}{% endblock %}
+    </div>
+
+    <div class="sidebar-footer">
+      <span class="sidebar-user" id="sidebarUser"></span>
+      <div class="theme-switcher" id="themeSwitcher">
+        <button class="theme-btn active" data-theme="{{ game_id }}" title="Forge &amp; Braise">🔥</button>
+        <button class="theme-btn" data-theme="{{ game_id }}-ice" title="Valheim Ice">❄</button>
+        <button class="theme-btn" data-theme="dark-steel" title="Dark Steel">⚙</button>
+        <button class="theme-btn" data-theme="parchment" title="Parchemin">📜</button>
+      </div>
+      <a href="{{ prefix }}/logout" class="btn-logout">Déconnexion</a>
+    </div>
+  </nav>
+
+  <!-- ── MAIN ───────────────────────────────────────────────────────────── -->
+  <main class="main">
+
+    <header class="topbar">
+      <button class="menu-toggle" id="menuToggle">☰</button>
+      <div class="server-status">
+        <span class="status-dot" id="statusDot"></span>
+        <span class="status-label" id="statusLabel">—</span>
+        <span class="status-uptime" id="statusUptime"></span>
+      </div>
+      <div class="topbar-actions" id="topbarActions"></div>
+    </header>
+
+    <!-- DASHBOARD -->
+    <section class="tab-panel active" id="tab-dashboard">
+      <div class="content-wrap">
+        <div class="gauges-row">
+          {% for id, label in [('Cpu','CPU'), ('Ram','RAM'), ('Players','Joueurs')] %}
+          <div class="gauge-card">
+            <span class="gauge-label">{{ label }}</span>
+            <div class="gauge-ring">
+              <svg viewBox="0 0 56 56">
+                <circle class="gauge-track" cx="28" cy="28" r="22"/>
+                <circle class="gauge-fill" id="gauge{{ id }}Fill" cx="28" cy="28" r="22"/>
+              </svg>
+              <span class="gauge-value" id="gauge{{ id }}Val">—</span>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="graph-wrap">
+          <div class="graph-header">
+            <span class="graph-title">Métriques</span>
+            <div class="graph-legend">
+              <span class="legend-item"><span class="legend-dot" id="legendCpuDot"></span>CPU %</span>
+              <span class="legend-item"><span class="legend-dot" id="legendRamDot"></span>RAM GB</span>
+            </div>
+            <div class="graph-range" id="chartRangeBtns">
+              <button class="range-btn" data-range="15">15m</button>
+              <button class="range-btn" data-range="30">30m</button>
+              <button class="range-btn active" data-range="60">1h</button>
+              <button class="range-btn" data-range="360">6h</button>
+              <button class="range-btn" data-range="1440">24h</button>
+            </div>
+          </div>
+          <div style="position:relative;height:220px;width:100%">
+            <canvas id="metricsChart"></canvas>
+          </div>
+        </div>
+
+        {% block dashboard_extra %}{% endblock %}
+      </div>
+    </section>
+
+    <!-- CONSOLE -->
+    {% if game.features.console %}
+    <section class="tab-panel" id="tab-console">
+      <div class="content-wrap">
+        <div class="panel console-panel">
+          <div class="console-output" id="consoleOutput"></div>
+          <div class="console-input-row" id="consoleInputRow" style="display:none">
+            <input type="text" class="console-input" id="consoleInput" placeholder="Commande...">
+            <button class="btn-send" id="consoleSend">↵</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
+    <!-- MODS -->
+    {% if game.features.mods %}
+    <section class="tab-panel" id="tab-mods">
+      <div class="content-wrap">
+        {% block mods_tab %}{% endblock %}
+      </div>
+    </section>
+    {% endif %}
+
+    <!-- CONFIG -->
+    {% if game.features.config %}
+    <section class="tab-panel" id="tab-config">
+      <div class="content-wrap">
+        {% block config_tab %}{% endblock %}
+      </div>
+    </section>
+    {% endif %}
+
+    <!-- UTILISATEURS -->
+    <section class="tab-panel" id="tab-users">
+      <div class="content-wrap">
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">Utilisateurs</span>
+            <button class="btn-primary btn-sm" id="btnAddUser">+ Ajouter</button>
+          </div>
+          <div id="usersList"></div>
+          <div class="user-form" id="userForm" style="display:none">
+            <div class="form-row">
+              <div class="form-field">
+                <label>Identifiant</label>
+                <input type="text" id="newUsername" placeholder="username">
+              </div>
+              <div class="form-field">
+                <label>Mot de passe</label>
+                <input type="password" id="newPassword" placeholder="(inchangé si vide)">
+              </div>
+            </div>
+            <div class="perms-grid" id="permsGrid"></div>
+            <div class="form-actions">
+              <button class="btn-primary" id="btnSaveUser">Enregistrer</button>
+              <button class="btn-ghost" id="btnCancelUser">Annuler</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    {% block extra_panels %}{% endblock %}
+  </main>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <p class="modal-text" id="modalText"></p>
+    <div class="modal-actions">
+      <button class="btn-danger" id="modalConfirm">Confirmer</button>
+      <button class="btn-ghost"  id="modalCancel">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════════════════════════════════════
+// GAME COMMANDER — JS CORE
+// ════════════════════════════════════════════════════════════════════════════
+const PREFIX   = '{{ prefix }}';
+const GAME_ID  = '{{ game_id }}';
+const FEATURES = {{ game.features | tojson }};
+const ALL_PERMS = {{ game.permissions | tojson }};
+
+let currentState = 0;
+let myPerms      = [];
+let chart        = null;
+let chartTimer   = null;
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initTabs();
+  initChart();
+  initModal();
+  initUsers();
+  if (FEATURES.console) initConsole();
+
+  document.getElementById('menuToggle').addEventListener('click', () =>
+    document.getElementById('sidebar').classList.toggle('open'));
+
+  fetchMe().then(() => {
+    fetchStatus();
+    setInterval(fetchStatus, 5000);
+    startChartRefresh();
+  });
+});
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function initTabs() {
+  document.querySelectorAll('.nav-btn[data-tab]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(`tab-${tab}`)?.classList.add('active');
+      document.getElementById('sidebar').classList.remove('open');
+      if (tab === 'console') startConsolePolling();
+      if (tab === 'users')   loadUsers();
+      if (tab === 'mods')    loadInstalledMods?.();
+      if (tab === 'config')  loadConfig?.();
+    });
+  });
+}
+
+// ── ME + PERMISSIONS ──────────────────────────────────────────────────────────
+async function fetchMe() {
+  const r = await fetch(`${PREFIX}/api/me`).catch(() => null);
+  if (!r?.ok) return;
+  const d = await r.json();
+  myPerms = d.permissions || [];
+  document.getElementById('sidebarUser').textContent = d.username || '';
+
+  const body = document.body;
+
+  // Classe par permission — éléments [data-perm="xxx"] réagissent via CSS
+  myPerms.forEach(p => body.classList.add(`perm-${p}`));
+
+  // Console : masquer le bouton nav si pas la perm
+  if (!myPerms.includes('console')) {
+    document.querySelector('.nav-btn[data-tab="console"]')?.remove();
+  } else if (FEATURES.console) {
+    document.getElementById('consoleInputRow')?.style.removeProperty('display');
+  }
+
+  // Onglet Utilisateurs : visible seulement si manage_users
+  if (myPerms.includes('manage_users')) {
+    document.querySelectorAll('.admin-only').forEach(el => el.style.removeProperty('display'));
+  }
+
+  // Config + World Modifiers — désactiver les boutons Sauvegarder si pas manage_config
+  if (!myPerms.includes('manage_config')) {
+    document.querySelectorAll('[data-requires-perm="manage_config"]').forEach(el => {
+      el.disabled = true;
+      el.title    = 'Permission insuffisante';
+      el.classList.add('btn-disabled');
+    });
+  }
+
+  // Mods — masquer install/delete si pas les perms
+  if (!myPerms.includes('install_mod')) {
+    body.classList.add('no-install-mod');
+  }
+  if (!myPerms.includes('remove_mod')) {
+    body.classList.add('no-remove-mod');
+  }
+}
+
+// ── STATUS ────────────────────────────────────────────────────────────────────
+async function fetchStatus() {
+  const r = await fetch(`${PREFIX}/api/status`).catch(() => null);
+  if (!r) return;
+  if (r.status === 401) { location.href = `${PREFIX}/login`; return; }
+  renderStatus(await r.json());
+}
+
+const STATE_LABELS = {0:'Arrêté', 5:'Pré-démarrage', 10:'Configuration', 20:'En ligne', 30:'Redémarrage', 40:'Arrêt en cours'};
+
+function renderStatus(s) {
+  currentState = s.state || 0;
+  const running = currentState === 20;
+  const dot = document.getElementById('statusDot');
+  dot.className = 'status-dot ' + (running ? 'running' : currentState > 0 ? 'busy' : 'stopped');
+  document.getElementById('statusLabel').textContent  = STATE_LABELS[currentState] ?? `État ${currentState}`;
+  document.getElementById('statusUptime').textContent = running ? (s.uptime || '') : '';
+  renderGauges(s.metrics || {});
+  renderActions();
+  if (typeof loadPlayers === 'function') loadPlayers();
+}
+
+// ── GAUGES ────────────────────────────────────────────────────────────────────
+function renderGauges(m) {
+  const cpu = m.cpu     || {value:0, max:100};
+  const ram = m.ram     || {value:0, max:1};
+  const pl  = m.players || {value:0, max:10};
+  setGauge('Cpu',     cpu.value,                             100, `${cpu.value}%`);
+  setGauge('Ram',     ram.max ? Math.round(ram.value*100/ram.max) : 0, 100, `${ram.value}M`);
+  setGauge('Players', pl.max  ? Math.round(pl.value*100/pl.max)  : 0, 100, `${pl.value}/${pl.max}`);
+}
+function setGauge(id, pct, max, label) {
+  const fill = document.getElementById(`gauge${id}Fill`);
+  const val  = document.getElementById(`gauge${id}Val`);
+  if (!fill || !val) return;
+  const r = 22, circ = 2 * Math.PI * r;
+  fill.style.strokeDasharray  = `${circ}`;
+  fill.style.strokeDashoffset = `${circ - (Math.min(pct,100) / 100) * circ}`;
+  val.textContent = label;
+}
+
+// ── ACTIONS ───────────────────────────────────────────────────────────────────
+function renderActions() {
+  const el = document.getElementById('topbarActions');
+  el.innerHTML = '';
+  const running = currentState === 20, stopped = currentState === 0;
+  if (stopped  && myPerms.includes('start_server'))   el.appendChild(mkBtn('▶ Démarrer',   'btn-success', () => confirmThen('Démarrer le serveur ?',  () => doAction('start'))));
+  if (running  && myPerms.includes('restart_server')) el.appendChild(mkBtn('↺ Redémarrer', 'btn-warn',    () => confirmThen('Redémarrer le serveur ?', () => doAction('restart'))));
+  if (running  && myPerms.includes('stop_server'))    el.appendChild(mkBtn('■ Arrêter',    'btn-danger',  () => confirmThen('Arrêter le serveur ?',    () => doAction('stop'))));
+}
+function mkBtn(label, cls, fn) {
+  const b = document.createElement('button');
+  b.className = `action-btn ${cls}`;
+  b.textContent = label;
+  b.onclick = fn;
+  return b;
+}
+async function doAction(action) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/${action}`, {method:'POST'}).catch(() => null);
+  if (!r) { showToast('Erreur réseau', 'error'); return; }
+  const d = await r.json();
+  showToast(r.ok ? `Commande envoyée : ${action}` : (d.error || `Erreur ${action}`), r.ok ? 'success' : 'error');
+  setTimeout(fetchStatus, 1500);
+}
+
+// ── CHART ─────────────────────────────────────────────────────────────────────
+function initChart() {
+  const ctx  = document.getElementById('metricsChart').getContext('2d');
+  const cs   = getComputedStyle(document.documentElement);
+  const p1   = cs.getPropertyValue('--color-chart-cpu').trim() || cs.getPropertyValue('--color-primary').trim()   || '#e88840';
+  const p2   = cs.getPropertyValue('--color-chart-ram').trim() || cs.getPropertyValue('--color-accent').trim()    || '#28b0c8';
+  const mt   = cs.getPropertyValue('--color-text').trim()      || '#c8e0f4';
+  const font = cs.getPropertyValue('--font-main').trim()       || 'sans-serif';
+  // Couleur de grille adaptée au thème (visible en clair ET en sombre)
+  const gridColor = cs.getPropertyValue('--color-border').trim() || 'rgba(128,128,128,0.2)';
+
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {labels: [], datasets: [
+      {label:'CPU %',  data:[], borderColor:p1, backgroundColor:p1+'25',
+       tension:.4, pointRadius:0, fill:true, borderWidth:2, yAxisID:'yCpu'},
+      {label:'RAM', data:[], borderColor:p2, backgroundColor:p2+'18',
+       tension:.4, pointRadius:0, fill:true, borderWidth:2, yAxisID:'yRam'},
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false, animation: false,
+      layout: { padding: { top: 10, right: 16, bottom: 4, left: 4 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index',
+          intersect: false,
+          callbacks: {
+            label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y.toFixed(ctx.datasetIndex === 0 ? 1 : 0) + (ctx.datasetIndex === 0 ? '%' : ' MB')
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: mt, maxTicksLimit: 8, font: { size: 12, family: font } },
+          grid:  { color: gridColor }
+        },
+        yCpu: {
+          type: 'linear', position: 'left',
+          min: 0, max: 100,
+          ticks: {
+            color: p1,
+            font: { size: 12, family: font },
+            callback: v => v + '%',
+            maxTicksLimit: 6
+          },
+          grid: { color: gridColor },
+          title: { display: false }
+        },
+        yRam: {
+          type: 'linear', position: 'right',
+          min: 0,
+          ticks: {
+            color: p2,
+            font: { size: 12, family: font },
+            callback: v => (v/1024).toFixed(1),
+            maxTicksLimit: 6
+          },
+          grid: { drawOnChartArea: false },
+          title: { display: false }
+        }
+      }
+    }
+  });
+  // Légende couleurs depuis le graphe
+  const cpu = chart.data.datasets[0];
+  const ram = chart.data.datasets[1];
+  const cpuDot = document.getElementById('legendCpuDot');
+  const ramDot = document.getElementById('legendRamDot');
+  if (cpuDot) cpuDot.style.background = (cpu.borderColor||'').slice(0,7) || '#38b8e8';
+  if (ramDot) ramDot.style.background = (ram.borderColor||'').slice(0,7) || '#2898c8';
+  // Boutons range
+  document.querySelectorAll('#chartRangeBtns .range-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#chartRangeBtns .range-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      loadChartData();
+    });
+  });
+}
+function startChartRefresh() {
+  clearInterval(chartTimer);
+  loadChartData();
+  chartTimer = setInterval(loadChartData, 30000);
+}
+async function loadChartData() {
+  const activeBtn = document.querySelector('#chartRangeBtns .range-btn.active');
+  const mins = activeBtn ? activeBtn.dataset.range : 60;
+  const r = await fetch(`${PREFIX}/api/metrics?minutes=${mins}`).catch(() => null);
+  if (!r?.ok) return;
+  const data = await r.json();
+  chart.data.labels = data.map(d => {
+    const dt = new Date(d.ts);
+    return `${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+  });
+  chart.data.datasets[0].data = data.map(d => d.cpu);
+  chart.data.datasets[1].data = data.map(d => d.ram);
+  chart.update('none');
+}
+
+// ── CONSOLE ───────────────────────────────────────────────────────────────────
+let consolePolling = false, consolePollTimer = null, consoleCursor = null;
+function initConsole() {
+  document.getElementById('consoleSend')?.addEventListener('click', sendConsoleCmd);
+  document.getElementById('consoleInput')?.addEventListener('keydown', e => { if (e.key==='Enter') sendConsoleCmd(); });
+}
+function startConsolePolling() {
+  if (consolePolling) return;
+  consolePolling = true;
+  consoleCursor = null;  // reset cursor à chaque ouverture de l'onglet
+  pollConsole();
+}
+async function pollConsole() {
+  if (!consolePolling) return;
+  const url = consoleCursor
+    ? `${PREFIX}/api/updates?cursor=${encodeURIComponent(consoleCursor)}`
+    : `${PREFIX}/api/updates`;
+  const r = await fetch(url).catch(() => null);
+  if (r?.ok) {
+    const d = await r.json();
+    if (d.cursor) consoleCursor = d.cursor;
+    const out = document.getElementById('consoleOutput');
+    const atBottom = out.scrollHeight - out.scrollTop <= out.clientHeight + 20;
+    (d.entries || []).forEach(e => {
+      const div = document.createElement('div');
+      div.className = 'console-line';
+      div.textContent = e.msg || e.Contents || '';
+      out.appendChild(div);
+    });
+    if ((d.entries?.length) && atBottom) out.scrollTop = out.scrollHeight;
+  }
+  consolePollTimer = setTimeout(pollConsole, 3000);
+}
+async function sendConsoleCmd() {
+  const inp = document.getElementById('consoleInput');
+  const cmd = inp.value.trim();
+  if (!cmd) return;
+  inp.value = '';
+  const r = await fetch(`${PREFIX}/api/console`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({command:cmd})
+  }).catch(() => null);
+  if (!r?.ok) showToast('Erreur commande', 'error');
+}
+
+// ── USERS ─────────────────────────────────────────────────────────────────────
+let editingUser = null;
+function initUsers() {
+  document.getElementById('btnAddUser')?.addEventListener('click', () => openUserForm(null));
+  document.getElementById('btnSaveUser')?.addEventListener('click', saveUser);
+  document.getElementById('btnCancelUser')?.addEventListener('click', closeUserForm);
+}
+async function loadUsers() {
+  const r = await fetch(`${PREFIX}/api/users`).catch(() => null);
+  if (!r?.ok) return;
+  const users = await r.json();
+  const list  = document.getElementById('usersList');
+  list.innerHTML = '';
+  Object.entries(users).forEach(([name, u]) => {
+    const row = document.createElement('div');
+    row.className = 'user-row';
+    const editBtn = document.createElement('button');
+    editBtn.className = 'btn-ghost btn-sm';
+    editBtn.textContent = 'Modifier';
+    editBtn.addEventListener('click', () => openUserForm(name, u.permissions || []));
+    const delBtn = document.createElement('button');
+    delBtn.className = 'btn-danger btn-sm';
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', () => confirmThen(`Supprimer ${name} ?`, () => deleteUser(name)));
+    row.innerHTML = `
+      <span class="user-name">${name}</span>
+      <span class="user-perms">${(u.permissions||[]).map(p=>`<span class="perm-tag">${p}</span>`).join('')||'—'}</span>
+      <div class="user-btns"></div>`;
+    row.querySelector('.user-btns').append(editBtn, delBtn);
+    list.appendChild(row);
+  });
+}
+function openUserForm(username, perms=[]) {
+  editingUser = username;
+  document.getElementById('newUsername').value    = username || '';
+  document.getElementById('newUsername').disabled = !!username;
+  document.getElementById('newPassword').value    = '';
+  const grid = document.getElementById('permsGrid');
+  grid.innerHTML = '';
+  ALL_PERMS.forEach(p => {
+    const lbl = document.createElement('label');
+    lbl.className = 'perm-check';
+    lbl.innerHTML = `<input type="checkbox" value="${p}" ${perms.includes(p)?'checked':''}><span>${p}</span>`;
+    grid.appendChild(lbl);
+  });
+  document.getElementById('userForm').style.removeProperty('display');
+}
+function closeUserForm() {
+  document.getElementById('userForm').style.display = 'none';
+  editingUser = null;
+}
+async function saveUser() {
+  const username    = document.getElementById('newUsername').value.trim();
+  const password    = document.getElementById('newPassword').value;
+  const permissions = [...document.querySelectorAll('#permsGrid input:checked')].map(i => i.value);
+  if (!username) { showToast('Identifiant requis', 'error'); return; }
+  const r = await fetch(`${PREFIX}/api/users`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({username, password, permissions})
+  }).catch(() => null);
+  if (r?.ok) { showToast('Utilisateur enregistré', 'success'); closeUserForm(); loadUsers(); }
+  else showToast((await r?.json())?.error || 'Erreur', 'error');
+}
+async function deleteUser(username) {
+  const r = await fetch(`${PREFIX}/api/users/${username}`, {method:'DELETE'}).catch(() => null);
+  if (r?.ok) { showToast('Supprimé', 'success'); loadUsers(); }
+  else showToast('Erreur', 'error');
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+let _modalCb = null;
+function initModal() {
+  document.getElementById('modalCancel').addEventListener('click', closeModal);
+  document.getElementById('modalConfirm').addEventListener('click', () => { _modalCb?.(); });
+  document.getElementById('modalOverlay').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(); });
+}
+function confirmThen(msg, cb) {
+  _modalCb = cb;
+  document.getElementById('modalText').textContent = msg;
+  document.getElementById('modalOverlay').classList.add('visible');
+}
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('visible');
+  _modalCb = null;
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+let _toastTimer;
+function showToast(msg, type='info') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className   = `toast visible toast-${type}`;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('visible'), 3500);
+}
+
+// ── THEME SWITCHER ────────────────────────────────────────────────────────────
+(function initThemes() {
+  const gameId   = '{{ game_id }}';
+  const prefix   = '{{ prefix }}';
+  const storageKey = `gc_theme_${gameId}`;
+  const saved    = localStorage.getItem(storageKey) || gameId;
+
+  function applyTheme(name) {
+    document.getElementById('themeLink').href = `${prefix}/static/themes/${name}/theme.css`;
+    localStorage.setItem(storageKey, name);
+    document.querySelectorAll('.theme-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.theme === name);
+    });
+  }
+
+  document.querySelectorAll('.theme-btn').forEach(b => {
+    b.addEventListener('click', () => applyTheme(b.dataset.theme));
+  });
+
+  // Marquer le bouton actif au chargement
+  document.querySelectorAll('.theme-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.theme === saved);
+  });
+})();
+</script>
+
+{% block game_scripts %}{% endblock %}
+</body>
+</html>
