@@ -17,6 +17,9 @@ venv/
 # Configs de déploiement sauvegardées
 deploy_config.env
 deploy_*.env
+env/*.env
+!env/.gitkeep
+!env/README.md
 
 # Backups
 *.bak

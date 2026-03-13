@@ -33,13 +33,13 @@ deploy_set_defaults() {
 }
 
 deploy_handle_special_args() {
-    local outfile="${1:-deploy_config.env}"
+    local outfile="${1:-env/deploy_config.env}"
 
-    [[ "$outfile" == --* ]] && outfile="deploy_config.env"
+    [[ "$outfile" == --* ]] && outfile="env/deploy_config.env"
     cat > "$outfile" << 'CFGTPL'
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Game Commander — Fichier de configuration de déploiement
-#  Usage : sudo bash game_commander.sh deploy --config deploy_config.env
+#  Usage : sudo bash game_commander.sh deploy --config env/deploy_config.env
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Jeu : valheim | enshrouded | minecraft

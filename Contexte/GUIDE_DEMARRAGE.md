@@ -317,7 +317,7 @@ sudo bash game_commander.sh deploy --generate-config
 Cela cree un fichier d'exemple que vous pourrez editer, puis reutiliser avec :
 
 ```bash
-sudo bash game_commander.sh deploy --config deploy_config.env
+sudo bash game_commander.sh deploy --config env/deploy_config.env
 ```
 
 Pratique si vous voulez refaire un deploiement sans repondre a toutes les questions.

@@ -21,6 +21,7 @@ require_clean_ignore_rules() {
         users.json \
         metrics.log \
         deploy_config.env \
+        'env/*.env' \
         'deploy_*.env' \
         '*.bak' \
         '*.bak.*')

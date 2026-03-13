@@ -98,7 +98,7 @@ sudo bash game_commander.sh
 sudo bash game_commander.sh deploy
 
 # Avec fichier de config (CI/redéploiement)
-sudo bash game_commander.sh deploy --config deploy_config.env
+sudo bash game_commander.sh deploy --config env/deploy_config.env
 
 # Générer un modèle de config
 sudo bash game_commander.sh deploy --generate-config
@@ -168,11 +168,11 @@ La modularisation bash est en place :
 
 La documentation de contexte du projet repose désormais sur :
 
-- `CODEX.md` pour le contexte opérationnel concis
-- `CODEX_historique.md` pour la mémoire projet détaillée
-- `BUGS.md` pour les régressions, bugs connus et solutions validées
+- `Contexte/CODEX.md` pour le contexte opérationnel concis
+- `Contexte/CODEX_historique.md` pour la mémoire projet détaillée
+- `Contexte/BUGS.md` pour les régressions, bugs connus et solutions validées
 - `README.md` pour la vue d'ensemble du dépôt
-- `GUIDE_DEMARRAGE.md` pour une prise en main débutant côté serveur/VPS/SSH
+- `Contexte/GUIDE_DEMARRAGE.md` pour une prise en main débutant côté serveur/VPS/SSH
 
 ### Jeux supportés
 

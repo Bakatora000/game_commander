@@ -1,4 +1,4 @@
-# CODEX.md — Game Commander
+# CODEX_historique.md — Game Commander
 > Fichier de mémoire pour Codex. Lire intégralement avant toute modification.
 > Mettre à jour après chaque correction ou décision importante.
 
@@ -26,7 +26,7 @@ dédiés (Valheim, Enshrouded, Minecraft) sur un VPS Hetzner Ubuntu 24.04.
 
 ```
 gc/
-├── CODEX.md                   # ce fichier
+├── Contexte/CODEX_historique.md # ce fichier
 ├── game_commander.sh          # point d'entrée bash, source les modules lib/
 ├── lib/
 │   ├── helpers.sh             # logs, prompts, helpers shell communs

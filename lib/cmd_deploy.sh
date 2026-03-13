@@ -14,7 +14,7 @@ cmd_deploy() {
                 CONFIG_MODE=true
                 ;;
             --generate-config)
-                deploy_handle_special_args "${_args[$((i+1))]:-deploy_config.env}"
+                deploy_handle_special_args "${_args[$((i+1))]:-env/deploy_config.env}"
                 return 0
                 ;;
         esac
