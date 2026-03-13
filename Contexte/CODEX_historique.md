@@ -251,6 +251,32 @@ le serveur Enshrouded fonctionne encore normalement.
 
 ---
 
+### [13] Sauvegardes Minecraft — périmètre ciblé validé
+**Objectif retenu :**
+- Sauvegarder uniquement les données utiles du monde Minecraft et les fichiers d'administration
+- Ne pas archiver tout le répertoire serveur
+
+**Périmètre validé :**
+- `world/`
+- `server.properties`
+- `ops.json`
+- `whitelist.json`
+- `banned-players.json`
+- `banned-ips.json`
+- `usercache.json`
+
+**Validation réelle :**
+- Test effectué sur `testfabric`
+- L'archive produite contient bien `world/` et les fichiers admin attendus
+- Elle n'inclut pas `mods/`, `libraries/`, `logs/` ni `fabric-server-launch.jar`
+
+**Bug connexe corrigé :**
+- Le déploiement installait `unzip` mais pas `zip`, alors que tous les scripts de sauvegarde
+  utilisent `zip`
+- `zip` fait maintenant partie des dépendances de base
+
+---
+
 ## Décisions d'architecture
 
 ### Nginx — vhost partagé multi-instances

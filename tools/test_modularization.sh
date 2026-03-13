@@ -72,6 +72,8 @@ test_deploy_modules_present() {
     grep -q 'deploy_configure_server()' "$configure_file" || return 1
     grep -q 'deploy_step_dependencies()' "$steps_file" || return 1
     grep -q 'mkdir -p "\$APP_DIR"' "$steps_file" || return 1
+    grep -q '\[\[ "\$GAME_ID" == "minecraft" || "\$GAME_ID" == "minecraft-fabric" \]\]' "$steps_file" || return 1
+    grep -q 'server.properties ops.json whitelist.json banned-players.json banned-ips.json usercache.json' "$steps_file" || return 1
     grep -q 'deploy_step_nginx()' "$steps_file" || return 1
     grep -q 'nginx_manifest_add "\$INSTANCE_ID" "\$URL_PREFIX" "\$FLASK_PORT" "\$GAME_LABEL"' "$steps_file" || return 1
     grep -q 'deploy_step_validation()' "$steps_file" || return 1

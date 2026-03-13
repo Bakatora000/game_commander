@@ -30,6 +30,11 @@ such as `fabric-api` are installed automatically when Modrinth metadata is incom
 Validated deployment note: Minecraft Java and Minecraft Fabric also expose a connected
 players list in the UI by parsing server logs (`joined the game` / `left the game`).
 
+Validated deployment note: Minecraft Java and Minecraft Fabric backups now target only the
+world data plus the main administrative files (`server.properties`, `ops.json`,
+`whitelist.json`, `banned-players.json`, `banned-ips.json`, `usercache.json`), not the
+full server directory.
+
 ## Running the App
 
 ```bash

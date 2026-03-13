@@ -54,6 +54,20 @@
   - ✅ Validation réelle effectuée : installation de `Vanish` sur `testfabric`, téléchargement automatique de `fabric-api`, redémarrage OK et connexion en jeu réussie
 - **Régression connue :** Pour Fabric, ne pas supposer que l'API Modrinth suffit à décrire toutes les dépendances ; le manifeste `fabric.mod.json` du JAR doit rester une source de vérité complémentaire.
 
+### [13] Sauvegardes Minecraft — échec `zip: command not found`
+- **Statut :** Résolu
+- **Composant :** `lib/deploy_steps.sh`
+- **Instance(s) affectée(s) :** `testfabric`
+- **Symptôme :** Le script `backup_minecraft-fabric.sh` échoue avec `zip: command not found` alors que l'installation et l'instance sont correctes.
+- **Cause racine :**
+  - Le déploiement installait `unzip`, mais pas `zip`
+  - Tous les scripts de sauvegarde utilisent pourtant `zip` pour créer les archives
+- **Solutions essayées :**
+  - ❌ Installer `zip` manuellement sur le serveur pour débloquer le test
+  - ✅ Ajouter `zip` aux dépendances de base installées à l'étape 3
+  - ✅ Validation réelle effectuée ensuite sur `testfabric`, avec archive créée correctement
+- **Régression connue :** Ne pas considérer le pipeline de sauvegarde fonctionnel si `zip` n'est pas installé par défaut.
+
 ### [9] Enshrouded — serveur invisible si seuls les ports game/query contigus sont ouverts
 - **Statut :** Résolu
 - **Composant :** `tools/config_gen.py` + `games/enshrouded/config.py`

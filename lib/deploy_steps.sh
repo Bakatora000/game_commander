@@ -17,7 +17,7 @@ deploy_step_dependencies() {
                || warn "$pkg ignoré"
     }
 
-    for pkg in python3 python3-pip nginx curl unzip jq; do install_pkg "$pkg"; done
+    for pkg in python3 python3-pip nginx curl zip unzip jq; do install_pkg "$pkg"; done
 
     if [[ -n "$STEAM_APPID" ]]; then
         dpkg --print-foreign-architectures | grep -q i386 || {
@@ -554,6 +554,30 @@ zip -j "$ARC" "${FILES[@]}" -q \
 find "$BACKUP_DIR" -name "${WORLD_NAME}_*.zip" -mtime +${RETENTION} -delete
 BKPEOF
         sed -i "s|__BACKUP_DIR__|${BACKUP_DIR}|g; s|__WORLD_DIR__|${WORLD_DIR}|g; s|__WORLD_NAME__|${WORLD_NAME}|g" "$BACKUP_SCRIPT"
+    elif [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
+        cat > "$BACKUP_SCRIPT" << 'BKPEOF'
+#!/usr/bin/env bash
+BACKUP_DIR="__BACKUP_DIR__"
+SERVER_DIR="__SERVER_DIR__"
+WORLD_DIR="__WORLD_DIR__"
+PREFIX="__GAME_ID__"
+RETENTION=7
+TS=$(date +%Y%m%d_%H%M%S)
+ARC="${BACKUP_DIR}/${PREFIX}_save_${TS}.zip"
+[[ ! -d "$WORLD_DIR" ]] && { echo "[$(date)] WARN: $WORLD_DIR introuvable" >&2; exit 1; }
+mkdir -p "$BACKUP_DIR"
+FILES=("$(basename "$WORLD_DIR")")
+for f in server.properties ops.json whitelist.json banned-players.json banned-ips.json usercache.json; do
+    [[ -f "$SERVER_DIR/$f" ]] && FILES+=("$f")
+done
+(
+    cd "$SERVER_DIR"
+    zip -r "$ARC" "${FILES[@]}" -q
+) && echo "[$(date)] OK: $(basename "$ARC") ($(du -sh "$ARC"|cut -f1))" \
+  || { echo "[$(date)] ERROR" >&2; exit 1; }
+find "$BACKUP_DIR" -name "${PREFIX}_save_*.zip" -mtime +${RETENTION} -delete
+BKPEOF
+        sed -i "s|__BACKUP_DIR__|${BACKUP_DIR}|g; s|__SERVER_DIR__|${SERVER_DIR}|g; s|__WORLD_DIR__|${WORLD_DIR}|g; s|__GAME_ID__|${GAME_ID}|g" "$BACKUP_SCRIPT"
     else
         cat > "$BACKUP_SCRIPT" << 'BKPEOF'
 #!/usr/bin/env bash

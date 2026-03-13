@@ -191,8 +191,10 @@ La documentation de contexte du projet repose désormais sur :
 Note Minecraft Java :
 - le serveur téléchargé automatiquement peut être plus récent que ton client Java local
 - en cas d'erreur `Incompatible client`, il faut lancer la bonne version dans le launcher
+- les sauvegardes ciblent `world/` et les fichiers admin utiles (`server.properties`, `ops.json`, `whitelist.json`, `banned-players.json`, `banned-ips.json`, `usercache.json`)
 
 Note Minecraft Fabric :
 - un client Java vanilla peut se connecter tant qu'aucun mod serveur n'exige un client moddé
 - l'installation de mods passe par Modrinth
 - les dépendances Fabric requises sont résolues automatiquement, y compris quand elles ne sont pas complètement déclarées dans l'API Modrinth mais présentes dans `fabric.mod.json`
+- les sauvegardes ciblent `world/` et les mêmes fichiers admin utiles que Minecraft Java, sans inclure `mods/`, `libraries/` ou les binaires serveur
