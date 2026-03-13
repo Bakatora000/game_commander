@@ -29,11 +29,23 @@ app.py                     ← Flask factory (lit game.json)
 game.json                  ← Config du jeu actif (copier depuis game_*.json)
 users.json                 ← Utilisateurs (bcrypt)
 metrics.log                ← Métriques append-only
+game_commander.sh          ← Point d'entrée deploy/status/uninstall
 
 core/
   auth.py                  ← Auth locale + permissions
   server.py                ← psutil + systemd
   metrics.py               ← Poller + lecture
+
+lib/
+  helpers.sh               ← Helpers shell partagés
+  nginx.sh                 ← Fonctions Nginx
+  cmd_deploy.sh            ← Déploiement
+  cmd_uninstall.sh         ← Désinstallation
+  cmd_status.sh            ← Statut instances
+
+tools/
+  nginx_manager.py         ← Manifest Nginx + génération des locations
+  test_tools.py            ← Tests outils Python
 
 games/
   valheim/mods.py          ← Thunderstore + BepInEx
@@ -76,13 +88,20 @@ static/
 
 ```bash
 # Interactif (demande tout)
-sudo bash deploy_game_commander.sh
+sudo bash game_commander.sh
+
+# Déploiement interactif
+sudo bash game_commander.sh deploy
 
 # Avec fichier de config (CI/redéploiement)
-sudo bash deploy_game_commander.sh --config deploy_game_commander.env
+sudo bash game_commander.sh deploy --config deploy_game_commander.env
 
 # Générer un modèle de config
-sudo bash deploy_game_commander.sh --generate-config
+sudo bash game_commander.sh deploy --generate-config
+
+# Désinstallation / statut
+sudo bash game_commander.sh uninstall
+sudo bash game_commander.sh status
 ```
 
 ### Ce que fait le script (12 étapes)
@@ -98,10 +117,38 @@ sudo bash deploy_game_commander.sh --generate-config
 | 6 | Sauvegardes automatiques (cron 3h, 7 jours) |
 | 7 | Copie Game Commander + génération game.json + users.json |
 | 8 | Service systemd Flask |
-| 9 | Nginx (vhost ou injection dans existant) |
+| 9 | Nginx (manifest + fichier locations généré + include dans le vhost) |
 | 10 | SSL (certbot / existing / none) |
 | 11 | Règles sudoers (systemctl + BepInEx pour Valheim) |
 | 12 | Sauvegarde deploy_config.env |
+
+### Nginx multi-instances
+
+Le déploiement actuel ne maintient plus chaque bloc `location` directement dans le vhost
+partagé. Il utilise :
+
+- `/etc/nginx/game-commander-manifest.json` comme source de vérité des instances
+- `/etc/nginx/game-commander-locations.conf` comme fichier auto-généré
+- `tools/nginx_manager.py` pour initialiser, migrer, régénérer et nettoyer
+
+Le vhost du domaine inclut ensuite ce fichier généré dans son bloc SSL.
+
+## GitHub
+
+Le dépôt local est prévu pour être synchronisé avec GitHub via `origin`.
+
+Avant push, lancer :
+
+```bash
+./tools/github_preflight.sh
+```
+
+Ce script :
+- vérifie que `origin` existe
+- vérifie que les fichiers serveur sensibles ne sont pas trackés
+- exécute `./tools/test_modularization.sh`
+
+Un hook `pre-push` versionné est aussi fourni dans `.githooks/pre-push`.
 
 ### Jeux supportés
 

@@ -36,6 +36,13 @@ sudo bash game_commander.sh status       # show all instances
 sudo bash game_commander.sh uninstall --dry-run
 ```
 
+`game_commander.sh` is now a thin entrypoint that sources the bash modules under `lib/`
+(`cmd_deploy.sh`, `cmd_uninstall.sh`, `cmd_status.sh`, `nginx.sh`).
+
+Nginx management is also split out into `tools/nginx_manager.py`, which maintains a
+manifest and a generated locations file rather than repeatedly editing inline blocks for
+each instance.
+
 ## Architecture
 
 ### Config-driven game selection (`game.json`)
