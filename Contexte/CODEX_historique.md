@@ -7,7 +7,7 @@
 ## Contexte du projet
 
 **Game Commander** — Interface web Flask autonome (sans AMP) pour gérer des serveurs de jeux
-dédiés (Valheim, Enshrouded, Minecraft Java) sur un VPS Hetzner Ubuntu 24.04.
+dédiés (Valheim, Enshrouded, Minecraft Java, Minecraft Fabric) sur un VPS Hetzner Ubuntu 24.04.
 
 - **Utilisateur système :** `gameserver`
 - **Domaine :** `gaming.example.com` (multi-instances sous le même domaine)
@@ -199,6 +199,33 @@ le serveur Enshrouded fonctionne encore normalement.
 - Exclure du scan tout PID encore rattaché à une unité `*.service` via `/proc/<pid>/cgroup`
 - Résultat attendu : un Enshrouded actif n'est plus proposé comme orphelin lors de la
   désinstallation d'une autre instance
+
+---
+
+### [11] Minecraft Fabric — validation réelle du support mods
+**État validé :**
+- Déploiement d'une instance Fabric OK
+- UI Game Commander OK
+- Connexion en jeu OK avec client Java vanilla `1.21.11`
+- Installation de `Vanish` via l'UI validée
+- Installation automatique de `fabric-api` validée
+- Redémarrage et reconnexion au monde validés
+
+**Bug rencontré puis corrigé :**
+- L'API Modrinth ne remonte pas toujours les dépendances requises d'un mod Fabric
+- Dans le cas réel `Vanish`, aucune dépendance n'était retournée par l'API, alors que le JAR
+  déclarait `fabric-api` dans `fabric.mod.json`
+
+**Solution retenue :**
+- Garder la résolution de dépendances Modrinth quand elles sont présentes
+- Compléter par une lecture de `fabric.mod.json` dans le JAR téléchargé pour détecter les
+  dépendances Fabric manquantes
+- Résoudre ensuite ces dépendances par projet/version compatible avec la version Minecraft
+  et le loader de l'instance
+
+**Conclusion de contexte :**
+- Le support `minecraft-fabric` est maintenant validé en conditions réelles
+- La prochaine amélioration logique côté Minecraft est la liste des joueurs via parsing des logs
 
 ---
 

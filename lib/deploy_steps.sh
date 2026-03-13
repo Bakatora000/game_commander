@@ -108,6 +108,79 @@ deploy_step_dependencies() {
 }
 
 deploy_step_game_install() {
+    if [[ "$GAME_ID" == "minecraft-fabric" ]]; then
+        hdr "ÉTAPE 4 : Installation Minecraft Fabric"
+        install_pkg "default-jre-headless"
+        mkdir -p "$SERVER_DIR"
+        chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
+
+        if [[ -f "$SERVER_DIR/fabric-server-launch.jar" ]]; then
+            ok "Fabric server launcher déjà présent"
+        else
+            info "Téléchargement du serveur Minecraft Fabric..."
+            python3 - "$SERVER_DIR" <<'PYEOF' || die "Échec téléchargement serveur Minecraft Fabric"
+import json
+import sys
+import urllib.request
+from pathlib import Path
+
+server_dir = Path(sys.argv[1])
+out = server_dir / "fabric-server-launch.jar"
+meta_out = server_dir / ".fabric-meta.json"
+
+with urllib.request.urlopen("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json", timeout=20) as r:
+    manifest = json.load(r)
+mc_version = manifest["latest"]["release"]
+
+with urllib.request.urlopen("https://meta.fabricmc.net/v2/versions/loader", timeout=20) as r:
+    loader_version = json.load(r)[0]["version"]
+
+with urllib.request.urlopen("https://meta.fabricmc.net/v2/versions/installer", timeout=20) as r:
+    installer_version = json.load(r)[0]["version"]
+
+jar_url = f"https://meta.fabricmc.net/v2/versions/loader/{mc_version}/{loader_version}/{installer_version}/server/jar"
+with urllib.request.urlopen(jar_url, timeout=60) as r, open(out, "wb") as f:
+    f.write(r.read())
+
+meta = {
+    "minecraft_version": mc_version,
+    "loader_version": loader_version,
+    "installer_version": installer_version,
+    "loader": "fabric",
+}
+meta_out.write_text(json.dumps(meta, indent=2) + "\n")
+print(f"[fabric] launcher téléchargé : {out}")
+print(f"[fabric] meta enregistrée : {meta_out}")
+PYEOF
+            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/fabric-server-launch.jar" "$SERVER_DIR/.fabric-meta.json"
+            ok "Serveur Minecraft Fabric téléchargé"
+        fi
+
+        if [[ ! -f "$SERVER_DIR/eula.txt" ]]; then
+            cat > "$SERVER_DIR/eula.txt" << 'EOF'
+# EULA acceptée automatiquement par Game Commander
+eula=true
+EOF
+            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/eula.txt"
+            ok "eula.txt généré"
+        fi
+
+        mkdir -p "$SERVER_DIR/mods"
+        chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/mods"
+
+        if [[ ! -f "$SERVER_DIR/server.properties" ]]; then
+            python3 "$SCRIPT_DIR/tools/config_gen.py" minecraft-props \
+                --out "$SERVER_DIR/server.properties" \
+                --name "$SERVER_NAME" \
+                --port "$SERVER_PORT" \
+                --max-players "$MAX_PLAYERS" \
+            || die "Échec génération server.properties"
+            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/server.properties"
+            ok "server.properties généré"
+        fi
+        return
+    fi
+
     if [[ "$GAME_ID" == "minecraft" ]]; then
         hdr "ÉTAPE 4 : Installation Minecraft Java"
         install_pkg "default-jre-headless"
@@ -229,6 +302,52 @@ deploy_step_game_service() {
 #!/usr/bin/env bash
 cd "${SERVER_DIR}"
 exec /usr/bin/java -Xms1G -Xmx2G -jar server.jar nogui
+STARTEOF
+        chmod +x "$START_SCRIPT"
+        chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
+        ok "Script de démarrage : $START_SCRIPT"
+
+        cat > "/etc/systemd/system/${GAME_SERVICE}.service" << SVCEOF
+[Unit]
+Description=${GAME_LABEL} Dedicated Server
+After=network.target
+
+[Service]
+Type=simple
+User=${SYS_USER}
+WorkingDirectory=${SERVER_DIR}
+ExecStart=${START_SCRIPT}
+Restart=on-failure
+RestartSec=10
+SuccessExitStatus=0 130 143
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=${GAME_SERVICE}
+KillSignal=SIGINT
+KillMode=mixed
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+        systemctl daemon-reload
+        systemctl enable "$GAME_SERVICE"
+        info "Démarrage de $GAME_SERVICE..."
+        systemctl start "$GAME_SERVICE"
+        sleep 5
+        service_active "$GAME_SERVICE" \
+            && ok "Service $GAME_SERVICE actif" \
+            || warn "$GAME_SERVICE pas encore actif — journalctl -u $GAME_SERVICE -f"
+        return
+    fi
+
+    if [[ "$GAME_ID" == "minecraft-fabric" ]]; then
+        START_SCRIPT="$SERVER_DIR/start_server.sh"
+        cat > "$START_SCRIPT" << STARTEOF
+#!/usr/bin/env bash
+cd "${SERVER_DIR}"
+exec /usr/bin/java -Xms1G -Xmx2G -jar fabric-server-launch.jar nogui
 STARTEOF
         chmod +x "$START_SCRIPT"
         chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
@@ -406,7 +525,7 @@ deploy_step_backups() {
             [[ ! -d "$WORLD_DIR" ]] && WORLD_DIR="$DATA_DIR/worlds"
             ;;
         enshrouded) WORLD_DIR="$SERVER_DIR/savegame" ;;
-        minecraft)  WORLD_DIR="$SERVER_DIR/world" ;;
+        minecraft|minecraft-fabric) WORLD_DIR="$SERVER_DIR/world" ;;
     esac
 
     BACKUP_SCRIPT="$APP_DIR/backup_${GAME_ID}.sh"
@@ -667,11 +786,9 @@ deploy_step_validation() {
     echo ""
     ERRORS=0
 
-    if [[ "$GAME_ID" != "minecraft" ]]; then
-        service_active "$GAME_SERVICE" \
-            && ok "Service $GAME_SERVICE : actif" \
-            || { warn "Service $GAME_SERVICE : inactif"; ERRORS=$((ERRORS+1)); }
-    fi
+    service_active "$GAME_SERVICE" \
+        && ok "Service $GAME_SERVICE : actif" \
+        || { warn "Service $GAME_SERVICE : inactif"; ERRORS=$((ERRORS+1)); }
 
     if $DEPLOY_APP; then
         sleep 1
@@ -700,13 +817,13 @@ deploy_step_validation() {
     echo "    sudo bash game_commander.sh deploy --config $CONFIG_SAVE"
     echo ""
 
-    if [[ "$GAME_ID" == "minecraft" ]]; then
+    if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
         _GAME_PORTS=("${SERVER_PORT}/tcp")
     else
         _GAME_PORTS=("${SERVER_PORT}/udp" "$((SERVER_PORT+1))/udp")
     fi
     echo -e "  ${BOLD}Ports à ouvrir (firewall) :${RESET}"
-    if [[ "$GAME_ID" == "minecraft" ]]; then
+    if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
         echo -e "    Jeu  : ${SERVER_PORT}/TCP"
     else
         echo -e "    Jeu  : ${SERVER_PORT}/UDP  $((SERVER_PORT+1))/UDP"
@@ -721,7 +838,7 @@ deploy_step_validation() {
         ufw allow "443/tcp" && ok "UFW : 443/tcp ouvert"
     else
         warn "UFW inactif ou absent — pensez à ouvrir les ports dans le firewall Hetzner :"
-        if [[ "$GAME_ID" == "minecraft" ]]; then
+        if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
             echo "    ${SERVER_PORT}/TCP, 80/TCP, 443/TCP"
         else
             echo "    ${SERVER_PORT}/UDP, $((SERVER_PORT+1))/UDP, 80/TCP, 443/TCP"

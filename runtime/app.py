@@ -13,8 +13,11 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(_HERE, 'game.json')) as f:
     GAME = json.load(f)
 
-PREFIX  = GAME['web']['url_prefix'].rstrip('/')
-GAME_ID = GAME['id']
+PREFIX      = GAME['web']['url_prefix'].rstrip('/')
+GAME_ID     = GAME['id']
+MODULE_ID   = GAME.get('module_id') or GAME_ID.replace('-', '_')
+TEMPLATE_ID = GAME.get('template_id') or MODULE_ID
+THEME_NAME  = GAME.get('theme', {}).get('name', MODULE_ID)
 
 # ── Application Flask ──────────────────────────────────────────────────────────
 app = Flask(
@@ -41,20 +44,27 @@ config_module = None
 
 if GAME['features'].get('mods'):
     try:
-        mods_module = importlib.import_module(f'games.{GAME_ID}.mods')
+        mods_module = importlib.import_module(f'games.{MODULE_ID}.mods')
     except ImportError as e:
         print(f'[WARN] Module mods introuvable pour {GAME_ID}: {e}')
 
 if GAME['features'].get('config'):
     try:
-        config_module = importlib.import_module(f'games.{GAME_ID}.config')
+        config_module = importlib.import_module(f'games.{MODULE_ID}.config')
     except ImportError as e:
         print(f'[WARN] Module config introuvable pour {GAME_ID}: {e}')
 
 # ── Context processor Jinja2 ──────────────────────────────────────────────────
 @app.context_processor
 def inject_globals():
-    return {'game': GAME, 'prefix': PREFIX, 'game_id': GAME_ID}
+    return {
+        'game': GAME,
+        'prefix': PREFIX,
+        'game_id': GAME_ID,
+        'module_id': MODULE_ID,
+        'template_id': TEMPLATE_ID,
+        'theme_name': THEME_NAME,
+    }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # ROUTES PAGES
@@ -66,7 +76,7 @@ def index():
 
 @app.route(f'{PREFIX}/login')
 def login_page():
-    return render_template(f'games/{GAME_ID}/login.html')
+    return render_template(f'games/{TEMPLATE_ID}/login.html')
 
 @app.route(f'{PREFIX}/logout')
 def logout():
@@ -76,7 +86,7 @@ def logout():
 @app.route(f'{PREFIX}/app')
 @auth.require_auth
 def app_page():
-    return render_template(f'games/{GAME_ID}/app.html')
+    return render_template(f'games/{TEMPLATE_ID}/app.html')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # API — AUTH

@@ -4,7 +4,7 @@ This file provides guidance to Codex when working with code in this repository.
 
 ## Overview
 
-**Game Commander** is a generic Flask web interface for managing game servers (Valheim, Enshrouded, Minecraft Java) without AMP. It uses `psutil` + `systemd` + `bcrypt`. One instance of the app manages one game server, selected by `game.json`.
+**Game Commander** is a generic Flask web interface for managing game servers (Valheim, Enshrouded, Minecraft Java, Minecraft Fabric) without AMP. It uses `psutil` + `systemd` + `bcrypt`. One instance of the app manages one game server, selected by `game.json`.
 
 Current server state noted in project memory: no active Game Commander instance is deployed
 at the moment; AMP instances still coexist on the same machine and must not be impacted by
@@ -17,10 +17,15 @@ not only the base game port. With a firewall range limited to `15636-15639`, use
 Operational note: orphan-process detection during uninstall must ignore any process still
 attached to a systemd service cgroup. This is required for Wine-based Enshrouded servers.
 
-Validated deployment note: Minecraft support currently targets Minecraft Java only.
-Deployment now provisions a vanilla `server.jar`, `eula.txt`, `server.properties`,
-a Java systemd service, and the Game Commander UI. The player client version must match
-the downloaded server version.
+Validated deployment note: Minecraft Java support provisions a vanilla `server.jar`,
+`eula.txt`, `server.properties`, a Java systemd service, and the Game Commander UI.
+The player client version must match the downloaded server version.
+
+Validated deployment note: Minecraft Fabric support is now functional in real deployment.
+The deploy provisions a Fabric launcher, `eula.txt`, `server.properties`, `.fabric-meta.json`,
+the `mods/` directory, a Java systemd service, and the Game Commander UI. Mod installation
+uses Modrinth and also reads `fabric.mod.json` inside downloaded JARs so required dependencies
+such as `fabric-api` are installed automatically when Modrinth metadata is incomplete.
 
 ## Running the App
 
@@ -67,7 +72,7 @@ each instance.
 
 `runtime/app.py` reads `runtime/game.json` at startup to determine everything: routes (`web.url_prefix`), port (`web.flask_port`), which feature modules to load (`features.mods`, `features.config`, `features.console`), theme, and game-specific paths. The active `runtime/game.json` is copied from one of the `runtime/game_*.json` templates.
 
-Key fields: `id` (selects `runtime/games/{id}/` modules and `runtime/templates/games/{id}/`), `server.binary` (psutil lookup), `server.service` (systemd unit name), `web.admin_user` (superuser who always gets all permissions).
+Key fields: `id` (public game id), `module_id` (Python module id, useful for names like `minecraft-fabric`), `template_id` (template directory id), `server.binary` (psutil lookup), `server.service` (systemd unit name), `web.admin_user` (superuser who always gets all permissions).
 
 ### Route/API structure (`runtime/app.py`)
 
@@ -80,7 +85,7 @@ All routes are prefixed with `PREFIX` from `game.json`. Common routes:
 - `GET/POST {PREFIX}/api/config` (loaded only if `features.config`)
 - `GET/POST {PREFIX}/api/mods/*` (loaded only if `features.mods`)
 - `GET/POST {PREFIX}/api/world_modifiers` (Valheim only)
-- `GET {PREFIX}/api/players` (Valheim / Enshrouded only)
+- `GET {PREFIX}/api/players` (Valheim / Enshrouded only for now)
 - `POST {PREFIX}/api/update` → SteamCMD update in background thread
 
 ### Auth (`runtime/core/auth.py`)
@@ -112,7 +117,7 @@ Modules are conditionally imported at startup based on `features.*` flags. Missi
 - `runtime/static/common.css` — layout only (no colors)
 - `runtime/static/themes/{name}/theme.css` and `login.css` — per-game colors/branding
 
-Jinja2 context always has: `game` (full config dict), `prefix`, `game_id`.
+Jinja2 context always has: `game` (full config dict), `prefix`, `game_id`, `module_id`, `template_id`, `theme_name`.
 
 ## Versioning
 

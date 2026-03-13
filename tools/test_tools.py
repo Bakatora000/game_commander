@@ -8,11 +8,13 @@ Usage :
 """
 
 import json
+import io
 import os
 import sys
 import tempfile
 import types
 import unittest
+import zipfile
 from pathlib import Path
 from flask import Flask
 
@@ -25,6 +27,7 @@ sys.path.insert(0, str(ROOT_DIR))
 import nginx_manager
 import config_gen
 from runtime.games.minecraft import config as minecraft_config
+from runtime.games.minecraft_fabric import mods as minecraft_fabric_mods
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -410,6 +413,24 @@ class ConfigGenGameJsonTests(unittest.TestCase):
         self.assertIsNone(data["server"]["world_name"])
         self.assertNotIn("install_mod", data["permissions"])
 
+    def test_minecraft_fabric_support(self):
+        out = tmp_path(".json")
+        rc = config_gen.cmd_game_json(make_args(
+            out=out, game_id="minecraft-fabric", game_label="Minecraft Fabric",
+            game_binary="java", game_service="minecraft-fabric-server-test",
+            server_dir="/home/gameserver/minecraft_fabric_server",
+            data_dir="", world_name="", max_players=20, port=25565,
+            url_prefix="/minecraft-fabric", flask_port=5005, admin_user="admin",
+            bepinex_path="", steam_appid="", steamcmd_path="",
+        ))
+        self.assertEqual(rc, 0)
+        data = json.loads(Path(out).read_text())
+        self.assertEqual(data["id"], "minecraft-fabric")
+        self.assertEqual(data["module_id"], "minecraft_fabric")
+        self.assertTrue(data["features"]["mods"])
+        self.assertEqual(data["theme"]["name"], "minecraft")
+        self.assertIn("install_mod", data["permissions"])
+
     def test_steamcmd_section(self):
         data = self._gen_valheim()
         self.assertIn("steamcmd", data)
@@ -652,6 +673,101 @@ class MinecraftConfigTests(unittest.TestCase):
                 })
             self.assertFalse(ok)
             self.assertIn("server-port", err)
+
+
+class MinecraftFabricModsTests(unittest.TestCase):
+
+    def _app(self, install_dir):
+        app = Flask(__name__)
+        app.config["GAME"] = {
+            "mods": {
+                "loader": "fabric",
+                "mods_path": os.path.join(install_dir, "mods"),
+                "meta_path": os.path.join(install_dir, ".fabric-meta.json"),
+            }
+        }
+        return app
+
+    def _jar_bytes(self, fabric_mod_json):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as zf:
+            zf.writestr("fabric.mod.json", json.dumps(fabric_mod_json))
+        return buf.getvalue()
+
+    def test_install_mod_pulls_required_dependency_from_fabric_mod_json(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            Path(tmpdir, ".fabric-meta.json").write_text(json.dumps({
+                "minecraft_version": "1.21.11",
+                "loader": "fabric",
+            }))
+
+            app = self._app(tmpdir)
+            original_get = minecraft_fabric_mods.http.get
+
+            class FakeResp:
+                def __init__(self, payload=None, content=b"jar-bytes"):
+                    self._payload = payload
+                    self._content = content
+                def raise_for_status(self):
+                    return None
+                def json(self):
+                    return self._payload
+                def iter_content(self, _size):
+                    yield self._content
+                def __enter__(self):
+                    return self
+                def __exit__(self, exc_type, exc, tb):
+                    return False
+
+            def fake_get(url, params=None, headers=None, timeout=None, stream=False):
+                if url.endswith("/version/vanish-ver"):
+                    return FakeResp({
+                        "id": "vanish-ver",
+                        "project_id": "vanish-proj",
+                        "dependencies": [],
+                        "files": [{"url": "https://cdn.modrinth.com/data/vanish.jar", "filename": "vanish.jar", "primary": True}],
+                    })
+                if url.endswith("/project/fabric-api-proj/version"):
+                    return FakeResp([{"id": "fabric-api-ver", "project_id": "fabric-api-proj"}])
+                if url.endswith("/project/fabric-api/version"):
+                    return FakeResp([{"id": "fabric-api-ver", "project_id": "fabric-api-proj"}])
+                if url.endswith("/version/fabric-api-ver"):
+                    return FakeResp({
+                        "id": "fabric-api-ver",
+                        "project_id": "fabric-api-proj",
+                        "dependencies": [],
+                        "files": [{"url": "https://cdn.modrinth.com/data/fabric-api.jar", "filename": "fabric-api.jar", "primary": True}],
+                    })
+                if url == "https://cdn.modrinth.com/data/vanish.jar":
+                    return FakeResp(content=self._jar_bytes({
+                        "id": "vanish",
+                        "version": "1.6.6+1.21.11",
+                        "depends": {
+                            "fabricloader": ">=0.15.10",
+                            "fabric-api": "*",
+                            "java": ">=21",
+                        },
+                    }))
+                if url == "https://cdn.modrinth.com/data/fabric-api.jar":
+                    return FakeResp(content=self._jar_bytes({
+                        "id": "fabric-api",
+                        "version": "0.141.3+1.21.11",
+                        "depends": {
+                            "fabricloader": "*",
+                            "minecraft": "1.21.11",
+                        },
+                    }))
+                raise AssertionError(f"URL inattendue: {url}")
+
+            minecraft_fabric_mods.http.get = fake_get
+            try:
+                with app.app_context():
+                    ok, err = minecraft_fabric_mods.install_mod("vanish-proj", "Vanish", "vanish-ver")
+                self.assertTrue(ok, err)
+                self.assertTrue(Path(tmpdir, "mods", "vanish.jar").is_file())
+                self.assertTrue(Path(tmpdir, "mods", "fabric-api.jar").is_file())
+            finally:
+                minecraft_fabric_mods.http.get = original_get
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -983,6 +1099,7 @@ if __name__ == "__main__":
         ConfigGenPatchBepinexTests,
         ConfigGenMinecraftPropsTests,
         MinecraftConfigTests,
+        MinecraftFabricModsTests,
     ]
     if len(sys.argv) > 1:
         names = sys.argv[1:]

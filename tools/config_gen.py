@@ -46,10 +46,15 @@ def cmd_game_json(args):
     game_id    = args.game_id
     game_label = args.game_label
 
-    logos = {"valheim": "⚔", "enshrouded": "🌿", "minecraft": "⛏"}
+    logos = {"valheim": "⚔", "enshrouded": "🌿", "minecraft": "⛏", "minecraft-fabric": "🧵"}
+    module_id = game_id.replace('-', '_')
+    template_id = module_id
+    theme_name = game_id
 
     game = {
         "id":       game_id,
+        "module_id": module_id,
+        "template_id": template_id,
         "name":     game_label,
         "subtitle": args.game_label,
         "logo":     logos.get(game_id, "🎮"),
@@ -68,13 +73,17 @@ def cmd_game_json(args):
             "admin_user": args.admin_user,
         },
         "features": {
-            "mods":    game_id == "valheim" and bool(args.bepinex_path),
-            "config":  game_id in ("valheim", "enshrouded", "minecraft"),
+            "mods":    (game_id == "valheim" and bool(args.bepinex_path)) or game_id == "minecraft-fabric",
+            "config":  game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric"),
             "console": True,
             "players": False,
         },
-        "theme": {"name": game_id if game_id in ("valheim", "enshrouded", "minecraft") else "valheim"},
+        "theme": {"name": theme_name if theme_name in ("valheim", "enshrouded", "minecraft") else "valheim"},
     }
+
+    if game_id == "minecraft-fabric":
+        theme_name = "minecraft"
+        game["theme"]["name"] = theme_name
 
     # Permissions
     if game_id == "valheim":
@@ -92,6 +101,11 @@ def cmd_game_json(args):
             "start_server", "stop_server", "restart_server",
             "manage_config", "console", "manage_users",
         ]
+    elif game_id == "minecraft-fabric":
+        game["permissions"] = [
+            "start_server", "stop_server", "restart_server",
+            "install_mod", "remove_mod", "manage_config", "console", "manage_users",
+        ]
     else:
         game["permissions"] = [
             "start_server", "stop_server", "restart_server",
@@ -104,6 +118,13 @@ def cmd_game_json(args):
             "platform":     "thunderstore",
             "community":    "valheim",
             "bepinex_path": args.bepinex_path,
+        }
+    elif game_id == "minecraft-fabric":
+        game["mods"] = {
+            "platform": "modrinth",
+            "loader": "fabric",
+            "mods_path": f"{args.server_dir}/mods",
+            "meta_path": f"{args.server_dir}/.fabric-meta.json",
         }
 
     # SteamCMD

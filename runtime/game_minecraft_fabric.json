@@ -1,0 +1,42 @@
+{
+  "id": "minecraft-fabric",
+  "module_id": "minecraft_fabric",
+  "template_id": "minecraft_fabric",
+  "name": "Minecraft Fabric",
+  "subtitle": "Serveur Java modde",
+  "logo": "🧵",
+  "server": {
+    "binary": "java",
+    "service": "minecraft-fabric-server",
+    "install_dir": "/home/gameserver/minecraft_fabric_server",
+    "max_players": 20
+  },
+  "web": {
+    "url_prefix": "/minecraft-fabric",
+    "flask_port": 5005,
+    "admin_user": "admin"
+  },
+  "features": {
+    "mods": true,
+    "config": true,
+    "console": true,
+    "players": false
+  },
+  "permissions": [
+    "start_server",
+    "stop_server",
+    "restart_server",
+    "install_mod",
+    "remove_mod",
+    "manage_config",
+    "console",
+    "manage_users"
+  ],
+  "theme": { "name": "minecraft" },
+  "mods": {
+    "platform": "modrinth",
+    "loader": "fabric",
+    "mods_path": "/home/gameserver/minecraft_fabric_server/mods",
+    "meta_path": "/home/gameserver/minecraft_fabric_server/.fabric-meta.json"
+  }
+}

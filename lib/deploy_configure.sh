@@ -9,7 +9,10 @@ deploy_check_port_conflict() {
 }
 
 deploy_game_port_proto() {
-    [[ "${GAME_ID:-}" == "minecraft" ]] && printf 't\n' || printf 'u\n'
+    case "${GAME_ID:-}" in
+        minecraft|minecraft-fabric) printf 't\n' ;;
+        *) printf 'u\n' ;;
+    esac
 }
 
 deploy_port_owner() {
@@ -39,11 +42,13 @@ deploy_select_game() {
         echo -e "  ${CYAN}[1]${RESET} Valheim"
         echo -e "  ${CYAN}[2]${RESET} Enshrouded"
         echo -e "  ${CYAN}[3]${RESET} Minecraft Java"
+        echo -e "  ${CYAN}[4]${RESET} Minecraft Fabric"
         echo ""
         prompt "Votre choix" "1"
         case "$REPLY" in
             2) GAME_ID="enshrouded" ;;
             3) GAME_ID="minecraft" ;;
+            4) GAME_ID="minecraft-fabric" ;;
             *) GAME_ID="valheim" ;;
         esac
     else
@@ -56,6 +61,7 @@ deploy_select_game() {
         valheim)    GAME_LABEL="Valheim";    STEAM_APPID="896660";  GAME_BINARY="valheim_server.x86_64" ;;
         enshrouded) GAME_LABEL="Enshrouded"; STEAM_APPID="2278520"; GAME_BINARY="enshrouded_server.exe" ;;
         minecraft)  GAME_LABEL="Minecraft Java";  STEAM_APPID="";        GAME_BINARY="java" ;;
+        minecraft-fabric) GAME_LABEL="Minecraft Fabric"; STEAM_APPID=""; GAME_BINARY="java" ;;
     esac
     ok "Jeu sélectionné : ${BOLD}${GAME_LABEL}${RESET}"
 }
@@ -154,7 +160,7 @@ deploy_configure_server() {
     local port_proto
     port_proto="$(deploy_game_port_proto)"
 
-    if [[ "$GAME_ID" == "minecraft" ]]; then
+    if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
         if deploy_check_port_conflict "$SERVER_PORT" "$port_proto"; then
             next_port="$SERVER_PORT"
             while deploy_check_port_conflict "$next_port" "$port_proto"; do
@@ -174,7 +180,7 @@ deploy_configure_server() {
 
     prompt "Port principal" "${SERVER_PORT}"
     SERVER_PORT="$REPLY"
-    if [[ "$GAME_ID" == "minecraft" ]]; then
+    if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
         if deploy_check_port_conflict "$SERVER_PORT" "$port_proto"; then
             warn "Port ${SERVER_PORT}/TCP déjà utilisé par : $(deploy_port_owner "$SERVER_PORT")"
         fi

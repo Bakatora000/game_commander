@@ -35,6 +35,25 @@
   - ✅ Lancer la bonne version Java depuis le launcher, alignée sur celle demandée par le serveur
 - **Régression connue :** Pour Minecraft Java, vérifier la version exacte du client avant de conclure à un bug de réseau ou de déploiement.
 
+### [12] Minecraft Fabric — dépendances Modrinth requises non installées après ajout d'un mod
+- **Statut :** Résolu
+- **Composant :** `runtime/games/minecraft_fabric/mods.py`
+- **Instance(s) affectée(s) :** `testfabric`
+- **Symptôme :**
+  - Après installation de `Vanish` depuis l'UI puis redémarrage, le serveur Fabric ne redémarre pas correctement.
+  - Les logs indiquent que `fabric-api` manque alors que le mod installé en dépend.
+  - Le dossier `mods/` ne contient que `vanish-1.6.6+1.21.11.jar`.
+- **Cause racine :**
+  - L'API Modrinth ne remonte pas toujours les dépendances requises d'un mod Fabric.
+  - Dans le cas réel `Vanish`, aucune dépendance n'était exposée via l'API, alors que le JAR déclarait bien `fabric-api` dans `fabric.mod.json`.
+- **Solutions essayées :**
+  - ❌ Installer `Vanish` seul puis redémarrer — boucle d'échec Fabric avec message `requires any version of fabric-api, which is missing`
+  - ❌ Première implémentation basée uniquement sur les dépendances de l'API Modrinth — insuffisante en validation réelle
+  - ✅ Lire aussi les dépendances déclarées dans `fabric.mod.json` après téléchargement du JAR
+  - ✅ Résoudre les dépendances manquantes par slug/projet Modrinth compatible avec la version Minecraft/loader de l'instance
+  - ✅ Validation réelle effectuée : installation de `Vanish` sur `testfabric`, téléchargement automatique de `fabric-api`, redémarrage OK et connexion en jeu réussie
+- **Régression connue :** Pour Fabric, ne pas supposer que l'API Modrinth suffit à décrire toutes les dépendances ; le manifeste `fabric.mod.json` du JAR doit rester une source de vérité complémentaire.
+
 ### [9] Enshrouded — serveur invisible si seuls les ports game/query contigus sont ouverts
 - **Statut :** Résolu
 - **Composant :** `tools/config_gen.py` + `games/enshrouded/config.py`

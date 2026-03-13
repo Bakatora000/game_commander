@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?{% block fonts %}{% endblock %}&display=swap">
   <link rel="stylesheet" href="{{ prefix }}/static/common.css">
-  <link rel="stylesheet" id="themeLink" href="{{ prefix }}/static/themes/{{ game_id }}/theme.css">
+  <link rel="stylesheet" id="themeLink" href="{{ prefix }}/static/themes/{{ theme_name }}/theme.css">
   <script>
     // Appliquer le thème sauvegardé dès le chargement (évite le flash)
     (function(){
@@ -49,7 +49,7 @@
     <div class="sidebar-footer">
       <span class="sidebar-user" id="sidebarUser"></span>
       <div class="theme-switcher" id="themeSwitcher">
-        <button class="theme-btn active" data-theme="{{ game_id }}" title="Forge &amp; Braise">🔥</button>
+        <button class="theme-btn active" data-theme="{{ theme_name }}" title="Thème principal">🔥</button>
         <button class="theme-btn" data-theme="{{ game_id }}-ice" title="Valheim Ice">❄</button>
         <button class="theme-btn" data-theme="dark-steel" title="Dark Steel">⚙</button>
         <button class="theme-btn" data-theme="parchment" title="Parchemin">📜</button>

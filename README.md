@@ -57,7 +57,8 @@ runtime/
     valheim/mods.py        ← Thunderstore + BepInEx
     valheim/config.py      ← BetterNetworking.cfg
     enshrouded/config.py   ← enshrouded_server.json
-    minecraft/             ← Support Minecraft Java minimal
+    minecraft/             ← Support Minecraft Java vanilla
+    minecraft_fabric/      ← Support Minecraft Fabric + mods Modrinth
   templates/
     base/app_base.html     ← Structure commune (Jinja2 blocks)
     base/login_base.html   ← Login commun
@@ -182,7 +183,13 @@ La documentation de contexte du projet repose désormais sur :
 | Valheim | ✅ 896660 | ✅ optionnel | BetterNetworking.cfg |
 | Enshrouded | ✅ 2278520 | — | enshrouded_server.json |
 | Minecraft Java | ✅ vanilla | — | `server.properties` |
+| Minecraft Fabric | ✅ Fabric | ✅ Modrinth | `server.properties` |
 
 Note Minecraft Java :
 - le serveur téléchargé automatiquement peut être plus récent que ton client Java local
 - en cas d'erreur `Incompatible client`, il faut lancer la bonne version dans le launcher
+
+Note Minecraft Fabric :
+- un client Java vanilla peut se connecter tant qu'aucun mod serveur n'exige un client moddé
+- l'installation de mods passe par Modrinth
+- les dépendances Fabric requises sont résolues automatiquement, y compris quand elles ne sont pas complètement déclarées dans l'API Modrinth mais présentes dans `fabric.mod.json`
