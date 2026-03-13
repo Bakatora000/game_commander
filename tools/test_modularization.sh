@@ -52,19 +52,48 @@ test_entrypoint_is_thin() {
 test_deploy_uses_nginx_module() {
     local file="$ROOT_DIR/lib/cmd_deploy.sh"
 
-    grep -q 'nginx_ensure_init "\$DOMAIN"' "$file" || return 1
-    grep -q 'nginx_manifest_add "\$INSTANCE_ID" "\$URL_PREFIX" "\$FLASK_PORT" "\$GAME_LABEL"' "$file" || return 1
-    grep -q 'nginx_regenerate_locations' "$file" || return 1
-    grep -q 'nginx_apply' "$file" || return 1
+    grep -q 'deploy_step_dependencies' "$file" || return 1
+    grep -q 'deploy_step_game_install' "$file" || return 1
+    grep -q 'deploy_step_nginx' "$file" || return 1
+    grep -q 'deploy_step_validation' "$file" || return 1
+}
+
+test_deploy_modules_present() {
+    local helpers_file="$ROOT_DIR/lib/deploy_helpers.sh"
+    local configure_file="$ROOT_DIR/lib/deploy_configure.sh"
+    local steps_file="$ROOT_DIR/lib/deploy_steps.sh"
+
+    grep -q 'deploy_set_defaults()' "$helpers_file" || return 1
+    grep -q 'deploy_handle_special_args()' "$helpers_file" || return 1
+    grep -q 'deploy_init_logging()' "$helpers_file" || return 1
+    grep -q 'deploy_step_configuration()' "$configure_file" || return 1
+    grep -q 'deploy_check_port_conflict()' "$configure_file" || return 1
+    grep -q 'deploy_configure_server()' "$configure_file" || return 1
+    grep -q 'deploy_step_dependencies()' "$steps_file" || return 1
+    grep -q 'deploy_step_nginx()' "$steps_file" || return 1
+    grep -q 'nginx_manifest_add "\$INSTANCE_ID" "\$URL_PREFIX" "\$FLASK_PORT" "\$GAME_LABEL"' "$steps_file" || return 1
+    grep -q 'deploy_step_validation()' "$steps_file" || return 1
 }
 
 test_uninstall_prefers_manifest() {
     local file="$ROOT_DIR/lib/cmd_uninstall.sh"
 
-    grep -q '\[\[ -f "\$GC_NGINX_MANIFEST" \]\] && nginx_manifest_check "\$INSTANCE_ID"' "$file" || return 1
-    grep -q 'nginx_manifest_remove "\$INSTANCE_ID"' "$file" || return 1
-    grep -q 'nginx_regenerate_locations' "$file" || return 1
-    grep -q 'nginx_apply' "$file" || return 1
+    grep -q 'uninstall_gc_section' "$file" || return 1
+    grep -q 'uninstall_flask_section' "$file" || return 1
+    grep -q 'uninstall_orphans_section' "$file" || return 1
+}
+
+test_uninstall_modules_present() {
+    local gc_file="$ROOT_DIR/lib/uninstall_gc.sh"
+    local flask_file="$ROOT_DIR/lib/uninstall_flask.sh"
+    local orphans_file="$ROOT_DIR/lib/uninstall_orphans.sh"
+
+    grep -q '\[\[ -f "\$GC_NGINX_MANIFEST" \]\] && nginx_manifest_check "\$instance_id"' "$gc_file" || return 1
+    grep -q 'nginx_manifest_remove "\$instance_id"' "$gc_file" || return 1
+    grep -q 'nginx_regenerate_locations' "$gc_file" || return 1
+    grep -q 'nginx_apply' "$gc_file" || return 1
+    grep -q 'uninstall_flask_process_entry' "$flask_file" || return 1
+    grep -q 'uninstall_orphans_section' "$orphans_file" || return 1
 }
 
 test_nginx_wrappers_call_python_manager() {
@@ -164,8 +193,10 @@ EOF
 main() {
     run_test "Python tool tests" test_python_tools
     run_test "Thin game_commander.sh entrypoint" test_entrypoint_is_thin
-    run_test "Deploy uses nginx module" test_deploy_uses_nginx_module
-    run_test "Uninstall prefers nginx manifest flow" test_uninstall_prefers_manifest
+    run_test "Deploy delegates to modular steps" test_deploy_uses_nginx_module
+    run_test "Deploy helper and step modules present" test_deploy_modules_present
+    run_test "Uninstall delegates to dedicated modules" test_uninstall_prefers_manifest
+    run_test "Uninstall modules keep manifest and process logic" test_uninstall_modules_present
     run_test "Nginx shell wrappers call python manager" test_nginx_wrappers_call_python_manager
     run_test "Helpers support dry-run and shared-dir detection" test_helpers_dry_run_and_shared_detection
 
