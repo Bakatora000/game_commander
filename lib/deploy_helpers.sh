@@ -33,13 +33,13 @@ deploy_set_defaults() {
 }
 
 deploy_handle_special_args() {
-    local outfile="${1:-deploy_game_commander.env}"
+    local outfile="${1:-deploy_config.env}"
 
-    [[ "$outfile" == --* ]] && outfile="deploy_game_commander.env"
+    [[ "$outfile" == --* ]] && outfile="deploy_config.env"
     cat > "$outfile" << 'CFGTPL'
 # ═══════════════════════════════════════════════════════════════════════════════
 #  Game Commander — Fichier de configuration de déploiement
-#  Usage : sudo bash game_commander.sh deploy --config deploy_game_commander.env
+#  Usage : sudo bash game_commander.sh deploy --config deploy_config.env
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Jeu : valheim | enshrouded | minecraft
@@ -54,7 +54,7 @@ SERVER_DIR=""
 DATA_DIR=""
 BACKUP_DIR=""
 APP_DIR=""
-SRC_DIR=""          # dossier contenant le projet Game Commander (app.py etc.)
+SRC_DIR=""          # racine du projet Game Commander ou dossier runtime
 
 # Configuration du serveur de jeu
 SERVER_NAME="Mon Serveur Valheim"
@@ -85,6 +85,26 @@ CFGTPL
     echo -e "${GREEN}  ✓  Modèle généré : $outfile${RESET}"
     echo -e "${CYAN}  →  Éditez puis lancez :${RESET}"
     echo -e "      sudo bash game_commander.sh deploy --config $outfile"
+}
+
+deploy_runtime_src_dir() {
+    local src_dir="${1:-$SRC_DIR}"
+
+    if [[ -f "$src_dir/runtime/app.py" ]]; then
+        printf '%s\n' "$src_dir/runtime"
+        return 0
+    fi
+
+    if [[ -f "$src_dir/app.py" ]]; then
+        printf '%s\n' "$src_dir"
+        return 0
+    fi
+
+    return 1
+}
+
+deploy_has_runtime_sources() {
+    deploy_runtime_src_dir "${1:-$SRC_DIR}" >/dev/null 2>&1
 }
 
 set_game_defaults() {

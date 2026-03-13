@@ -21,7 +21,7 @@ attached to a systemd service cgroup. This is required for Wine-based Enshrouded
 
 ```bash
 # 1. Select a game config
-cp game_valheim.json game.json   # or game_enshrouded.json
+cp runtime/game_valheim.json runtime/game.json   # or runtime/game_enshrouded.json
 
 # 2. Create users.json with an admin account
 python3 -c "
@@ -29,14 +29,14 @@ import bcrypt, json
 pw = input('Password: ').encode()
 h  = bcrypt.hashpw(pw, bcrypt.gensalt()).decode()
 print(json.dumps({'admin': {'password_hash': h, 'permissions': []}}, indent=2))
-" > users.json
+" > runtime/users.json
 
 # 3. Launch
 export GAME_COMMANDER_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-python3 app.py
+python3 runtime/app.py
 ```
 
-The app is deployed behind Nginx (for example `gaming.example.com.conf`). Flask listens on `127.0.0.1:<flask_port>` from `game.json`.
+The app is deployed behind Nginx (for example `gaming.example.com.conf`). Flask listens on `127.0.0.1:<flask_port>` from `runtime/game.json`.
 
 ## Deployment Script
 
@@ -58,17 +58,17 @@ each instance.
 
 ## Architecture
 
-### Config-driven game selection (`game.json`)
+### Config-driven game selection (`runtime/game.json`)
 
-`app.py` reads `game.json` at startup to determine everything: routes (`web.url_prefix`), port (`web.flask_port`), which feature modules to load (`features.mods`, `features.config`, `features.console`), theme, and game-specific paths. The active `game.json` is copied from one of the `game_*.json` templates.
+`runtime/app.py` reads `runtime/game.json` at startup to determine everything: routes (`web.url_prefix`), port (`web.flask_port`), which feature modules to load (`features.mods`, `features.config`, `features.console`), theme, and game-specific paths. The active `runtime/game.json` is copied from one of the `runtime/game_*.json` templates.
 
-Key fields: `id` (selects `games/{id}/` modules and `templates/games/{id}/`), `server.binary` (psutil lookup), `server.service` (systemd unit name), `web.admin_user` (superuser who always gets all permissions).
+Key fields: `id` (selects `runtime/games/{id}/` modules and `runtime/templates/games/{id}/`), `server.binary` (psutil lookup), `server.service` (systemd unit name), `web.admin_user` (superuser who always gets all permissions).
 
-### Route/API structure (`app.py`)
+### Route/API structure (`runtime/app.py`)
 
 All routes are prefixed with `PREFIX` from `game.json`. Common routes:
 - `GET {PREFIX}/` → redirect to `/app` or `/login`
-- `GET {PREFIX}/app` → game-specific `templates/games/{id}/app.html`
+- `GET {PREFIX}/app` → game-specific `runtime/templates/games/{id}/app.html`
 - `POST {PREFIX}/api/login` → session auth
 - `GET/POST {PREFIX}/api/status`, `/api/updates`, `/api/metrics`
 - `POST {PREFIX}/api/start|stop|restart` (requires perms)
@@ -78,19 +78,19 @@ All routes are prefixed with `PREFIX` from `game.json`. Common routes:
 - `GET {PREFIX}/api/players` (Valheim / Enshrouded only)
 - `POST {PREFIX}/api/update` → SteamCMD update in background thread
 
-### Auth (`core/auth.py`)
+### Auth (`runtime/core/auth.py`)
 
-Users stored in `users.json` (bcrypt hashed passwords). The `admin_user` (from `game.json`) always receives all permissions listed in `game.json["permissions"]`. Non-admin users have an explicit permission list. Two decorators: `@auth.require_auth` (session check) and `@auth.require_perm('perm_name')`.
+Users stored in `runtime/users.json` (bcrypt hashed passwords). The `admin_user` (from `runtime/game.json`) always receives all permissions listed in `runtime/game.json["permissions"]`. Non-admin users have an explicit permission list. Two decorators: `@auth.require_auth` (session check) and `@auth.require_perm('perm_name')`.
 
-### Server control (`core/server.py`)
+### Server control (`runtime/core/server.py`)
 
 Finds the game process by binary name + port via `psutil`, with a fallback to `systemctl show <service> --property=MainPID` for Wine-based games (Enshrouded runs as a `.exe` under Wine). Start/stop/restart call `sudo /usr/bin/systemctl`. Console reads from `journalctl -u <service>` with cursor-based polling.
 
-### Metrics (`core/metrics.py`)
+### Metrics (`runtime/core/metrics.py`)
 
 Append-only JSON Lines file (`metrics.log`). Background thread polls every 30s, purges entries older than 24h every ~30 minutes. `state=20` means online (AMP-compatible convention).
 
-### Game modules (`games/{id}/`)
+### Game modules (`runtime/games/{id}/`)
 
 Each game can provide:
 - `mods.py` — `search_mods(q)`, `get_installed_mods()`, `install_mod(ns, name, ver)`, `remove_mod(name)`
@@ -102,10 +102,10 @@ Modules are conditionally imported at startup based on `features.*` flags. Missi
 
 ### Templates and themes
 
-- `templates/base/app_base.html` and `login_base.html` — shared Jinja2 block structure
-- `templates/games/{id}/app.html` and `login.html` — game-specific overrides
-- `static/common.css` — layout only (no colors)
-- `static/themes/{name}/theme.css` and `login.css` — per-game colors/branding
+- `runtime/templates/base/app_base.html` and `login_base.html` — shared Jinja2 block structure
+- `runtime/templates/games/{id}/app.html` and `login.html` — game-specific overrides
+- `runtime/static/common.css` — layout only (no colors)
+- `runtime/static/themes/{name}/theme.css` and `login.css` — per-game colors/branding
 
 Jinja2 context always has: `game` (full config dict), `prefix`, `game_id`.
 
@@ -117,7 +117,7 @@ Current validated milestone: `v2.1`
 
 ## Adding a New Game
 
-1. Create `games/{id}/config.py` and/or `games/{id}/mods.py` with the expected function signatures
-2. Create `templates/games/{id}/app.html` and `login.html` extending the base templates
-3. Create `static/themes/{id}/theme.css` and `login.css`
-4. Create `game_{id}.json` with all required fields
+1. Create `runtime/games/{id}/config.py` and/or `runtime/games/{id}/mods.py` with the expected function signatures
+2. Create `runtime/templates/games/{id}/app.html` and `login.html` extending the base templates
+3. Create `runtime/static/themes/{id}/theme.css` and `login.css`
+4. Create `runtime/game_{id}.json` with all required fields

@@ -114,7 +114,7 @@
 
 ### [5] Métriques CPU/RAM incorrectes pour Enshrouded (Wine)
 - **Statut :** Résolu
-- **Composant :** `core/server.py` — collecte métriques psutil
+- **Composant :** `runtime/core/server.py` — collecte métriques psutil
 - **Symptôme :** CPU affiché à 0%, RAM à 2–32 MB alors que l'usage réel est ~20–60% CPU et ~1.5 GB RAM.
 - **Cause racine :** Wine re-parente `enshrouded_server.exe` hors de l'arbre systemd.
   - `MainPID` systemd = `xvfb-run` (wrapper léger)
@@ -148,7 +148,7 @@
 
 ### [7] Métriques — graphe vide durant les périodes de downtime
 - **Statut :** Résolu
-- **Composant :** `core/metrics.py` — thread de polling
+- **Composant :** `runtime/core/metrics.py` — thread de polling
 - **Symptôme :** Le graphe s'arrête net à l'heure d'arrêt, pas de visualisation du downtime.
 - **Cause racine :** Le poller n'enregistrait des points que si `state == 20` (serveur en ligne).
 - **Solutions essayées :**
@@ -160,7 +160,7 @@
 
 ### [8] Valheim — conflit Steam entre deux instances sur la même machine
 - **Statut :** Résolu
-- **Composant :** `game_valheim.json` — flags de démarrage du serveur
+- **Composant :** `runtime/game_valheim.json` — flags de démarrage du serveur
 - **Symptôme :** `Steam is not initialized` / `Awake of network backend failed` au démarrage d'une deuxième instance Valheim.
 - **Cause racine :** Le flag `-vanilla` tente d'initialiser Steam localement, ce qui entre en conflit avec l'instance AMP Valheim (CauchemarCommu01) déjà active.
 - **Solutions essayées :**

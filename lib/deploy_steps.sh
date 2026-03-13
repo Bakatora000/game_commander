@@ -386,14 +386,16 @@ BKPEOF
 
 deploy_step_app_files() {
     hdr "ÉTAPE 7 : Game Commander"
+    local runtime_src=""
 
     if ! $DEPLOY_APP; then
         warn "Sources introuvables — Game Commander ignoré"
     else
+        runtime_src=$(deploy_runtime_src_dir "$SRC_DIR") || die "Sources runtime introuvables dans $SRC_DIR"
         mkdir -p "$APP_DIR"
         rsync -a --exclude='__pycache__' --exclude='*.pyc' --exclude='metrics.log' \
                   --exclude='users.json' --exclude='game.json' --exclude='deploy_config.env' \
-                  "$SRC_DIR/" "$APP_DIR/"
+                  "$runtime_src/" "$APP_DIR/"
         chown -R "$SYS_USER:$SYS_USER" "$APP_DIR"
         ok "Fichiers Game Commander copiés dans $APP_DIR"
 

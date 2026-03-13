@@ -6,8 +6,8 @@ Sans dépendance AMP — psutil + systemd + bcrypt.
 ## Déploiement
 
 ```bash
-# 1. Copier game_valheim.json (ou enshrouded) en game.json
-cp game_valheim.json game.json
+# 1. Copier un template runtime en game.json
+cp runtime/game_valheim.json runtime/game.json
 
 # 2. Créer users.json avec un compte admin
 python3 -c "
@@ -15,26 +15,17 @@ import bcrypt, json
 pw = input('Mot de passe admin : ').encode()
 h  = bcrypt.hashpw(pw, bcrypt.gensalt()).decode()
 print(json.dumps({'admin': {'password_hash': h, 'permissions': []}}, indent=2))
-" > users.json
+" > runtime/users.json
 
 # 3. Lancer
 export GAME_COMMANDER_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-python3 app.py
+python3 runtime/app.py
 ```
 
 ## Structure
 
 ```
-app.py                     ← Flask factory (lit game.json)
-game.json                  ← Config du jeu actif (copier depuis game_*.json)
-users.json                 ← Utilisateurs (bcrypt)
-metrics.log                ← Métriques append-only
 game_commander.sh          ← Point d'entrée deploy/status/uninstall
-
-core/
-  auth.py                  ← Auth locale + permissions
-  server.py                ← psutil + systemd
-  metrics.py               ← Poller + lecture
 
 lib/
   helpers.sh               ← Helpers shell partagés
@@ -53,42 +44,49 @@ tools/
   nginx_manager.py         ← Manifest Nginx + génération des locations
   test_tools.py            ← Tests outils Python
 
-games/
-  valheim/mods.py          ← Thunderstore + BepInEx
-  valheim/config.py        ← BetterNetworking.cfg
-  enshrouded/config.py     ← enshrouded_server.json
-  minecraft/               ← Placeholder
-
-templates/
-  base/app_base.html       ← Structure commune (Jinja2 blocks)
-  base/login_base.html     ← Login commun
-  games/valheim/           ← Templates spécifiques Valheim
-  games/enshrouded/        ← Templates spécifiques Enshrouded
-
-static/
-  common.css               ← Layout pur (zéro couleur)
-  themes/valheim/          ← Thème forge/braise
-  themes/enshrouded/       ← Thème brume/sarcelle
+runtime/
+  app.py                   ← Flask factory (lit game.json)
+  game.json                ← Config du jeu actif (copier depuis game_*.json)
+  users.json               ← Utilisateurs (bcrypt)
+  metrics.log              ← Métriques append-only
+  core/
+    auth.py                ← Auth locale + permissions
+    server.py              ← psutil + systemd
+    metrics.py             ← Poller + lecture
+  games/
+    valheim/mods.py        ← Thunderstore + BepInEx
+    valheim/config.py      ← BetterNetworking.cfg
+    enshrouded/config.py   ← enshrouded_server.json
+    minecraft/             ← Placeholder
+  templates/
+    base/app_base.html     ← Structure commune (Jinja2 blocks)
+    base/login_base.html   ← Login commun
+    games/valheim/         ← Templates spécifiques Valheim
+    games/enshrouded/      ← Templates spécifiques Enshrouded
+  static/
+    common.css             ← Layout pur (zéro couleur)
+    themes/valheim/        ← Thème forge/braise
+    themes/enshrouded/     ← Thème brume/sarcelle
 ```
 
 ## game.json — Variables clés
 
 | Champ | Rôle |
 |---|---|
-| `id` | Sélectionne les templates et modules games/{id}/ |
+| `id` | Sélectionne les templates et modules runtime/games/{id}/ |
 | `server.binary` | Nom du process pour psutil |
 | `server.service` | Nom du service systemd |
 | `web.url_prefix` | Préfixe des routes Flask (/valheim, /enshrouded) |
 | `web.flask_port` | Port d'écoute Flask |
 | `features.*` | Active/désactive les onglets (mods, config, console) |
-| `theme.name` | Sélectionne static/themes/{name}/ |
+| `theme.name` | Sélectionne runtime/static/themes/{name}/ |
 
 ## Ajouter un nouveau jeu
 
-1. Créer `games/{id}/config.py` et/ou `games/{id}/mods.py`
-2. Créer `templates/games/{id}/app.html` et `login.html`
-3. Créer `static/themes/{id}/theme.css` et `login.css`
-4. Créer `game_{id}.json` et le copier en `game.json`
+1. Créer `runtime/games/{id}/config.py` et/ou `runtime/games/{id}/mods.py`
+2. Créer `runtime/templates/games/{id}/app.html` et `login.html`
+3. Créer `runtime/static/themes/{id}/theme.css` et `login.css`
+4. Créer `runtime/game_{id}.json` et le copier en `runtime/game.json`
 
 ## Script de déploiement
 

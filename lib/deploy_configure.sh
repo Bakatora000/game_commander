@@ -125,11 +125,11 @@ deploy_configure_paths() {
     BACKUP_DIR="$REPLY"
     prompt "Répertoire Game Commander" "${APP_DIR}"
     APP_DIR="$REPLY"
-    prompt "Dossier source Game Commander (contenant app.py)" "${SRC_DIR}"
+    prompt "Dossier source Game Commander (racine du projet)" "${SRC_DIR}"
     SRC_DIR="$REPLY"
 
-    if [[ ! -f "$SRC_DIR/app.py" ]]; then
-        warn "app.py introuvable dans $SRC_DIR — Game Commander ne sera pas déployé"
+    if ! deploy_has_runtime_sources "$SRC_DIR"; then
+        warn "runtime/app.py introuvable dans $SRC_DIR — Game Commander ne sera pas déployé"
         DEPLOY_APP=false
     else
         DEPLOY_APP=true

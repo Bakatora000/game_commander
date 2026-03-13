@@ -28,10 +28,6 @@ dédiés (Valheim, Enshrouded, Minecraft) sur un VPS Hetzner Ubuntu 24.04.
 gc/
 ├── CODEX.md                   # ce fichier
 ├── game_commander.sh          # point d'entrée bash, source les modules lib/
-├── game_valheim.json          # config template Valheim
-├── game_enshrouded.json       # config template Enshrouded
-├── game_minecraft.json        # config template Minecraft
-├── app.py                     # application Flask principale
 ├── lib/
 │   ├── helpers.sh             # logs, prompts, helpers shell communs
 │   ├── nginx.sh               # wrapper bash autour de tools/nginx_manager.py
@@ -48,27 +44,32 @@ gc/
 │   ├── nginx_manager.py       # manifest nginx + génération locations + migration
 │   ├── config_gen.py          # génération/config utilitaires
 │   └── test_tools.py          # tests des outils Python
-├── core/
-│   ├── auth.py                # authentification bcrypt + permissions
-│   ├── server.py              # contrôle systemd + métriques psutil
-│   └── metrics.py             # logging CPU/RAM/joueurs (JSON Lines, 24h)
-├── games/
-│   ├── valheim/
-│   │   ├── config.py          # lecture/écriture config Valheim
-│   │   ├── players.py         # joueurs via journalctl
-│   │   ├── mods.py            # gestion mods BepInEx/Thunderstore
-│   │   └── world_modifiers.py
-│   └── enshrouded/
-│       ├── config.py          # lecture/écriture enshrouded_server.json
-│       └── players.py         # joueurs via journalctl (steamid)
-├── static/
-│   ├── common.css
-│   └── themes/                # valheim, enshrouded, minecraft, dark-steel...
-└── templates/
-    ├── base/
-    │   ├── app_base.html      # template principal (dashboard, métriques, actions)
-    │   └── login_base.html
-    └── games/                 # templates spécifiques par jeu
+├── runtime/
+│   ├── app.py                 # application Flask principale
+│   ├── game_valheim.json      # config template Valheim
+│   ├── game_enshrouded.json   # config template Enshrouded
+│   ├── game_minecraft.json    # config template Minecraft
+│   ├── core/
+│   │   ├── auth.py            # authentification bcrypt + permissions
+│   │   ├── server.py          # contrôle systemd + métriques psutil
+│   │   └── metrics.py         # logging CPU/RAM/joueurs (JSON Lines, 24h)
+│   ├── games/
+│   │   ├── valheim/
+│   │   │   ├── config.py      # lecture/écriture config Valheim
+│   │   │   ├── players.py     # joueurs via journalctl
+│   │   │   ├── mods.py        # gestion mods BepInEx/Thunderstore
+│   │   │   └── world_modifiers.py
+│   │   └── enshrouded/
+│   │       ├── config.py      # lecture/écriture enshrouded_server.json
+│   │       └── players.py     # joueurs via journalctl (steamid)
+│   ├── static/
+│   │   ├── common.css
+│   │   └── themes/            # valheim, enshrouded, minecraft, dark-steel...
+│   └── templates/
+│       ├── base/
+│       │   ├── app_base.html  # template principal (dashboard, métriques, actions)
+│       │   └── login_base.html
+│       └── games/             # templates spécifiques par jeu
 ```
 
 ---
@@ -131,7 +132,7 @@ et ~1.5GB RAM.
 - `MainPID` systemd = `xvfb-run` (wrapper léger)
 - `children(recursive=True)` ne trouve pas `enshrouded_server.exe` re-parenté
 - La cmdline Wine utilise le format `Z:\home\gameserver\...` pas `/home/gameserver/...`
-**Solution dans `core/server.py` :**
+**Solution dans `runtime/core/server.py` :**
 1. Fallback via `systemctl show --property=MainPID` si binaire non trouvé
 2. Scanner tous les process dont la cmdline contient `install_dir` OU son équivalent
    Wine `Z:\home\gameserver\enshrouded2_server`
@@ -153,7 +154,7 @@ entier, ce qui casserait toutes les autres instances sur ce domaine.
 
 ### [7] Métriques graphe vides quand serveur arrêté
 **Symptôme :** Le graphe s'arrête net à l'heure d'arrêt, pas de visualisation du downtime.
-**Cause :** Le poller dans `core/metrics.py` n'enregistrait des points que si `state == 20`.
+**Cause :** Le poller dans `runtime/core/metrics.py` n'enregistrait des points que si `state == 20`.
 **Solution :** Enregistrer des points à `0/0/0` même quand le serveur est arrêté, pour
 visualiser les périodes de downtime comme des creux plats dans le graphe.
 
@@ -278,8 +279,8 @@ sudo bash ~/gc/game_commander.sh status
 sudo journalctl -u game-commander-enshrouded2 -f
 sudo journalctl -u enshrouded-server-enshrouded2 -f
 
-# Appliquer un fix sur core/server.py sans redéploiement
-sudo cp core/server.py /home/gameserver/game-commander-enshrouded2/core/server.py
+# Appliquer un fix sur runtime/core/server.py sans redéploiement
+sudo cp runtime/core/server.py /home/gameserver/game-commander-enshrouded2/core/server.py
 sudo systemctl restart game-commander-enshrouded2
 
 # Vérifier l'arbre de process Wine
