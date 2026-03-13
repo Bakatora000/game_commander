@@ -76,7 +76,7 @@ def cmd_game_json(args):
             "mods":    (game_id == "valheim" and bool(args.bepinex_path)) or game_id == "minecraft-fabric",
             "config":  game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric"),
             "console": True,
-            "players": False,
+            "players": game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric"),
         },
         "theme": {"name": theme_name if theme_name in ("valheim", "enshrouded", "minecraft") else "valheim"},
     }

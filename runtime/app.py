@@ -351,27 +351,18 @@ if GAME_ID == 'valheim':
         print(f'[WARN] world_modifiers non chargé: {e}')
 
 # ─────────────────────────────────────────────────────────────────────────────
-# API — JOUEURS CONNECTÉS (Valheim uniquement)
+# API — JOUEURS CONNECTÉS (conditionnel)
 # ─────────────────────────────────────────────────────────────────────────────
-if GAME_ID == 'valheim':
+if GAME['features'].get('players'):
     try:
-        import games.valheim.players as _players
-        @app.route(f'{PREFIX}/api/players')
-        @auth.require_auth
-        def api_players():
-            return jsonify({'players': _players.get_players()})
-    except ImportError as e:
-        print(f'[WARN] players non chargé: {e}')
+        _players_module = importlib.import_module(f'games.{MODULE_ID}.players')
 
-if GAME_ID == 'enshrouded':
-    try:
-        import games.enshrouded.players as _ens_players
         @app.route(f'{PREFIX}/api/players')
         @auth.require_auth
         def api_players():
-            return jsonify({'players': _ens_players.get_players()})
+            return jsonify({'players': _players_module.get_players()})
     except ImportError as e:
-        print(f'[WARN] enshrouded players non chargé: {e}')
+        print(f'[WARN] players non chargé pour {GAME_ID}: {e}')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DÉMARRAGE

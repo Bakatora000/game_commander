@@ -27,6 +27,9 @@ the `mods/` directory, a Java systemd service, and the Game Commander UI. Mod in
 uses Modrinth and also reads `fabric.mod.json` inside downloaded JARs so required dependencies
 such as `fabric-api` are installed automatically when Modrinth metadata is incomplete.
 
+Validated deployment note: Minecraft Java and Minecraft Fabric also expose a connected
+players list in the UI by parsing server logs (`joined the game` / `left the game`).
+
 ## Running the App
 
 ```bash
@@ -85,7 +88,7 @@ All routes are prefixed with `PREFIX` from `game.json`. Common routes:
 - `GET/POST {PREFIX}/api/config` (loaded only if `features.config`)
 - `GET/POST {PREFIX}/api/mods/*` (loaded only if `features.mods`)
 - `GET/POST {PREFIX}/api/world_modifiers` (Valheim only)
-- `GET {PREFIX}/api/players` (Valheim / Enshrouded only for now)
+- `GET {PREFIX}/api/players` (Valheim / Enshrouded / Minecraft Java / Minecraft Fabric)
 - `POST {PREFIX}/api/update` → SteamCMD update in background thread
 
 ### Auth (`runtime/core/auth.py`)

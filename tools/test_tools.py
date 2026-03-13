@@ -27,6 +27,7 @@ sys.path.insert(0, str(ROOT_DIR))
 import nginx_manager
 import config_gen
 from runtime.games.minecraft import config as minecraft_config
+from runtime.games.minecraft import players as minecraft_players
 from runtime.games.minecraft_fabric import mods as minecraft_fabric_mods
 
 
@@ -675,6 +676,28 @@ class MinecraftConfigTests(unittest.TestCase):
             self.assertIn("server-port", err)
 
 
+class MinecraftPlayersTests(unittest.TestCase):
+
+    def test_tracks_connected_players_from_logs(self):
+        original_run = minecraft_players.subprocess.run
+
+        def fake_run(*args, **kwargs):
+            return types.SimpleNamespace(stdout="\n".join([
+                "[15:13:54] [Server thread/INFO]: xuanphu joined the game",
+                "[15:15:00] [Server thread/INFO]: alex joined the game",
+                "[15:17:12] [Server thread/INFO]: xuanphu lost connection: Disconnected",
+                "[15:17:12] [Server thread/INFO]: xuanphu left the game",
+            ]))
+
+        minecraft_players.subprocess.run = fake_run
+        try:
+            players = minecraft_players.get_players()
+        finally:
+            minecraft_players.subprocess.run = original_run
+
+        self.assertEqual(players, [{'name': 'alex'}])
+
+
 class MinecraftFabricModsTests(unittest.TestCase):
 
     def _app(self, install_dir):
@@ -1099,6 +1122,7 @@ if __name__ == "__main__":
         ConfigGenPatchBepinexTests,
         ConfigGenMinecraftPropsTests,
         MinecraftConfigTests,
+        MinecraftPlayersTests,
         MinecraftFabricModsTests,
     ]
     if len(sys.argv) > 1:

@@ -225,7 +225,7 @@ le serveur Enshrouded fonctionne encore normalement.
 
 **Conclusion de contexte :**
 - Le support `minecraft-fabric` est maintenant validé en conditions réelles
-- La prochaine amélioration logique côté Minecraft est la liste des joueurs via parsing des logs
+- La liste des joueurs Minecraft/Fabric via parsing des logs est maintenant aussi validée en réel
 
 ---
 

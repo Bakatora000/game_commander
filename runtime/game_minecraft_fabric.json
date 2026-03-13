@@ -20,7 +20,7 @@
     "mods": true,
     "config": true,
     "console": true,
-    "players": false
+    "players": true
   },
   "permissions": [
     "start_server",
