@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════════════════════
-#  game_commander.sh — Déploiement et gestion des instances Game Commander
+#  game_commander.sh v2.1 — Déploiement et gestion des instances Game Commander
 #
 #  Usage :
 #    sudo bash game_commander.sh                          # menu interactif
