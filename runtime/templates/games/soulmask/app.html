@@ -1,0 +1,97 @@
+{% extends "base/app_base.html" %}
+
+{% block fonts %}family=Cinzel:wght@400;600&family=Inter:wght@400;500;600{% endblock %}
+{% block sidebar_logo %}🗿{% endblock %}
+
+{% block config_tab %}
+<div class="panel config-panel" id="configPanel">
+  <div class="panel-header">
+    <span class="panel-title">Soulmask server config</span>
+    <button class="btn-primary btn-sm" id="btnSaveConfig" data-requires-perm="manage_config">Enregistrer</button>
+  </div>
+  <div id="configFields" class="config-fields"></div>
+  <p class="config-note">Les changements nécessitent un redémarrage du serveur Soulmask.</p>
+</div>
+{% endblock %}
+
+{% block game_scripts %}
+<script>
+const CONFIG_SCHEMA = [
+  {key:'server_name',     label:'Nom du serveur',        type:'text'},
+  {key:'max_players',     label:'Joueurs max',           type:'number', min:1, max:100},
+  {key:'password',        label:'Mot de passe',          type:'password'},
+  {key:'admin_password',  label:'Mot de passe admin',    type:'password'},
+  {key:'mode',            label:'Mode',                  type:'select', options:[
+    {value:'pve', label:'PvE'},
+    {value:'pvp', label:'PvP'},
+  ]},
+  {key:'port',            label:'Port de jeu',           type:'number'},
+  {key:'query_port',      label:'Port Query',            type:'number'},
+  {key:'echo_port',       label:'Port Echo',             type:'number'},
+  {key:'backup_enabled',  label:'Backups auto',          type:'select', options:[
+    {value:true, label:'Oui'},
+    {value:false, label:'Non'},
+  ]},
+  {key:'saving_enabled',  label:'Sauvegardes auto',      type:'select', options:[
+    {value:true, label:'Oui'},
+    {value:false, label:'Non'},
+  ]},
+  {key:'backup_interval', label:'Intervalle backup (s)', type:'number', min:60, max:86400},
+];
+let configData = {};
+
+async function loadConfig() {
+  const panel = document.getElementById('configPanel');
+  const r = await fetch(`${PREFIX}/api/config`).catch(() => null);
+  if (!r?.ok) {
+    const d = await r?.json() || {};
+    panel.innerHTML += `<p class="config-notice">⚠ ${d.error || 'Erreur de chargement'}</p>`;
+    return;
+  }
+  configData = await r.json();
+  renderConfigFields();
+}
+
+function renderConfigFields() {
+  const el = document.getElementById('configFields');
+  el.innerHTML = '';
+  CONFIG_SCHEMA.forEach(f => {
+    const val = configData[f.key];
+    const row = document.createElement('div');
+    row.className = 'config-row';
+    let input;
+    if (f.type === 'select') {
+      const opts = f.options.map(o => {
+        const value = typeof o === 'object' ? o.value : o;
+        const label = typeof o === 'object' ? o.label : o;
+        const selected = String(value) === String(val);
+        return `<option value="${value}"${selected?' selected':''}>${label}</option>`;
+      }).join('');
+      input = `<select class="config-input" id="cfg_${f.key}">${opts}</select>`;
+    } else {
+      const extra = f.min != null ? `min="${f.min}" max="${f.max}"` : '';
+      input = `<input class="config-input" type="${f.type}" id="cfg_${f.key}" value="${val ?? ''}" ${extra}>`;
+    }
+    row.innerHTML = `<label class="config-label">${f.label}</label>${input}`;
+    el.appendChild(row);
+  });
+}
+
+document.getElementById('btnSaveConfig')?.addEventListener('click', async () => {
+  const payload = {};
+  CONFIG_SCHEMA.forEach(f => {
+    const inp = document.getElementById(`cfg_${f.key}`);
+    if (!inp) return;
+    if (f.type === 'number') payload[f.key] = parseInt(inp.value || '0', 10);
+    else if (f.key === 'backup_enabled' || f.key === 'saving_enabled') payload[f.key] = inp.value === 'true';
+    else payload[f.key] = inp.value;
+  });
+  const r = await fetch(`${PREFIX}/api/config`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload)
+  }).catch(()=>null);
+  showToast(r?.ok ? 'Configuration sauvegardée' : 'Erreur sauvegarde', r?.ok ? 'success' : 'error');
+});
+</script>
+{% endblock %}

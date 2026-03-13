@@ -13,8 +13,15 @@ deploy_set_defaults() {
     WORLD_NAME="Monde1"
     SERVER_NAME="Mon Serveur"
     SERVER_PASSWORD=""
+    SERVER_ADMIN_PASSWORD=""
     SERVER_PORT=""
+    QUERY_PORT=""
+    ECHO_PORT=""
     MAX_PLAYERS=""
+    SERVER_MODE="pve"
+    BACKUP_ENABLED=true
+    SAVING_ENABLED=true
+    BACKUP_INTERVAL="7200"
     CROSSPLAY=false
     BEPINEX=true
     DOMAIN="monserveur.example.com"
@@ -42,7 +49,7 @@ deploy_handle_special_args() {
 #  Usage : sudo bash game_commander.sh deploy --config env/deploy_config.env
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Jeu : valheim | enshrouded | minecraft | minecraft-fabric | terraria
+# Jeu : valheim | enshrouded | minecraft | minecraft-fabric | terraria | soulmask
 GAME_ID="valheim"
 
 # Utilisateur système
@@ -59,8 +66,15 @@ SRC_DIR=""          # racine du projet Game Commander ou dossier runtime
 # Configuration du serveur de jeu
 SERVER_NAME="Mon Serveur Valheim"
 SERVER_PASSWORD=""
+SERVER_ADMIN_PASSWORD=""
 SERVER_PORT=""          # vide = défaut du jeu
+QUERY_PORT=""           # Soulmask uniquement
+ECHO_PORT=""            # Soulmask uniquement
 MAX_PLAYERS=""
+SERVER_MODE="pve"       # Soulmask : pve | pvp
+BACKUP_ENABLED=true     # Soulmask
+SAVING_ENABLED=true     # Soulmask
+BACKUP_INTERVAL="7200"  # Soulmask, en secondes
 WORLD_NAME="Monde1"     # Valheim uniquement
 CROSSPLAY=false
 BEPINEX=true
@@ -143,6 +157,17 @@ set_game_defaults() {
             URL_PREFIX="${URL_PREFIX:-/terraria}"
             FLASK_PORT="${FLASK_PORT:-5006}"
             SERVER_NAME="${SERVER_NAME:-Mon Serveur Terraria}"
+            ;;
+        soulmask)
+            SERVER_PORT="${SERVER_PORT:-8777}"
+            QUERY_PORT="${QUERY_PORT:-27015}"
+            ECHO_PORT="${ECHO_PORT:-18888}"
+            MAX_PLAYERS="${MAX_PLAYERS:-50}"
+            URL_PREFIX="${URL_PREFIX:-/soulmask}"
+            FLASK_PORT="${FLASK_PORT:-5011}"
+            SERVER_NAME="${SERVER_NAME:-Mon Serveur Soulmask}"
+            SERVER_MODE="${SERVER_MODE:-pve}"
+            BACKUP_INTERVAL="${BACKUP_INTERVAL:-7200}"
             ;;
     esac
 }

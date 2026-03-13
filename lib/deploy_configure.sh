@@ -35,6 +35,89 @@ deploy_next_free_flask_port() {
     echo "$port"
 }
 
+deploy_port_group_step() {
+    case "${GAME_ID:-}" in
+        valheim|enshrouded) printf '2\n' ;;
+        *) printf '1\n' ;;
+    esac
+}
+
+deploy_port_group_specs() {
+    case "${GAME_ID:-}" in
+        minecraft|minecraft-fabric)
+            printf 'SERVER_PORT|t|Port principal\n'
+            ;;
+        terraria)
+            printf 'SERVER_PORT|t|Port principal\n'
+            ;;
+        soulmask)
+            printf 'SERVER_PORT|u|Port de jeu\n'
+            printf 'QUERY_PORT|u|Port requête\n'
+            printf 'ECHO_PORT|t|Port Echo\n'
+            ;;
+        valheim)
+            printf 'SERVER_PORT|u|Port principal\n'
+            printf 'SERVER_PORT_PLUS1|u|Port query\n'
+            ;;
+        enshrouded)
+            printf 'SERVER_PORT|u|Port principal\n'
+            printf 'SERVER_PORT_PLUS1|u|Port requête\n'
+            ;;
+    esac
+}
+
+deploy_port_value() {
+    local spec="$1"
+    case "$spec" in
+        SERVER_PORT) printf '%s\n' "${SERVER_PORT:-}" ;;
+        QUERY_PORT) printf '%s\n' "${QUERY_PORT:-}" ;;
+        ECHO_PORT) printf '%s\n' "${ECHO_PORT:-}" ;;
+        SERVER_PORT_PLUS1) printf '%s\n' "$((SERVER_PORT + 1))" ;;
+        *) printf '0\n' ;;
+    esac
+}
+
+deploy_shift_port_group() {
+    local step="$1"
+    SERVER_PORT=$((SERVER_PORT + step))
+    [[ -n "${QUERY_PORT:-}" ]] && QUERY_PORT=$((QUERY_PORT + step))
+    [[ -n "${ECHO_PORT:-}" ]] && ECHO_PORT=$((ECHO_PORT + step))
+}
+
+deploy_first_port_group_conflict() {
+    local line spec proto label port
+    while IFS='|' read -r spec proto label; do
+        [[ -n "$spec" ]] || continue
+        port="$(deploy_port_value "$spec")"
+        if deploy_check_port_conflict "$port" "$proto"; then
+            printf '%s|%s|%s|%s\n' "$spec" "$proto" "$label" "$port"
+            return 0
+        fi
+    done < <(deploy_port_group_specs)
+    return 1
+}
+
+deploy_suggest_port_group() {
+    local step
+    step="$(deploy_port_group_step)"
+    while deploy_first_port_group_conflict >/dev/null; do
+        deploy_shift_port_group "$step"
+    done
+}
+
+deploy_warn_port_group_conflicts() {
+    local line spec proto label port
+    while IFS='|' read -r spec proto label; do
+        [[ -n "$spec" ]] || continue
+        port="$(deploy_port_value "$spec")"
+        if deploy_check_port_conflict "$port" "$proto"; then
+            local proto_label="UDP"
+            [[ "$proto" == "t" ]] && proto_label="TCP"
+            warn "${label} ${port}/${proto_label} déjà utilisé par : $(deploy_port_owner "$port")"
+        fi
+    done < <(deploy_port_group_specs)
+}
+
 deploy_select_game() {
     echo ""
     if [[ -z "$GAME_ID" ]]; then
@@ -44,6 +127,7 @@ deploy_select_game() {
         echo -e "  ${CYAN}[3]${RESET} Minecraft Java"
         echo -e "  ${CYAN}[4]${RESET} Minecraft Fabric"
         echo -e "  ${CYAN}[5]${RESET} Terraria"
+        echo -e "  ${CYAN}[6]${RESET} Soulmask"
         echo ""
         prompt "Votre choix" "1"
         case "$REPLY" in
@@ -51,6 +135,7 @@ deploy_select_game() {
             3) GAME_ID="minecraft" ;;
             4) GAME_ID="minecraft-fabric" ;;
             5) GAME_ID="terraria" ;;
+            6) GAME_ID="soulmask" ;;
             *) GAME_ID="valheim" ;;
         esac
     else
@@ -65,6 +150,7 @@ deploy_select_game() {
         minecraft)  GAME_LABEL="Minecraft Java";  STEAM_APPID="";        GAME_BINARY="java" ;;
         minecraft-fabric) GAME_LABEL="Minecraft Fabric"; STEAM_APPID=""; GAME_BINARY="java" ;;
         terraria) GAME_LABEL="Terraria"; STEAM_APPID=""; GAME_BINARY="TerrariaServer.bin.x86_64" ;;
+        soulmask) GAME_LABEL="Soulmask"; STEAM_APPID="3017300"; GAME_BINARY="StartServer.sh" ;;
     esac
     ok "Jeu sélectionné : ${BOLD}${GAME_LABEL}${RESET}"
 }
@@ -151,7 +237,7 @@ deploy_configure_paths() {
 }
 
 deploy_configure_server() {
-    local query_port next_port other_valheim nginx_conf_for_domain existing_owner
+    local other_valheim nginx_conf_for_domain existing_owner conflict spec proto label port
 
     echo ""
     info "Configuration du serveur $GAME_LABEL"
@@ -159,43 +245,26 @@ deploy_configure_server() {
     SERVER_NAME="$REPLY"
     prompt_secret "Mot de passe (vide = public)" "${SERVER_PASSWORD}"
     SERVER_PASSWORD="$REPLY"
+    if [[ "$GAME_ID" == "soulmask" ]]; then
+        prompt_secret "Mot de passe administrateur serveur" "${SERVER_ADMIN_PASSWORD}"
+        SERVER_ADMIN_PASSWORD="$REPLY"
+    fi
 
-    local port_proto
-    port_proto="$(deploy_game_port_proto)"
-
-    if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
-        if deploy_check_port_conflict "$SERVER_PORT" "$port_proto"; then
-            next_port="$SERVER_PORT"
-            while deploy_check_port_conflict "$next_port" "$port_proto"; do
-                next_port=$((next_port + 1))
-            done
-            warn "Port ${SERVER_PORT}/TCP déjà utilisé — suggestion : ${next_port}"
-            SERVER_PORT="$next_port"
-        fi
-    elif deploy_check_port_conflict "$SERVER_PORT" "$port_proto" || deploy_check_port_conflict "$((SERVER_PORT+1))" "$port_proto"; then
-        next_port="$SERVER_PORT"
-        while deploy_check_port_conflict "$next_port" "$port_proto" || deploy_check_port_conflict "$((next_port+1))" "$port_proto"; do
-            next_port=$((next_port + 2))
-        done
-        warn "Port ${SERVER_PORT}/UDP déjà utilisé — suggestion : ${next_port}"
-        SERVER_PORT="$next_port"
+    if conflict="$(deploy_first_port_group_conflict)"; then
+        IFS='|' read -r spec proto label port <<< "$conflict"
+        deploy_suggest_port_group
+        warn "${label} ${port}/$([[ "$proto" == "t" ]] && echo TCP || echo UDP) déjà utilisé — groupe de ports suggéré mis à jour"
     fi
 
     prompt "Port principal" "${SERVER_PORT}"
     SERVER_PORT="$REPLY"
-    if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
-        if deploy_check_port_conflict "$SERVER_PORT" "$port_proto"; then
-            warn "Port ${SERVER_PORT}/TCP déjà utilisé par : $(deploy_port_owner "$SERVER_PORT")"
-        fi
-    else
-        query_port=$((SERVER_PORT + 1))
-        if deploy_check_port_conflict "$SERVER_PORT" "$port_proto"; then
-            warn "Port ${SERVER_PORT}/UDP déjà utilisé par : $(deploy_port_owner "$SERVER_PORT")"
-        fi
-        if deploy_check_port_conflict "$query_port" "$port_proto"; then
-            warn "Port ${query_port}/UDP déjà utilisé par : $(deploy_port_owner "$query_port")"
-        fi
+    if [[ "$GAME_ID" == "soulmask" ]]; then
+        prompt "Port Query" "${QUERY_PORT}"
+        QUERY_PORT="$REPLY"
+        prompt "Port Echo" "${ECHO_PORT}"
+        ECHO_PORT="$REPLY"
     fi
+    deploy_warn_port_group_conflicts
     prompt "Joueurs max" "${MAX_PLAYERS}"
     MAX_PLAYERS="$REPLY"
 
@@ -219,6 +288,23 @@ deploy_configure_server() {
                 GC_FORCE_PLAYFAB=true
             fi
         fi
+    elif [[ "$GAME_ID" == "soulmask" ]]; then
+        if $CONFIG_MODE; then
+            echo -e "  ${DIM}  (config) Mode serveur : ${BOLD}${SERVER_MODE}${RESET}"
+            echo -e "  ${DIM}  (config) Backups auto : ${BOLD}${BACKUP_ENABLED}${RESET}"
+            echo -e "  ${DIM}  (config) Sauvegardes  : ${BOLD}${SAVING_ENABLED}${RESET}"
+            echo -e "  ${DIM}  (config) Backup intervalle : ${BOLD}${BACKUP_INTERVAL}${RESET}"
+        else
+            echo -e "  ${BOLD}Mode serveur :${RESET}"
+            echo -e "  ${CYAN}[1]${RESET} PvE"
+            echo -e "  ${CYAN}[2]${RESET} PvP"
+            prompt "Votre choix" "$([[ "$SERVER_MODE" == "pvp" ]] && echo 2 || echo 1)"
+            [[ "$REPLY" == "2" ]] && SERVER_MODE="pvp" || SERVER_MODE="pve"
+            confirm "Activer les backups Soulmask ?" "o" && BACKUP_ENABLED=true || BACKUP_ENABLED=false
+            confirm "Activer les sauvegardes périodiques ?" "o" && SAVING_ENABLED=true || SAVING_ENABLED=false
+        fi
+        prompt "Intervalle backup (secondes)" "${BACKUP_INTERVAL}"
+        BACKUP_INTERVAL="$REPLY"
     fi
 
     echo ""
@@ -289,6 +375,11 @@ deploy_print_summary() {
     [[ "$GAME_ID" != "enshrouded" ]] && echo -e "  ${BOLD}Données           :${RESET} $DATA_DIR"
     echo -e "  ${BOLD}Nom serveur       :${RESET} $SERVER_NAME"
     echo -e "  ${BOLD}Port              :${RESET} $SERVER_PORT"
+    [[ "$GAME_ID" == "soulmask" ]] && {
+        echo -e "  ${BOLD}Query Port        :${RESET} $QUERY_PORT"
+        echo -e "  ${BOLD}Echo Port         :${RESET} $ECHO_PORT"
+        echo -e "  ${BOLD}Mode              :${RESET} $SERVER_MODE"
+    }
     echo -e "  ${BOLD}Joueurs max       :${RESET} $MAX_PLAYERS"
     [[ "$GAME_ID" == "valheim" ]] && {
         echo -e "  ${BOLD}Monde             :${RESET} $WORLD_NAME"

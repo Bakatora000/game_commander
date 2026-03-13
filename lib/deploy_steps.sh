@@ -108,6 +108,40 @@ deploy_step_dependencies() {
 }
 
 deploy_step_game_install() {
+    if [[ "$GAME_ID" == "soulmask" ]]; then
+        hdr "ÉTAPE 4 : Installation Soulmask"
+        mkdir -p "$SERVER_DIR" "$DATA_DIR"
+        chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR" "$DATA_DIR"
+
+        DO_INSTALL=true
+        if [[ -f "$SERVER_DIR/$GAME_BINARY" ]]; then
+            ok "$GAME_LABEL déjà installé"
+            if $AUTO_UPDATE_SERVER; then
+                echo -e "  ${DIM}  (config) Mise à jour → oui${RESET}"
+            else
+                confirm "Mettre à jour depuis Steam ?" "n" || DO_INSTALL=false
+            fi
+        fi
+
+        if $DO_INSTALL; then
+            info "Téléchargement $GAME_LABEL via SteamCMD (AppID $STEAM_APPID)..."
+            info "Cela peut prendre plusieurs minutes..."
+            sudo -u "$SYS_USER" "$STEAMCMD_PATH" \
+                +@sSteamCmdForcePlatformType linux \
+                +login anonymous \
+                +force_install_dir "$SERVER_DIR" \
+                +app_update "$STEAM_APPID" validate \
+                +quit || die "Échec SteamCMD."
+            ok "$GAME_LABEL téléchargé"
+        fi
+
+        [[ -f "$SERVER_DIR/$GAME_BINARY" ]] || die "Binaire $GAME_BINARY introuvable dans $SERVER_DIR"
+        chmod +x "$SERVER_DIR/$GAME_BINARY" 2>/dev/null || true
+        chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
+        ok "Binaire $GAME_BINARY vérifié"
+        return
+    fi
+
     if [[ "$GAME_ID" == "terraria" ]]; then
         hdr "ÉTAPE 4 : Installation Terraria"
         mkdir -p "$SERVER_DIR" "$DATA_DIR"
@@ -580,6 +614,110 @@ SVCEOF
         return
     fi
 
+    if [[ "$GAME_ID" == "soulmask" ]]; then
+        START_SCRIPT="$SERVER_DIR/start_server.sh"
+        SOULMASK_CFG="$SERVER_DIR/soulmask_server.json"
+        SOULMASK_LOG_DIR="$SERVER_DIR/LinuxServer/WS/Saved/Logs"
+        SOULMASK_SAVED_DIR="$SERVER_DIR/LinuxServer/WS/Saved"
+        mkdir -p "$SOULMASK_LOG_DIR" "$SOULMASK_SAVED_DIR"
+
+        python3 "$SCRIPT_DIR/tools/config_gen.py" soulmask-cfg \
+            --out "$SOULMASK_CFG" \
+            --name "$SERVER_NAME" \
+            --port "$SERVER_PORT" \
+            --query-port "$QUERY_PORT" \
+            --echo-port "$ECHO_PORT" \
+            --max-players "$MAX_PLAYERS" \
+            --password "$SERVER_PASSWORD" \
+            --admin-password "$SERVER_ADMIN_PASSWORD" \
+            --mode "$SERVER_MODE" \
+            --backup-enabled "$BACKUP_ENABLED" \
+            --saving-enabled "$SAVING_ENABLED" \
+            --backup-interval "$BACKUP_INTERVAL" \
+            --log-dir "$SOULMASK_LOG_DIR" \
+            --saved-dir "$SOULMASK_SAVED_DIR" \
+        || die "Échec génération soulmask_server.json"
+        chown "$SYS_USER:$SYS_USER" "$SOULMASK_CFG"
+        ok "soulmask_server.json généré"
+
+        cat > "$START_SCRIPT" << 'STARTEOF'
+#!/usr/bin/env bash
+set -euo pipefail
+cd "__SERVER_DIR__"
+CFG="__CFG_PATH__"
+
+json_get() {
+    jq -r "$1" "$CFG"
+}
+
+SERVER_NAME="$(json_get '.server_name')"
+MAX_PLAYERS="$(json_get '.max_players')"
+PASSWORD="$(json_get '.password')"
+ADMIN_PASSWORD="$(json_get '.admin_password')"
+MODE="$(json_get '.mode')"
+PORT="$(json_get '.port')"
+QUERY_PORT="$(json_get '.query_port')"
+ECHO_PORT="$(json_get '.echo_port')"
+BACKUP_ENABLED="$(json_get '.backup_enabled')"
+SAVING_ENABLED="$(json_get '.saving_enabled')"
+BACKUP_INTERVAL="$(json_get '.backup_interval')"
+
+ARGS=(
+  "-SteamServerName=${SERVER_NAME}"
+  "-MaxPlayers=${MAX_PLAYERS}"
+  "-Port=${PORT}"
+  "-QueryPort=${QUERY_PORT}"
+)
+
+[[ -n "$PASSWORD" && "$PASSWORD" != "null" ]] && ARGS+=("-PSW=${PASSWORD}")
+[[ -n "$ADMIN_PASSWORD" && "$ADMIN_PASSWORD" != "null" ]] && ARGS+=("-adminpsw=${ADMIN_PASSWORD}")
+[[ "$MODE" == "pvp" ]] && ARGS+=(-pvp) || ARGS+=(-pve)
+[[ "$BACKUP_ENABLED" == "true" ]] && ARGS+=(-backup)
+[[ "$SAVING_ENABLED" == "true" ]] && ARGS+=(-saving)
+[[ -n "$BACKUP_INTERVAL" && "$BACKUP_INTERVAL" != "null" ]] && ARGS+=("-backupinterval=${BACKUP_INTERVAL}")
+
+exec ./WSServer.sh Level01_Main -server "${ARGS[@]}" -log -UTF8Output -MULTIHOME=0.0.0.0 "-EchoPort=${ECHO_PORT}" -forcepassthrough
+STARTEOF
+        sed -i "s|__SERVER_DIR__|${SERVER_DIR}|g; s|__CFG_PATH__|${SOULMASK_CFG}|g" "$START_SCRIPT"
+        chmod +x "$START_SCRIPT"
+        chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
+        ok "Script de démarrage : $START_SCRIPT"
+
+        cat > "/etc/systemd/system/${GAME_SERVICE}.service" << SVCEOF
+[Unit]
+Description=${GAME_LABEL} Dedicated Server
+After=network.target
+
+[Service]
+Type=simple
+User=${SYS_USER}
+WorkingDirectory=${SERVER_DIR}
+ExecStart=${START_SCRIPT}
+Restart=on-failure
+RestartSec=10
+SuccessExitStatus=0 130 143
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=${GAME_SERVICE}
+KillSignal=SIGINT
+KillMode=mixed
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+        systemctl daemon-reload
+        systemctl enable "$GAME_SERVICE"
+        info "Démarrage de $GAME_SERVICE..."
+        systemctl start "$GAME_SERVICE"
+        sleep 5
+        service_active "$GAME_SERVICE" \
+            && ok "Service $GAME_SERVICE actif" \
+            || warn "$GAME_SERVICE pas encore actif — journalctl -u $GAME_SERVICE -f"
+        return
+    fi
+
     START_SCRIPT="$SERVER_DIR/start_server.sh"
     if [[ "$GAME_ID" == "valheim" ]]; then
         CROSSPLAY_FLAG=""
@@ -722,6 +860,7 @@ deploy_step_backups() {
         enshrouded) WORLD_DIR="$SERVER_DIR/savegame" ;;
         minecraft|minecraft-fabric) WORLD_DIR="$SERVER_DIR/world" ;;
         terraria) WORLD_DIR="$DATA_DIR" ;;
+        soulmask) WORLD_DIR="$SERVER_DIR/LinuxServer/WS/Saved" ;;
     esac
 
     BACKUP_SCRIPT="$APP_DIR/backup_${GAME_ID}.sh"
@@ -1039,12 +1178,16 @@ deploy_step_validation() {
 
     if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
         _GAME_PORTS=("${SERVER_PORT}/tcp")
+    elif [[ "$GAME_ID" == "soulmask" ]]; then
+        _GAME_PORTS=("${SERVER_PORT}/udp" "${QUERY_PORT}/udp" "${ECHO_PORT}/tcp")
     else
         _GAME_PORTS=("${SERVER_PORT}/udp" "$((SERVER_PORT+1))/udp")
     fi
     echo -e "  ${BOLD}Ports à ouvrir (firewall) :${RESET}"
     if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
         echo -e "    Jeu  : ${SERVER_PORT}/TCP"
+    elif [[ "$GAME_ID" == "soulmask" ]]; then
+        echo -e "    Jeu  : ${SERVER_PORT}/UDP  ${QUERY_PORT}/UDP  ${ECHO_PORT}/TCP"
     else
         echo -e "    Jeu  : ${SERVER_PORT}/UDP  $((SERVER_PORT+1))/UDP"
     fi
@@ -1060,6 +1203,8 @@ deploy_step_validation() {
         warn "UFW inactif ou absent — pensez à ouvrir les ports dans le firewall Hetzner :"
         if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
             echo "    ${SERVER_PORT}/TCP, 80/TCP, 443/TCP"
+        elif [[ "$GAME_ID" == "soulmask" ]]; then
+            echo "    ${SERVER_PORT}/UDP, ${QUERY_PORT}/UDP, ${ECHO_PORT}/TCP, 80/TCP, 443/TCP"
         else
             echo "    ${SERVER_PORT}/UDP, $((SERVER_PORT+1))/UDP, 80/TCP, 443/TCP"
         fi

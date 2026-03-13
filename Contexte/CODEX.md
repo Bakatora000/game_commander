@@ -4,7 +4,7 @@ This file provides guidance to Codex when working with code in this repository.
 
 ## Overview
 
-**Game Commander** is a generic Flask web interface for managing game servers (Valheim, Enshrouded, Minecraft Java, Minecraft Fabric, Terraria) without AMP. It uses `psutil` + `systemd` + `bcrypt`. One instance of the app manages one game server, selected by `game.json`.
+**Game Commander** is a generic Flask web interface for managing game servers (Valheim, Enshrouded, Minecraft Java, Minecraft Fabric, Terraria, Soulmask) without AMP. It uses `psutil` + `systemd` + `bcrypt`. One instance of the app manages one game server, selected by `game.json`.
 
 Current server state noted in project memory: no active Game Commander instance is deployed
 at the moment; AMP instances still coexist on the same machine and must not be impacted by
@@ -41,6 +41,19 @@ UI. The startup path was hardened to pass the critical world/server parameters d
 to `TerrariaServer.bin.x86_64` rather than relying only on `-config serverconfig.txt`.
 The systemd launch also uses a PTY wrapper (`script -qefc`) to avoid the high CPU behavior
 seen when the Terraria server runs headless without a pseudo-terminal.
+
+Implementation note: Soulmask vanilla is now implemented and has been partially validated
+in a real deployment cycle.
+It adds a generic multi-port-group deployment path (`game/query/echo`) and a Soulmask
+runtime/config UI based on `soulmask_server.json`.
+Validated so far:
+- deploy + systemd service
+- Game Commander UI
+- config save/apply + restart
+- grouped ports (`8777/udp`, `27015/udp`, `18888/tcp`)
+- launcher fix to avoid duplicated flags passed to the official startup wrapper
+Remaining point to validate later:
+- real in-game connection and CPU behavior with one or more players connected
 
 ## Running the App
 

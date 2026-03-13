@@ -329,6 +329,99 @@ le serveur Enshrouded fonctionne encore normalement.
 
 ## Décisions d'architecture
 
+### Soulmask — plan préparatoire pour la prochaine session
+
+Le prochain jeu prévu est **Soulmask**.
+
+Sources de travail déjà identifiées :
+- https://soulmask.fandom.com/wiki/Private_Server
+
+Constats retenus :
+- installation Linux via `steamcmd` avec AppID `3017300`
+- serveur dédié lancé via `StartServer.sh`
+- plusieurs ports distincts sont requis :
+  - `Port` UDP
+  - `QueryPort` UDP
+  - `EchoPort` TCP
+- données/saves sous `LinuxServer/WS/Saved`
+- logs utiles sous `WS/Saved/Logs/WS.log`
+
+Décision d'architecture prise avant implémentation :
+- ne pas ajouter un simple traitement ad hoc “Soulmask = 3 ports”
+- généraliser la logique de déploiement pour gérer des **groupes de ports**
+  par jeu
+
+Objectif de cette généralisation :
+- chaque jeu déclare les ports qu'il utilise avec :
+  - rôle
+  - protocole
+  - valeur par défaut
+- le mode interactif vérifie le groupe complet avant validation
+- si un port du groupe est occupé, le groupe entier est considéré invalide
+- le mode interactif doit proposer un groupe libre cohérent
+- le mode `--config` doit valider strictement sans corriger silencieusement
+
+Abstractions envisagées :
+- `deploy_port_specs_for_game`
+- `deploy_check_port_group_conflicts`
+- `deploy_suggest_port_group`
+
+Exemples de modélisation visés :
+- Minecraft :
+  - `game_port` → `25565/tcp`
+- Enshrouded :
+  - `game_port` → `15636/udp`
+  - `query_port` → `15637/udp`
+- Soulmask :
+  - `game_port` → `8777/udp`
+  - `query_port` → `27015/udp`
+  - `echo_port` → `18888/tcp`
+
+Périmètre MVP Soulmask retenu pour plus tard :
+- install via SteamCMD
+- service systemd
+- UI Game Commander
+- sauvegardes
+- configuration basique
+
+Hors périmètre initial :
+- mods
+- joueurs connectés
+- console avancée / telnet `EchoPort`
+- tuning fin de `Engine.ini`
+
+### [15] Soulmask — validation partielle du socle deploy + commander
+
+**Validation réelle effectuée :**
+- installation de l'instance `testsoul`
+- déploiement du service `soulmask-server-testsoul`
+- accès à l'UI Game Commander via `/testsoul`
+- sauvegarde de config `soulmask_server.json`
+- modification de config depuis l'UI suivie d'un redémarrage
+- vérification des ports :
+  - `8777/udp`
+  - `27015/udp`
+  - `18888/tcp`
+
+**Bug découvert pendant la validation :**
+- le wrapper Game Commander appelait `StartServer.sh` avec des flags déjà ajoutés par le script officiel
+- `StartServer.sh` appelait ensuite `WSServer.sh` en rajoutant encore `-server`, `-log`, `-forcepassthrough`, `-MULTIHOME` et `-EchoPort`
+- résultat :
+  - arguments dupliqués
+  - `ECHO_PORT` non réellement maîtrisé par Game Commander
+  - comportement de redémarrage ambigu
+
+**Correctif retenu :**
+- appeler directement `WSServer.sh` depuis `start_server.sh`
+- ne passer qu'un jeu d'arguments propre et explicite
+- garder `-EchoPort=${ECHO_PORT}` sous contrôle côté Game Commander
+
+**État retenu après correctif :**
+- le redémarrage applique bien les changements de config
+- `max_players` a été vérifié en réel après modification
+- l'instance repart correctement avec les 3 ports attendus
+- la charge CPU au repos reste relativement élevée et devra être réévaluée plus tard avec un vrai joueur connecté
+
 ### Nginx — vhost partagé multi-instances
 Toutes les instances Game Commander sur `gaming.example.com` partagent **un seul fichier**
 `/etc/nginx/conf.d/gaming.example.com.conf`.

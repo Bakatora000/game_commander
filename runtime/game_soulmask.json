@@ -1,0 +1,41 @@
+{
+  "id": "soulmask",
+  "name": "Soulmask",
+  "subtitle": "Serveur vanilla",
+  "logo": "🗿",
+  "server": {
+    "binary": "StartServer.sh",
+    "service": "soulmask-server",
+    "install_dir": "/home/gameserver/soulmask_server",
+    "data_dir": "/home/gameserver/soulmask_data",
+    "world_name": null,
+    "max_players": 50,
+    "port": 8777
+  },
+  "web": {
+    "url_prefix": "/soulmask",
+    "flask_port": 5011,
+    "admin_user": "admin"
+  },
+  "features": {
+    "mods": false,
+    "config": true,
+    "console": true,
+    "players": false
+  },
+  "permissions": [
+    "start_server",
+    "stop_server",
+    "restart_server",
+    "manage_config",
+    "console",
+    "manage_users"
+  ],
+  "theme": {
+    "name": "enshrouded"
+  },
+  "steamcmd": {
+    "app_id": "3017300",
+    "path": "/home/gameserver/steamcmd/steamcmd.sh"
+  }
+}

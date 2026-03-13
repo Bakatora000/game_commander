@@ -29,6 +29,7 @@ import config_gen
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import players as minecraft_players
 from runtime.games.minecraft_fabric import mods as minecraft_fabric_mods
+from runtime.games.soulmask import config as soulmask_config
 from runtime.games.terraria import config as terraria_config
 
 
@@ -451,6 +452,24 @@ class ConfigGenGameJsonTests(unittest.TestCase):
         self.assertFalse(data["features"]["players"])
         self.assertIn("manage_config", data["permissions"])
 
+    def test_soulmask_support(self):
+        out = tmp_path(".json")
+        rc = config_gen.cmd_game_json(make_args(
+            out=out, game_id="soulmask", game_label="Soulmask",
+            game_binary="StartServer.sh", game_service="soulmask-server-test",
+            server_dir="/home/gameserver/soulmask_server",
+            data_dir="/home/gameserver/soulmask_data", world_name="", max_players=50, port=8777,
+            url_prefix="/soulmask", flask_port=5011, admin_user="admin",
+            bepinex_path="", steam_appid="3017300", steamcmd_path="/home/gameserver/steamcmd/steamcmd.sh",
+        ))
+        self.assertEqual(rc, 0)
+        data = json.loads(Path(out).read_text())
+        self.assertEqual(data["id"], "soulmask")
+        self.assertTrue(data["features"]["config"])
+        self.assertFalse(data["features"]["mods"])
+        self.assertEqual(data["theme"]["name"], "enshrouded")
+        self.assertEqual(data["steamcmd"]["app_id"], "3017300")
+
     def test_steamcmd_section(self):
         data = self._gen_valheim()
         self.assertIn("steamcmd", data)
@@ -644,6 +663,24 @@ class ConfigGenTerrariaCfgTests(unittest.TestCase):
         self.assertIn("difficulty=1", content)
 
 
+class ConfigGenSoulmaskCfgTests(unittest.TestCase):
+
+    def test_basic_generation(self):
+        out = tmp_path(".json")
+        rc = config_gen.cmd_soulmask_cfg(make_args(
+            out=out, name="Mon Serveur Soulmask", port=8777, query_port=27015,
+            echo_port=18888, max_players=50, password="secret", admin_password="adminsecret",
+            mode="pve", backup_enabled=True, saving_enabled=True, backup_interval=7200,
+            log_dir="/srv/soulmask/logs", saved_dir="/srv/soulmask/saved",
+        ))
+        self.assertEqual(rc, 0)
+        data = json.loads(Path(out).read_text())
+        self.assertEqual(data["server_name"], "Mon Serveur Soulmask")
+        self.assertEqual(data["query_port"], 27015)
+        self.assertEqual(data["echo_port"], 18888)
+        self.assertEqual(data["mode"], "pve")
+
+
 class MinecraftConfigTests(unittest.TestCase):
 
     def _app(self, install_dir):
@@ -775,6 +812,74 @@ class TerrariaConfigTests(unittest.TestCase):
                 })
             self.assertFalse(ok)
             self.assertIn("difficulty", err)
+
+
+class SoulmaskConfigTests(unittest.TestCase):
+
+    def _app(self, install_dir, data_dir):
+        app = Flask(__name__)
+        app.config["GAME"] = {
+            "id": "soulmask",
+            "name": "Soulmask",
+            "server": {
+                "install_dir": install_dir,
+                "data_dir": data_dir,
+                "port": 8777,
+                "max_players": 50,
+            },
+        }
+        return app
+
+    def test_read_defaults_when_file_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir, os.path.join(tmpdir, "saved"))
+            with app.app_context():
+                data, err = soulmask_config.read_config()
+            self.assertIsNone(err)
+            self.assertEqual(data["port"], 8777)
+            self.assertEqual(data["query_port"], 27015)
+            self.assertEqual(data["echo_port"], 18888)
+
+    def test_write_and_read_config(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir, os.path.join(tmpdir, "saved"))
+            with app.app_context():
+                ok, err = soulmask_config.write_config({
+                    "server_name": "tribe-land",
+                    "max_players": 24,
+                    "password": "secret",
+                    "admin_password": "adminsecret",
+                    "mode": "pvp",
+                    "port": 8778,
+                    "query_port": 27016,
+                    "echo_port": 18889,
+                    "backup_enabled": False,
+                    "saving_enabled": True,
+                    "backup_interval": 3600,
+                })
+                self.assertTrue(ok)
+                self.assertIsNone(err)
+                data, err = soulmask_config.read_config()
+            self.assertIsNone(err)
+            self.assertEqual(data["server_name"], "tribe-land")
+            self.assertEqual(data["mode"], "pvp")
+            self.assertEqual(data["echo_port"], 18889)
+
+    def test_validation_rejects_invalid_mode(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir, os.path.join(tmpdir, "saved"))
+            with app.app_context():
+                ok, err = soulmask_config.write_config({
+                    "server_name": "tribe-land",
+                    "max_players": 24,
+                    "mode": "coop",
+                    "port": 8778,
+                    "query_port": 27016,
+                    "echo_port": 18889,
+                    "backup_interval": 3600,
+                })
+            self.assertFalse(ok)
+            self.assertIn("mode", err)
 
 
 class MinecraftPlayersTests(unittest.TestCase):

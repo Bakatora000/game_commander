@@ -34,6 +34,11 @@ update_game_meta() {
             GAME_BINARY="TerrariaServer.bin.x86_64"
             GAME_SERVICE="terraria-server-${INSTANCE_ID}"
             ;;
+        soulmask)
+            GAME_LABEL="Soulmask"
+            GAME_BINARY="StartServer.sh"
+            GAME_SERVICE="soulmask-server-${INSTANCE_ID}"
+            ;;
         *)
             die "GAME_ID non supporté pour update : $GAME_ID"
             ;;
@@ -43,7 +48,8 @@ update_game_meta() {
 update_process_config() {
     local cfg="$1"
     unset GAME_ID INSTANCE_ID SYS_USER SERVER_DIR DATA_DIR BACKUP_DIR APP_DIR SRC_DIR \
-          WORLD_NAME SERVER_NAME SERVER_PORT MAX_PLAYERS CROSSPLAY BEPINEX DOMAIN \
+          WORLD_NAME SERVER_NAME SERVER_PASSWORD SERVER_ADMIN_PASSWORD SERVER_PORT QUERY_PORT ECHO_PORT \
+          MAX_PLAYERS SERVER_MODE BACKUP_ENABLED SAVING_ENABLED BACKUP_INTERVAL CROSSPLAY BEPINEX DOMAIN \
           URL_PREFIX FLASK_PORT SSL_MODE ADMIN_LOGIN STEAM_APPID STEAMCMD_PATH
 
     source <(grep -E '^[A-Z_]+=' "$cfg" 2>/dev/null)

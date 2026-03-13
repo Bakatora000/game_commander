@@ -60,6 +60,7 @@ runtime/
     minecraft/             ← Support Minecraft Java vanilla
     minecraft_fabric/      ← Support Minecraft Fabric + mods Modrinth
     terraria/              ← Support Terraria vanilla
+    soulmask/              ← Framework Soulmask vanilla
   templates/
     base/app_base.html     ← Structure commune (Jinja2 blocks)
     base/login_base.html   ← Login commun
@@ -78,7 +79,7 @@ runtime/
 | `id` | Sélectionne les templates et modules runtime/games/{id}/ |
 | `server.binary` | Nom du process pour psutil |
 | `server.service` | Nom du service systemd |
-| `web.url_prefix` | Préfixe des routes Flask (/valheim, /enshrouded, /terraria) |
+| `web.url_prefix` | Préfixe des routes Flask (/valheim, /enshrouded, /terraria, /soulmask) |
 | `web.flask_port` | Port d'écoute Flask |
 | `features.*` | Active/désactive les onglets (mods, config, console) |
 | `theme.name` | Sélectionne runtime/static/themes/{name}/ |
@@ -189,6 +190,7 @@ La documentation de contexte du projet repose désormais sur :
 | Minecraft Java | ✅ vanilla | — | `server.properties` |
 | Minecraft Fabric | ✅ Fabric | ✅ Modrinth | `server.properties` |
 | Terraria | ✅ serveur officiel | — | `serverconfig.txt` |
+| Soulmask | ✅ 3017300 | — | `soulmask_server.json` |
 
 Note Minecraft Java :
 - le serveur téléchargé automatiquement peut être plus récent que ton client Java local
@@ -208,3 +210,13 @@ Note Terraria :
 - le lancement réel s'appuie sur un `start_server.sh` qui passe les paramètres critiques du monde en ligne de commande au binaire Terraria, en plus de `serverconfig.txt`
 - le service Terraria utilise aussi un wrapper PTY (`script -qefc`) pour éviter une charge CPU anormalement élevée en mode headless sans terminal
 - validé en réel pour l'installation, la création/charge du monde, le service et l'UI Game Commander
+
+Note Soulmask :
+- le support Soulmask vanilla est maintenant implémenté et validé partiellement en déploiement réel
+- le support gère un groupe de ports complet :
+  - port jeu UDP
+  - query port UDP
+  - echo port TCP
+- le lot actuel couvre l'installation SteamCMD, le service systemd, les sauvegardes, la config UI et la validation des groupes de ports
+- un bug de launcher a été corrigé : le wrapper Game Commander appelle maintenant `WSServer.sh` avec un jeu d'arguments propre, au lieu d'empiler des flags dupliqués sur `StartServer.sh`
+- la charge CPU au repos reste à surveiller plus tard en condition réelle avec joueur connecté

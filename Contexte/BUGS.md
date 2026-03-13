@@ -242,6 +242,38 @@ _(aucun pour l'instant)_
 
 ---
 
+### [15] Soulmask — lancement avec flags dupliqués et redémarrage instable
+- **Statut :** Résolu
+- **Composant :** `lib/deploy_steps.sh` — génération de `start_server.sh`
+- **Symptôme :**
+  - Le déploiement Soulmask fonctionne et l'UI est accessible.
+  - Après modification de config puis redémarrage, le serveur peut sembler repartir de façon sale ou garder une charge CPU anormale.
+  - `ECHO_PORT` n'est pas réellement maîtrisé par la config Game Commander.
+- **Cause racine :**
+  - Le wrapper appelait `StartServer.sh` avec des flags que le script officiel rajoute déjà lui-même.
+  - `StartServer.sh` lance ensuite `WSServer.sh` avec :
+    - `-server`
+    - `-log`
+    - `-UTF8Output`
+    - `-MULTIHOME=0.0.0.0`
+    - `-EchoPort=18888`
+    - `-forcepassthrough`
+  - Résultat : duplication de plusieurs flags et `EchoPort` forcé en dur.
+- **Correctif retenu :**
+  - Ne plus appeler `StartServer.sh` depuis le wrapper Game Commander.
+  - Appeler directement `WSServer.sh Level01_Main -server ...`
+  - Passer un ensemble d'arguments propre, sans doublons, avec `-EchoPort=${ECHO_PORT}` contrôlé par la config d'instance.
+- **État après correction :**
+  - Redémarrage validé en réel.
+  - `max_players` modifié depuis l'UI puis appliqué après restart.
+  - Ports Soulmask remontés correctement :
+    - `8777/udp`
+    - `27015/udp`
+    - `18888/tcp`
+  - Point restant à surveiller : la charge CPU au repos devra être réévaluée plus tard avec au moins un joueur connecté.
+
+---
+
 ## Tentatives à risque de régression — récapitulatif
 
 | Tentative à éviter | Risque | Voir bug |

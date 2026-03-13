@@ -8,6 +8,7 @@ Sous-commandes :
   enshrouded-cfg   Génère enshrouded_server.json.
   minecraft-props  Génère server.properties pour Minecraft.
   terraria-cfg     Génère serverconfig.txt pour Terraria.
+  soulmask-cfg     Génère soulmask_server.json.
   patch-bepinex    Injecte les paramètres dans start_server_bepinex.sh.
 
 Usage :
@@ -32,6 +33,10 @@ Usage :
   python3 tools/config_gen.py terraria-cfg --out /path/serverconfig.txt \\
       --name "Mon Serveur" --port 7777 --max-players 8 --world-path /srv/worlds
 
+  python3 tools/config_gen.py soulmask-cfg --out /path/soulmask_server.json \\
+      --name "Mon Serveur" --port 8777 --query-port 27015 --echo-port 18888 \\
+      --max-players 50 --password xxx --admin-password yyy --mode pve
+
   python3 tools/config_gen.py patch-bepinex --script /path/start_server_bepinex.sh \\
       --name "Mon Serveur" --port 5900 --world Monde1 --password xxx \\
       --savedir /home/gameserver/valheim8_data [--extra-flag -playfab]
@@ -50,7 +55,7 @@ def cmd_game_json(args):
     game_id    = args.game_id
     game_label = args.game_label
 
-    logos = {"valheim": "⚔", "enshrouded": "🌿", "minecraft": "⛏", "minecraft-fabric": "🧵", "terraria": "🌳"}
+    logos = {"valheim": "⚔", "enshrouded": "🌿", "minecraft": "⛏", "minecraft-fabric": "🧵", "terraria": "🌳", "soulmask": "🗿"}
     module_id = game_id.replace('-', '_')
     template_id = module_id
     theme_name = game_id
@@ -78,7 +83,7 @@ def cmd_game_json(args):
         },
         "features": {
             "mods":    (game_id == "valheim" and bool(args.bepinex_path)) or game_id == "minecraft-fabric",
-            "config":  game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria"),
+            "config":  game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria", "soulmask"),
             "console": True,
             "players": game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric"),
         },
@@ -87,6 +92,9 @@ def cmd_game_json(args):
 
     if game_id == "minecraft-fabric":
         theme_name = "minecraft"
+        game["theme"]["name"] = theme_name
+    elif game_id == "soulmask":
+        theme_name = "enshrouded"
         game["theme"]["name"] = theme_name
 
     # Permissions
@@ -111,6 +119,11 @@ def cmd_game_json(args):
             "install_mod", "remove_mod", "manage_config", "console", "manage_users",
         ]
     elif game_id == "terraria":
+        game["permissions"] = [
+            "start_server", "stop_server", "restart_server",
+            "manage_config", "console", "manage_users",
+        ]
+    elif game_id == "soulmask":
         game["permissions"] = [
             "start_server", "stop_server", "restart_server",
             "manage_config", "console", "manage_users",
@@ -318,6 +331,29 @@ def cmd_terraria_cfg(args):
     return 0
 
 
+def cmd_soulmask_cfg(args):
+    cfg = {
+        "server_name": args.name,
+        "max_players": args.max_players,
+        "password": args.password or "",
+        "admin_password": args.admin_password or "",
+        "mode": args.mode,
+        "port": args.port,
+        "query_port": args.query_port,
+        "echo_port": args.echo_port,
+        "backup_enabled": args.backup_enabled,
+        "saving_enabled": args.saving_enabled,
+        "backup_interval": args.backup_interval,
+        "log_dir": args.log_dir,
+        "saved_dir": args.saved_dir,
+    }
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(cfg, indent=2) + "\n")
+    print(f"[config_gen] soulmask_server.json généré : {out}")
+    return 0
+
+
 # ── Main ───────────────────────────────────────────────────────────────────────
 
 def main():
@@ -390,6 +426,23 @@ def main():
     p.add_argument("--autocreate", type=int, default=2)
     p.add_argument("--difficulty", type=int, default=0)
 
+    # soulmask-cfg
+    p = sub.add_parser("soulmask-cfg", help="Génère soulmask_server.json")
+    p.add_argument("--out", required=True)
+    p.add_argument("--name", required=True)
+    p.add_argument("--port", required=True, type=int)
+    p.add_argument("--query-port", required=True, type=int)
+    p.add_argument("--echo-port", required=True, type=int)
+    p.add_argument("--max-players", required=True, type=int)
+    p.add_argument("--password", default="")
+    p.add_argument("--admin-password", default="")
+    p.add_argument("--mode", choices=["pve", "pvp"], default="pve")
+    p.add_argument("--backup-enabled", type=lambda v: str(v).lower() == "true", default=True)
+    p.add_argument("--saving-enabled", type=lambda v: str(v).lower() == "true", default=True)
+    p.add_argument("--backup-interval", type=int, default=7200)
+    p.add_argument("--log-dir", required=True)
+    p.add_argument("--saved-dir", required=True)
+
     args = parser.parse_args()
 
     dispatch = {
@@ -398,6 +451,7 @@ def main():
         "enshrouded-cfg": cmd_enshrouded_cfg,
         "minecraft-props": cmd_minecraft_props,
         "terraria-cfg":  cmd_terraria_cfg,
+        "soulmask-cfg":  cmd_soulmask_cfg,
         "patch-bepinex":  cmd_patch_bepinex,
     }
     sys.exit(dispatch[args.command](args))
