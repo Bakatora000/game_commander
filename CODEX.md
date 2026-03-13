@@ -36,7 +36,7 @@ export GAME_COMMANDER_SECRET=$(python3 -c "import secrets; print(secrets.token_h
 python3 app.py
 ```
 
-The app is deployed behind Nginx (see `gaming.example.com.conf`). Flask listens on `127.0.0.1:<flask_port>` from `game.json`.
+The app is deployed behind Nginx (for example `gaming.example.com.conf`). Flask listens on `127.0.0.1:<flask_port>` from `game.json`.
 
 ## Deployment Script
 

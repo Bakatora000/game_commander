@@ -13,7 +13,7 @@ dédiés (Valheim, Enshrouded, Minecraft) sur un VPS Hetzner Ubuntu 24.04.
 - **Domaine :** `gaming.example.com` (multi-instances sous le même domaine)
 - **URLs :** `gaming.example.com/<instance>` (ex: `/valheim2`, `/enshrouded2`)
 - **Nginx conf :** `/etc/nginx/conf.d/gaming.example.com.conf` — fichier **partagé** entre toutes les instances
-- **Registrar DNS :** GenericRegistrar — domaine `example.com`
+- **Registrar DNS :** registrar DNS générique
 - **Instances Game Commander actives :**
   - aucune actuellement
 - **Autres instances sur le même serveur (AMP) :**
