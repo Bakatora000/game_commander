@@ -1,4 +1,4 @@
-# env
+# ENV
 
 Ce dossier sert a stocker les fichiers de configuration de deploiement locaux.
 

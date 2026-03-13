@@ -152,7 +152,7 @@ Le script pose les questions principales.
 Choisissez le jeu a deployer :
 - Valheim
 - Enshrouded
-- Minecraft
+- Minecraft Java
 
 ### Utilisateur systeme Linux
 
@@ -171,7 +171,7 @@ L'`instance_id` identifie votre installation.
 Exemples :
 - `valheim1`
 - `enshrouded1`
-- `minecraft1`
+- `minecraftjava1`
 
 Cette valeur sert aussi pour :
 - les noms de services systemd

@@ -57,7 +57,7 @@ runtime/
     valheim/mods.py        ← Thunderstore + BepInEx
     valheim/config.py      ← BetterNetworking.cfg
     enshrouded/config.py   ← enshrouded_server.json
-    minecraft/             ← Placeholder
+    minecraft/             ← Support Minecraft Java minimal
   templates/
     base/app_base.html     ← Structure commune (Jinja2 blocks)
     base/login_base.html   ← Login commun
@@ -173,6 +173,7 @@ La documentation de contexte du projet repose désormais sur :
 - `Contexte/BUGS.md` pour les régressions, bugs connus et solutions validées
 - `README.md` pour la vue d'ensemble du dépôt
 - `Contexte/GUIDE_DEMARRAGE.md` pour une prise en main débutant côté serveur/VPS/SSH
+- `env/ENV.md` pour l'organisation des fichiers `.env` locaux
 
 ### Jeux supportés
 
@@ -180,4 +181,8 @@ La documentation de contexte du projet repose désormais sur :
 |---|---|---|---|
 | Valheim | ✅ 896660 | ✅ optionnel | BetterNetworking.cfg |
 | Enshrouded | ✅ 2278520 | — | enshrouded_server.json |
-| Minecraft | ⚠ placeholder | — | — |
+| Minecraft Java | ✅ vanilla | — | `server.properties` |
+
+Note Minecraft Java :
+- le serveur téléchargé automatiquement peut être plus récent que ton client Java local
+- en cas d'erreur `Incompatible client`, il faut lancer la bonne version dans le launcher

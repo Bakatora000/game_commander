@@ -4,7 +4,7 @@ This file provides guidance to Codex when working with code in this repository.
 
 ## Overview
 
-**Game Commander** is a generic Flask web interface for managing game servers (Valheim, Enshrouded, Minecraft) without AMP. It uses `psutil` + `systemd` + `bcrypt`. One instance of the app manages one game server, selected by `game.json`.
+**Game Commander** is a generic Flask web interface for managing game servers (Valheim, Enshrouded, Minecraft Java) without AMP. It uses `psutil` + `systemd` + `bcrypt`. One instance of the app manages one game server, selected by `game.json`.
 
 Current server state noted in project memory: no active Game Commander instance is deployed
 at the moment; AMP instances still coexist on the same machine and must not be impacted by
@@ -16,6 +16,11 @@ not only the base game port. With a firewall range limited to `15636-15639`, use
 
 Operational note: orphan-process detection during uninstall must ignore any process still
 attached to a systemd service cgroup. This is required for Wine-based Enshrouded servers.
+
+Validated deployment note: Minecraft support currently targets Minecraft Java only.
+Deployment now provisions a vanilla `server.jar`, `eula.txt`, `server.properties`,
+a Java systemd service, and the Game Commander UI. The player client version must match
+the downloaded server version.
 
 ## Running the App
 

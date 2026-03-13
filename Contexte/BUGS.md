@@ -23,6 +23,18 @@
 
 ## Bugs résolus
 
+### [11] Minecraft Java — erreur "Incompatible client" après déploiement réussi
+- **Statut :** Résolu
+- **Composant :** `lib/deploy_steps.sh` + `tools/config_gen.py`
+- **Symptôme :** Le serveur Minecraft Java démarre correctement et l'UI Game Commander fonctionne, mais le client affiche `Failed to connect. Incompatible client!` si le launcher est resté sur une ancienne version.
+- **Cause racine :**
+  - Le déploiement télécharge le dernier `server.jar` vanilla disponible.
+  - Le launcher Minecraft Java peut rester sur une version précédente du client.
+- **Solutions essayées :**
+  - ❌ Tenter la connexion avec un client Java resté sur `1.21` alors que le serveur installé était plus récent
+  - ✅ Lancer la bonne version Java depuis le launcher, alignée sur celle demandée par le serveur
+- **Régression connue :** Pour Minecraft Java, vérifier la version exacte du client avant de conclure à un bug de réseau ou de déploiement.
+
 ### [9] Enshrouded — serveur invisible si seuls les ports game/query contigus sont ouverts
 - **Statut :** Résolu
 - **Composant :** `tools/config_gen.py` + `games/enshrouded/config.py`

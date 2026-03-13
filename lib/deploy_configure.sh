@@ -8,6 +8,10 @@ deploy_check_port_conflict() {
     return 1
 }
 
+deploy_game_port_proto() {
+    [[ "${GAME_ID:-}" == "minecraft" ]] && printf 't\n' || printf 'u\n'
+}
+
 deploy_port_owner() {
     local port="$1" pid cmd
     pid=$(ss -ulnpH 2>/dev/null | grep ":${port} " | grep -oP 'pid=\K\d+' | head -1)
@@ -34,7 +38,7 @@ deploy_select_game() {
         echo -e "  ${BOLD}Jeu à déployer :${RESET}"
         echo -e "  ${CYAN}[1]${RESET} Valheim"
         echo -e "  ${CYAN}[2]${RESET} Enshrouded"
-        echo -e "  ${CYAN}[3]${RESET} Minecraft ${DIM}(placeholder — serveur non installé)${RESET}"
+        echo -e "  ${CYAN}[3]${RESET} Minecraft Java"
         echo ""
         prompt "Votre choix" "1"
         case "$REPLY" in
@@ -51,7 +55,7 @@ deploy_select_game() {
     case "$GAME_ID" in
         valheim)    GAME_LABEL="Valheim";    STEAM_APPID="896660";  GAME_BINARY="valheim_server.x86_64" ;;
         enshrouded) GAME_LABEL="Enshrouded"; STEAM_APPID="2278520"; GAME_BINARY="enshrouded_server.exe" ;;
-        minecraft)  GAME_LABEL="Minecraft";  STEAM_APPID="";        GAME_BINARY="java" ;;
+        minecraft)  GAME_LABEL="Minecraft Java";  STEAM_APPID="";        GAME_BINARY="java" ;;
     esac
     ok "Jeu sélectionné : ${BOLD}${GAME_LABEL}${RESET}"
 }
@@ -147,9 +151,21 @@ deploy_configure_server() {
     prompt_secret "Mot de passe (vide = public)" "${SERVER_PASSWORD}"
     SERVER_PASSWORD="$REPLY"
 
-    if deploy_check_port_conflict "$SERVER_PORT" u || deploy_check_port_conflict "$((SERVER_PORT+1))" u; then
+    local port_proto
+    port_proto="$(deploy_game_port_proto)"
+
+    if [[ "$GAME_ID" == "minecraft" ]]; then
+        if deploy_check_port_conflict "$SERVER_PORT" "$port_proto"; then
+            next_port="$SERVER_PORT"
+            while deploy_check_port_conflict "$next_port" "$port_proto"; do
+                next_port=$((next_port + 1))
+            done
+            warn "Port ${SERVER_PORT}/TCP déjà utilisé — suggestion : ${next_port}"
+            SERVER_PORT="$next_port"
+        fi
+    elif deploy_check_port_conflict "$SERVER_PORT" "$port_proto" || deploy_check_port_conflict "$((SERVER_PORT+1))" "$port_proto"; then
         next_port="$SERVER_PORT"
-        while deploy_check_port_conflict "$next_port" u || deploy_check_port_conflict "$((next_port+1))" u; do
+        while deploy_check_port_conflict "$next_port" "$port_proto" || deploy_check_port_conflict "$((next_port+1))" "$port_proto"; do
             next_port=$((next_port + 2))
         done
         warn "Port ${SERVER_PORT}/UDP déjà utilisé — suggestion : ${next_port}"
@@ -158,12 +174,18 @@ deploy_configure_server() {
 
     prompt "Port principal" "${SERVER_PORT}"
     SERVER_PORT="$REPLY"
-    query_port=$((SERVER_PORT + 1))
-    if deploy_check_port_conflict "$SERVER_PORT" u; then
-        warn "Port ${SERVER_PORT}/UDP déjà utilisé par : $(deploy_port_owner "$SERVER_PORT")"
-    fi
-    if deploy_check_port_conflict "$query_port" u; then
-        warn "Port ${query_port}/UDP déjà utilisé par : $(deploy_port_owner "$query_port")"
+    if [[ "$GAME_ID" == "minecraft" ]]; then
+        if deploy_check_port_conflict "$SERVER_PORT" "$port_proto"; then
+            warn "Port ${SERVER_PORT}/TCP déjà utilisé par : $(deploy_port_owner "$SERVER_PORT")"
+        fi
+    else
+        query_port=$((SERVER_PORT + 1))
+        if deploy_check_port_conflict "$SERVER_PORT" "$port_proto"; then
+            warn "Port ${SERVER_PORT}/UDP déjà utilisé par : $(deploy_port_owner "$SERVER_PORT")"
+        fi
+        if deploy_check_port_conflict "$query_port" "$port_proto"; then
+            warn "Port ${query_port}/UDP déjà utilisé par : $(deploy_port_owner "$query_port")"
+        fi
     fi
     prompt "Joueurs max" "${MAX_PLAYERS}"
     MAX_PLAYERS="$REPLY"

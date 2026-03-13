@@ -7,7 +7,7 @@
 ## Contexte du projet
 
 **Game Commander** — Interface web Flask autonome (sans AMP) pour gérer des serveurs de jeux
-dédiés (Valheim, Enshrouded, Minecraft) sur un VPS Hetzner Ubuntu 24.04.
+dédiés (Valheim, Enshrouded, Minecraft Java) sur un VPS Hetzner Ubuntu 24.04.
 
 - **Utilisateur système :** `gameserver`
 - **Domaine :** `gaming.example.com` (multi-instances sous le même domaine)

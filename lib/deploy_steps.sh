@@ -109,13 +109,54 @@ deploy_step_dependencies() {
 
 deploy_step_game_install() {
     if [[ "$GAME_ID" == "minecraft" ]]; then
-        hdr "ÉTAPE 4 : Serveur Minecraft (placeholder)"
-        warn "L'installation automatique de Minecraft n'est pas encore implémentée."
-        warn "Installez manuellement le serveur dans $SERVER_DIR puis relancez."
-        install_pkg "default-jre"
+        hdr "ÉTAPE 4 : Installation Minecraft Java"
+        install_pkg "default-jre-headless"
         mkdir -p "$SERVER_DIR"
         chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
-        ok "Java installé — serveur à configurer manuellement"
+        if [[ -f "$SERVER_DIR/server.jar" ]]; then
+            ok "server.jar déjà présent"
+        else
+            info "Téléchargement du dernier serveur Minecraft Java vanilla..."
+            python3 - "$SERVER_DIR/server.jar" <<'PYEOF' || die "Échec téléchargement serveur Minecraft"
+import json
+import sys
+import urllib.request
+
+out = sys.argv[1]
+with urllib.request.urlopen("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json", timeout=20) as r:
+    manifest = json.load(r)
+latest_id = manifest["latest"]["release"]
+version_meta_url = next(v["url"] for v in manifest["versions"] if v["id"] == latest_id)
+with urllib.request.urlopen(version_meta_url, timeout=20) as r:
+    version_meta = json.load(r)
+jar_url = version_meta["downloads"]["server"]["url"]
+with urllib.request.urlopen(jar_url, timeout=60) as r, open(out, "wb") as f:
+    f.write(r.read())
+print(f"[minecraft] server.jar téléchargé : {out}")
+PYEOF
+            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/server.jar"
+            ok "Serveur Minecraft Java téléchargé"
+        fi
+
+        if [[ ! -f "$SERVER_DIR/eula.txt" ]]; then
+            cat > "$SERVER_DIR/eula.txt" << 'EOF'
+# EULA acceptée automatiquement par Game Commander
+eula=true
+EOF
+            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/eula.txt"
+            ok "eula.txt généré"
+        fi
+
+        if [[ ! -f "$SERVER_DIR/server.properties" ]]; then
+            python3 "$SCRIPT_DIR/tools/config_gen.py" minecraft-props \
+                --out "$SERVER_DIR/server.properties" \
+                --name "$SERVER_NAME" \
+                --port "$SERVER_PORT" \
+                --max-players "$MAX_PLAYERS" \
+            || die "Échec génération server.properties"
+            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/server.properties"
+            ok "server.properties généré"
+        fi
         return
     fi
 
@@ -183,7 +224,48 @@ deploy_step_game_service() {
     hdr "ÉTAPE 5 : Service $GAME_LABEL"
 
     if [[ "$GAME_ID" == "minecraft" ]]; then
-        warn "Service Minecraft à créer manuellement"
+        START_SCRIPT="$SERVER_DIR/start_server.sh"
+        cat > "$START_SCRIPT" << STARTEOF
+#!/usr/bin/env bash
+cd "${SERVER_DIR}"
+exec /usr/bin/java -Xms1G -Xmx2G -jar server.jar nogui
+STARTEOF
+        chmod +x "$START_SCRIPT"
+        chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
+        ok "Script de démarrage : $START_SCRIPT"
+
+        cat > "/etc/systemd/system/${GAME_SERVICE}.service" << SVCEOF
+[Unit]
+Description=${GAME_LABEL} Dedicated Server
+After=network.target
+
+[Service]
+Type=simple
+User=${SYS_USER}
+WorkingDirectory=${SERVER_DIR}
+ExecStart=${START_SCRIPT}
+Restart=on-failure
+RestartSec=10
+SuccessExitStatus=0 130 143
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=${GAME_SERVICE}
+KillSignal=SIGINT
+KillMode=mixed
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+        systemctl daemon-reload
+        systemctl enable "$GAME_SERVICE"
+        info "Démarrage de $GAME_SERVICE..."
+        systemctl start "$GAME_SERVICE"
+        sleep 5
+        service_active "$GAME_SERVICE" \
+            && ok "Service $GAME_SERVICE actif" \
+            || warn "$GAME_SERVICE pas encore actif — journalctl -u $GAME_SERVICE -f"
         return
     fi
 
@@ -618,9 +700,17 @@ deploy_step_validation() {
     echo "    sudo bash game_commander.sh deploy --config $CONFIG_SAVE"
     echo ""
 
-    _GAME_PORTS=("${SERVER_PORT}/udp" "$((SERVER_PORT+1))/udp")
+    if [[ "$GAME_ID" == "minecraft" ]]; then
+        _GAME_PORTS=("${SERVER_PORT}/tcp")
+    else
+        _GAME_PORTS=("${SERVER_PORT}/udp" "$((SERVER_PORT+1))/udp")
+    fi
     echo -e "  ${BOLD}Ports à ouvrir (firewall) :${RESET}"
-    echo -e "    Jeu  : ${SERVER_PORT}/UDP  $((SERVER_PORT+1))/UDP"
+    if [[ "$GAME_ID" == "minecraft" ]]; then
+        echo -e "    Jeu  : ${SERVER_PORT}/TCP"
+    else
+        echo -e "    Jeu  : ${SERVER_PORT}/UDP  $((SERVER_PORT+1))/UDP"
+    fi
     echo -e "    Web  : 80/TCP  443/TCP"
     if command -v ufw &>/dev/null && ufw status 2>/dev/null | grep -q "Status: active"; then
         info "UFW actif — ouverture des ports..."
@@ -631,7 +721,11 @@ deploy_step_validation() {
         ufw allow "443/tcp" && ok "UFW : 443/tcp ouvert"
     else
         warn "UFW inactif ou absent — pensez à ouvrir les ports dans le firewall Hetzner :"
-        echo "    ${SERVER_PORT}/UDP, $((SERVER_PORT+1))/UDP, 80/TCP, 443/TCP"
+        if [[ "$GAME_ID" == "minecraft" ]]; then
+            echo "    ${SERVER_PORT}/TCP, 80/TCP, 443/TCP"
+        else
+            echo "    ${SERVER_PORT}/UDP, $((SERVER_PORT+1))/UDP, 80/TCP, 443/TCP"
+        fi
     fi
     echo ""
     [[ $ERRORS -eq 0 ]] \

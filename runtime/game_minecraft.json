@@ -1,11 +1,8 @@
 {
   "id": "minecraft",
-  "name": "Minecraft",
-  "subtitle": "Serveur",
+  "name": "Minecraft Java",
+  "subtitle": "Serveur Java",
   "logo": "⛏",
-
-  "_placeholder": true,
-  "_note": "Non implémenté — templates et thème à créer",
 
   "server": {
     "binary":      "java",
@@ -22,14 +19,14 @@
 
   "features": {
     "mods":    false,
-    "config":  false,
+    "config":  true,
     "console": true,
     "players": false
   },
 
   "permissions": [
-    "start_server", "stop_server", "restart_server", "console", "manage_users"
+    "start_server", "stop_server", "restart_server", "manage_config", "console", "manage_users"
   ],
 
-  "theme": { "name": "valheim" }
+  "theme": { "name": "minecraft" }
 }

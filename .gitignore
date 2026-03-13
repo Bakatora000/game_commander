@@ -19,7 +19,7 @@ deploy_config.env
 deploy_*.env
 env/*.env
 !env/.gitkeep
-!env/README.md
+!env/ENV.md
 
 # Backups
 *.bak

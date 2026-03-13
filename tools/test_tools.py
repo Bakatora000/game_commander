@@ -14,13 +14,17 @@ import tempfile
 import types
 import unittest
 from pathlib import Path
+from flask import Flask
 
 # Ajouter le répertoire tools/ au path pour importer les modules
 TOOLS_DIR = Path(__file__).parent
+ROOT_DIR = TOOLS_DIR.parent
 sys.path.insert(0, str(TOOLS_DIR))
+sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
+from runtime.games.minecraft import config as minecraft_config
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -565,6 +569,91 @@ exec ./valheim_server.x86_64 -name "Ancien Nom" -port 2456 -world "AncienMonde" 
             os.unlink(script)
 
 
+class ConfigGenMinecraftPropsTests(unittest.TestCase):
+
+    def test_basic_generation(self):
+        out = tmp_path(".properties")
+        rc = config_gen.cmd_minecraft_props(make_args(
+            out=out, name="Mon Serveur Bloc", port=25565, max_players=20,
+        ))
+        self.assertEqual(rc, 0)
+        content = Path(out).read_text()
+        self.assertIn("motd=Mon Serveur Bloc", content)
+        self.assertIn("server-port=25565", content)
+        self.assertIn("max-players=20", content)
+
+
+class MinecraftConfigTests(unittest.TestCase):
+
+    def _app(self, install_dir):
+        app = Flask(__name__)
+        app.config["GAME"] = {
+            "name": "Minecraft",
+            "server": {"install_dir": install_dir, "port": 25565, "max_players": 20},
+        }
+        return app
+
+    def test_read_defaults_when_file_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir)
+            with app.app_context():
+                data, err = minecraft_config.read_config()
+            self.assertIsNone(err)
+            self.assertEqual(data["Server"]["server-port"], "25565")
+            self.assertEqual(data["Server"]["max-players"], "20")
+
+    def test_write_and_read_properties(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir)
+            with app.app_context():
+                ok, err = minecraft_config.write_config({
+                    "Server": {
+                        "motd": "Bloc Land",
+                        "server-port": "25570",
+                        "max-players": "12",
+                        "difficulty": "hard",
+                        "gamemode": "creative",
+                        "pvp": "false",
+                        "allow-nether": "true",
+                        "enable-command-block": "true",
+                        "spawn-monsters": "true",
+                        "spawn-animals": "false",
+                        "view-distance": "12",
+                        "simulation-distance": "10",
+                    }
+                })
+                self.assertTrue(ok)
+                self.assertIsNone(err)
+                data, err = minecraft_config.read_config()
+            self.assertIsNone(err)
+            self.assertEqual(data["Server"]["motd"], "Bloc Land")
+            self.assertEqual(data["Server"]["server-port"], "25570")
+            self.assertEqual(data["Server"]["gamemode"], "creative")
+
+    def test_validation_rejects_invalid_port(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir)
+            with app.app_context():
+                ok, err = minecraft_config.write_config({
+                    "Server": {
+                        "server-port": "99999",
+                        "max-players": "20",
+                        "difficulty": "easy",
+                        "gamemode": "survival",
+                        "pvp": "true",
+                        "allow-nether": "true",
+                        "enable-command-block": "false",
+                        "spawn-monsters": "true",
+                        "spawn-animals": "true",
+                        "view-distance": "10",
+                        "simulation-distance": "10",
+                        "motd": "Test",
+                    }
+                })
+            self.assertFalse(ok)
+            self.assertIn("server-port", err)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # Tests manifest nginx_manager
 # ══════════════════════════════════════════════════════════════════════════════
@@ -892,6 +981,8 @@ if __name__ == "__main__":
         ConfigGenUsersJsonTests,
         ConfigGenEnshroudedCfgTests,
         ConfigGenPatchBepinexTests,
+        ConfigGenMinecraftPropsTests,
+        MinecraftConfigTests,
     ]
     if len(sys.argv) > 1:
         names = sys.argv[1:]
