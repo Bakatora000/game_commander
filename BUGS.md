@@ -23,6 +23,35 @@
 
 ## Bugs résolus
 
+### [9] Enshrouded — serveur invisible si seuls les ports game/query contigus sont ouverts
+- **Statut :** Résolu
+- **Composant :** `tools/config_gen.py` + `games/enshrouded/config.py`
+- **Symptôme :** Le serveur Enshrouded démarre, l'UI Game Commander fonctionne, mais le serveur n'apparaît pas dans le jeu si l'on cherche `IP:queryPort` attendu.
+- **Cause racine :**
+  - La génération de `enshrouded_server.json` reposait sur un ancien schéma.
+  - Le format actuel du jeu stocke le mot de passe dans `userGroups[*].password`.
+  - Le `queryPort` est le port pertinent pour la découverte du serveur ; avec un port de base mal choisi, on tombait hors de la plage firewall ouverte.
+- **Solutions essayées :**
+  - ❌ Déployer une instance Enshrouded avec `SERVER_PORT=15639` alors que seuls `15636-15639` étaient ouverts côté firewall — le `queryPort` réel devient `15640`, donc serveur non visible
+  - ✅ Corriger la génération de `enshrouded_server.json` pour le format actuel du jeu
+  - ✅ Utiliser `SERVER_PORT=15638` pour obtenir `queryPort=15639` quand la plage ouverte est `15636-15639`
+  - ✅ Lire/écrire le mot de passe via `userGroups[*].password` côté génération et côté UI config
+- **Régression connue :** Pour Enshrouded, raisonner avec `gamePort = SERVER_PORT` et `queryPort = SERVER_PORT + 1`. Si le firewall n'ouvre que jusqu'à `15639`, il faut utiliser `SERVER_PORT=15638` et non `15639`.
+
+---
+
+### [10] Uninstall — faux positif sur les processus orphelins pour Enshrouded sous Wine
+- **Statut :** Résolu
+- **Composant :** `lib/uninstall_orphans.sh`
+- **Symptôme :** Lors de la désinstallation d'une autre instance, l'étape "Processus orphelins en mémoire" propose à tort le process `enshrouded_server.exe` d'une instance encore active et gérée par systemd.
+- **Cause racine :**
+  - Le scan des orphelins excluait seulement les `MainPID` systemd.
+  - Enshrouded sous Wine fait tourner le vrai serveur comme process enfant dans le cgroup du service systemd, pas nécessairement comme `MainPID`.
+- **Solutions essayées :**
+  - ❌ Se baser uniquement sur `MainPID` — faux positif sur `enshrouded_server.exe`
+  - ✅ Exclure tout process encore rattaché à une unité `*.service` via `/proc/<pid>/cgroup`
+- **Régression connue :** Ne jamais proposer comme "orphelin" un process encore contenu dans un cgroup systemd de service actif.
+
 ### [1] wine64 absent du PATH après installation (Ubuntu 24.04)
 - **Statut :** Résolu
 - **Composant :** `game_commander.sh` — section install dépendances

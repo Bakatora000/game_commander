@@ -135,27 +135,54 @@ def cmd_users_json(args):
 
 
 def cmd_enshrouded_cfg(args):
-    # Sur redéploiement, récupérer le mot de passe existant si non fourni
+    # Sur redéploiement, récupérer le mot de passe existant si non fourni.
+    # Les versions récentes d'Enshrouded stockent le mot de passe dans userGroups[*].password
+    # plutôt qu'au niveau racine du JSON.
     password = args.password
     if not password and Path(args.out).is_file():
         try:
             existing = json.loads(Path(args.out).read_text())
-            password = existing.get("password", "")
+            if isinstance(existing.get("userGroups"), list):
+                for group in existing["userGroups"]:
+                    if group.get("name", "").lower() == "default" and group.get("password"):
+                        password = group["password"]
+                        break
+                if not password and existing["userGroups"]:
+                    password = existing["userGroups"][0].get("password", "")
+            if not password:
+                password = existing.get("password", "")
             if password:
                 print(f"[config_gen] Mot de passe récupéré depuis {args.out}")
         except (json.JSONDecodeError, OSError):
             pass
 
     cfg = {
-        "name":          args.name,
-        "password":      password or "",
+        "name": "Mon Serveur",
         "saveDirectory": "./savegame",
-        "logDirectory":  "./logs",
-        "ip":            "0.0.0.0",
-        "queryPort":     args.port + 1,
-        "gamePort":      args.port,
-        "slotCount":     args.max_players,
+        "logDirectory": "./logs",
+        "ip": "0.0.0.0",
+        "queryPort": args.port + 1,
+        "slotCount": args.max_players,
+        "tags": [],
+        "voiceChatMode": "Proximity",
+        "enableVoiceChat": False,
+        "enableTextChat": False,
+        "gameSettingsPreset": "Default",
+        "userGroups": [
+            {
+                "name": "Default",
+                "password": password or "",
+                "canKickBan": False,
+                "canAccessInventories": True,
+                "canEditWorld": True,
+                "canEditBase": True,
+                "canExtendBase": True,
+                "reservedSlots": 0,
+            }
+        ],
+        "bannedAccounts": [],
     }
+    cfg["name"] = args.name
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

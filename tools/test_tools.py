@@ -450,10 +450,11 @@ class ConfigGenEnshroudedCfgTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         data = json.loads(Path(out).read_text())
         self.assertEqual(data["name"], "MonServeur")
-        self.assertEqual(data["password"], "secret")
-        self.assertEqual(data["gamePort"], 15639)
         self.assertEqual(data["queryPort"], 15640)
         self.assertEqual(data["slotCount"], 16)
+        self.assertNotIn("gamePort", data)
+        self.assertEqual(data["userGroups"][0]["password"], "secret")
+        self.assertEqual(data["userGroups"][0]["name"], "Default")
 
     def test_password_recovery_on_redeploy(self):
         """Bug [3] : si password vide, récupérer celui du fichier existant."""
@@ -470,7 +471,7 @@ class ConfigGenEnshroudedCfgTests(unittest.TestCase):
         ))
         self.assertEqual(rc, 0)
         data = json.loads(Path(out).read_text())
-        self.assertEqual(data["password"], "motdepasse_original",
+        self.assertEqual(data["userGroups"][0]["password"], "motdepasse_original",
                          "Le mot de passe existant doit être préservé sur redéploiement")
 
     def test_special_chars_in_password(self):
@@ -482,7 +483,7 @@ class ConfigGenEnshroudedCfgTests(unittest.TestCase):
             port=15639, max_players=16,
         ))
         data = json.loads(Path(out).read_text())
-        self.assertEqual(data["password"], password,
+        self.assertEqual(data["userGroups"][0]["password"], password,
                          "Les caractères spéciaux ne doivent pas être modifiés")
 
 

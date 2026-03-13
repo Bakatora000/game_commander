@@ -14,9 +14,8 @@ dédiés (Valheim, Enshrouded, Minecraft) sur un VPS Hetzner Ubuntu 24.04.
 - **URLs :** `gaming.example.com/<instance>` (ex: `/valheim2`, `/enshrouded2`)
 - **Nginx conf :** `/etc/nginx/conf.d/gaming.example.com.conf` — fichier **partagé** entre toutes les instances
 - **Registrar DNS :** GenericRegistrar — domaine `example.com`
-- **Instances actives :**
-  - `game-commander-valheim2` → port Flask 5002 → `/valheim2`
-  - `game-commander-enshrouded2` → port Flask 5004 → `/enshrouded2`
+- **Instances Game Commander actives :**
+  - aucune actuellement
 - **Autres instances sur le même serveur (AMP) :**
   - `CauchemarCommu01` — Valheim AMP (port AMP 8081)
   - `Test01` — Enshrouded AMP (port AMP 8082, ports jeu 15636/15637)
@@ -169,6 +168,39 @@ entre en conflit avec l'instance AMP déjà active.
 
 ---
 
+### [9] Enshrouded — serveur invisible si le `queryPort` sort de la plage firewall ouverte
+**Symptôme :** Une instance Enshrouded Game Commander démarre correctement et l'UI répond,
+mais le serveur reste introuvable en jeu.
+**Cause :**
+- Le format actuel de `enshrouded_server.json` ne correspond plus à l'ancien schéma simple.
+- Le mot de passe joueur est porté par `userGroups[*].password`.
+- Le port pertinent pour la découverte est `queryPort`.
+- Si on déploie avec `SERVER_PORT=15639`, alors `queryPort=15640`, donc le serveur est
+  invisible si seuls `15636-15639` sont ouverts côté firewall Hetzner.
+**Solution validée :**
+- Générer `enshrouded_server.json` dans le format actuel du jeu
+- Lire/écrire le mot de passe via `userGroups[*].password`
+- Pour la plage firewall `15636-15639`, utiliser `SERVER_PORT=15638` pour obtenir
+  `queryPort=15639`
+- Validation réelle effectuée : serveur joignable sur `203.0.113.10:15639`
+
+---
+
+### [10] Uninstall — faux positif "processus orphelin" sur Enshrouded encore géré par systemd
+**Symptôme :** Lors de la désinstallation d'une instance Valheim, l'outil propose de tuer
+`enshrouded_server.exe` de `testensh` dans la section des processus orphelins alors que
+le serveur Enshrouded fonctionne encore normalement.
+**Cause :**
+- Le scan des orphelins regardait surtout les `MainPID` systemd
+- Sous Wine, le vrai process `enshrouded_server.exe` reste dans le cgroup systemd du
+  service sans être forcément le `MainPID`
+**Solution validée :**
+- Exclure du scan tout PID encore rattaché à une unité `*.service` via `/proc/<pid>/cgroup`
+- Résultat attendu : un Enshrouded actif n'est plus proposé comme orphelin lors de la
+  désinstallation d'une autre instance
+
+---
+
 ## Décisions d'architecture
 
 ### Nginx — vhost partagé multi-instances
@@ -231,8 +263,6 @@ ou 30 (Redémarrage) avec bouton désactivé, et poll toutes les 3s jusqu'à sta
 
 | Instance | Jeu | Ports jeu | Flask | URL |
 |---|---|---|---|---|
-| valheim2 | Valheim | 5900/UDP 5901/UDP | 5002 | /valheim2 |
-| enshrouded2 | Enshrouded | 15639/UDP | 5004 | /enshrouded2 |
 | Test01 (AMP) | Enshrouded | 15636/UDP 15637/UDP | — | — |
 | CauchemarCommu01 (AMP) | Valheim | — | — | — |
 

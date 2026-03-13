@@ -1,6 +1,15 @@
 # ── lib/uninstall_orphans.sh ────────────────────────────────────────────────
 # Détection et arrêt optionnel de processus orphelins hors systemd/AMP
 
+uninstall_orphans_is_systemd_managed() {
+    local pid="$1"
+    local proc_root="${PROC_ROOT:-/proc}"
+    local cgroup_file="${proc_root}/${pid}/cgroup"
+
+    [[ -r "$cgroup_file" ]] || return 1
+    grep -qE '\.service($|[^[:alnum:]_])' "$cgroup_file" 2>/dev/null
+}
+
 uninstall_orphans_collect() {
     local safe_pids_file="$1" orphan_file="$2"
     local pid user cmd desc wdir app_name binary
@@ -14,6 +23,7 @@ uninstall_orphans_collect() {
         [[ "$pid" != "$$" ]] || continue
         echo "$cmd" | grep -qE 'game_commander|uninstall_flask|grep' && continue
         grep -qxF "$pid" "$safe_pids_file" 2>/dev/null && continue
+        uninstall_orphans_is_systemd_managed "$pid" && continue
         uninstall_orphans_is_amp_process "$pid" && continue
 
         desc=""

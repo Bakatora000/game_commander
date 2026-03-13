@@ -190,6 +190,23 @@ EOF
     grep -q 'valheim8 ens1\|ens1 valheim8' "$sandbox/helpers.out" || return 1
 }
 
+test_orphans_skip_systemd_managed_processes() {
+    local sandbox="$TMPDIR/orphans"
+    mkdir -p "$sandbox/proc/4242"
+
+    cat > "$sandbox/proc/4242/cgroup" <<'EOF'
+0::/system.slice/enshrouded-server-testensh.service
+EOF
+
+    PROC_ROOT="$sandbox/proc" \
+    ROOT_DIR="$ROOT_DIR" \
+    bash <<'EOF'
+set -euo pipefail
+source "$ROOT_DIR/lib/uninstall_orphans.sh"
+uninstall_orphans_is_systemd_managed 4242
+EOF
+}
+
 main() {
     run_test "Python tool tests" test_python_tools
     run_test "Thin game_commander.sh entrypoint" test_entrypoint_is_thin
@@ -199,6 +216,7 @@ main() {
     run_test "Uninstall modules keep manifest and process logic" test_uninstall_modules_present
     run_test "Nginx shell wrappers call python manager" test_nginx_wrappers_call_python_manager
     run_test "Helpers support dry-run and shared-dir detection" test_helpers_dry_run_and_shared_detection
+    run_test "Orphan scan skips systemd-managed child processes" test_orphans_skip_systemd_managed_processes
 
     printf '\nSummary: %d passed, %d failed\n' "$PASS_COUNT" "$FAIL_COUNT"
     [[ "$FAIL_COUNT" -eq 0 ]]
