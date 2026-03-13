@@ -236,7 +236,7 @@ uninstall_gc_section() {
 
     echo -e "  Entrez les numéros à traiter (ex: ${BOLD}A1 A2${RESET}), ${BOLD}all${RESET} pour tout, ${BOLD}skip${RESET} pour passer :"
     echo -en "  ${YELLOW}?  Sélection : ${RESET}"
-    read -r gc_sel
+    gc_read gc_sel
 
     if [[ "$gc_sel" == "skip" || -z "$gc_sel" ]]; then
         return
@@ -263,7 +263,7 @@ uninstall_gc_section() {
     echo -e "    ${BOLD}1${RESET}) Stopper les services (fichiers conservés)"
     echo -e "    ${BOLD}2${RESET}) Désinstaller complètement (services + fichiers)"
     echo -en "  ${YELLOW}?  Choix : ${RESET}"
-    read -r gc_action
+    gc_read gc_action
 
     for idx in "${gc_selected[@]}"; do
         uninstall_gc_process_entry "${gc_entries[$idx]}" "$gc_action"

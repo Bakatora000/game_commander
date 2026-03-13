@@ -144,7 +144,7 @@ uninstall_flask_section() {
 
     echo -e "  Entrez les numéros à traiter (ex: ${BOLD}B1 B2${RESET}), ${BOLD}all${RESET} pour tout, ${BOLD}skip${RESET} pour passer :"
     echo -en "  ${YELLOW}?  Sélection : ${RESET}"
-    read -r fl_sel
+    gc_read fl_sel
 
     if [[ "$fl_sel" == "skip" || -z "$fl_sel" ]]; then
         return
@@ -171,7 +171,7 @@ uninstall_flask_section() {
     echo -e "    ${BOLD}1${RESET}) Stopper uniquement"
     echo -e "    ${BOLD}2${RESET}) Désinstaller complètement"
     echo -en "  ${YELLOW}?  Choix : ${RESET}"
-    read -r fl_action
+    gc_read fl_action
 
     for idx in "${fl_selected[@]}"; do
         uninstall_flask_process_entry \

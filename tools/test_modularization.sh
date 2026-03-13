@@ -91,13 +91,40 @@ test_uninstall_modules_present() {
     local gc_file="$ROOT_DIR/lib/uninstall_gc.sh"
     local flask_file="$ROOT_DIR/lib/uninstall_flask.sh"
     local orphans_file="$ROOT_DIR/lib/uninstall_orphans.sh"
+    local helpers_file="$ROOT_DIR/lib/helpers.sh"
 
+    grep -q 'gc_read()' "$helpers_file" || return 1
+    grep -q 'gc_read _ans' "$helpers_file" || return 1
+    grep -q 'gc_read gc_sel' "$gc_file" || return 1
+    grep -q 'gc_read gc_action' "$gc_file" || return 1
+    grep -q 'gc_read fl_sel' "$flask_file" || return 1
+    grep -q 'gc_read fl_action' "$flask_file" || return 1
+    grep -q 'gc_read kill_sel' "$orphans_file" || return 1
+    grep -q 'gc_read sig_choice' "$orphans_file" || return 1
     grep -q '\[\[ -f "\$GC_NGINX_MANIFEST" \]\] && nginx_manifest_check "\$instance_id"' "$gc_file" || return 1
     grep -q 'nginx_manifest_remove "\$instance_id"' "$gc_file" || return 1
     grep -q 'nginx_regenerate_locations' "$gc_file" || return 1
     grep -q 'nginx_apply' "$gc_file" || return 1
     grep -q 'uninstall_flask_process_entry' "$flask_file" || return 1
     grep -q 'uninstall_orphans_section' "$orphans_file" || return 1
+}
+
+test_gc_read_falls_back_to_stdin() {
+    local sandbox="$TMPDIR/helpers_read"
+    mkdir -p "$sandbox"
+
+    GC_READ_OUT="$sandbox/out" \
+    ROOT_DIR="$ROOT_DIR" \
+    bash <<'EOF'
+set -euo pipefail
+source "$ROOT_DIR/lib/helpers.sh"
+printf 'hello\n' | {
+    gc_read val
+    printf '%s\n' "$val" > "$GC_READ_OUT"
+}
+EOF
+
+    grep -q '^hello$' "$sandbox/out" || return 1
 }
 
 test_update_module_present() {
@@ -228,6 +255,7 @@ main() {
     run_test "Deploy helper and step modules present" test_deploy_modules_present
     run_test "Uninstall delegates to dedicated modules" test_uninstall_prefers_manifest
     run_test "Uninstall modules keep manifest and process logic" test_uninstall_modules_present
+    run_test "Interactive prompt helper falls back to stdin" test_gc_read_falls_back_to_stdin
     run_test "Update command refreshes installed app runtime" test_update_module_present
     run_test "Nginx shell wrappers call python manager" test_nginx_wrappers_call_python_manager
     run_test "Helpers support dry-run and shared-dir detection" test_helpers_dry_run_and_shared_detection

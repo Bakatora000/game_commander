@@ -106,7 +106,7 @@ uninstall_orphans_section() {
 
     echo -e "  Numéros à terminer (ex: ${BOLD}C1 C2${RESET}), ${BOLD}all${RESET} pour tout, ${BOLD}skip${RESET} pour passer :"
     echo -en "  ${YELLOW}?  Sélection : ${RESET}"
-    read -r kill_sel
+    gc_read kill_sel
 
     if [[ "$kill_sel" == "skip" || -z "$kill_sel" ]]; then
         return
@@ -133,7 +133,7 @@ uninstall_orphans_section() {
     echo -e "    ${BOLD}1${RESET}) SIGTERM  — arrêt propre (recommandé)"
     echo -e "    ${BOLD}2${RESET}) SIGKILL  — arrêt forcé"
     echo -en "  ${YELLOW}?  Choix : ${RESET}"
-    read -r sig_choice
+    gc_read sig_choice
     kill_sig="-15"
     [[ "${sig_choice:-1}" == "2" ]] && kill_sig="-9"
 

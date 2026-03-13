@@ -21,10 +21,19 @@ die()  { err "$*"; exit 1; }
 DRY_RUN=false
 run() { $DRY_RUN && echo -e "${DIM}    [dry-run] $*${RESET}" || "$@"; }
 
+gc_read() {
+    local __var_name="$1"
+    if [[ -r /dev/tty ]] && { read -r "$__var_name" </dev/tty; } 2>/dev/null; then
+        :
+    else
+        read -r "$__var_name"
+    fi
+}
+
 ask_yn() {
     local prompt="$1"
     echo -en "  ${YELLOW}?  ${prompt} (o/n) : ${RESET}"
-    read -r _ans
+    gc_read _ans
     [[ "$_ans" == "o" || "$_ans" == "O" || "$_ans" == "oui" ]]
 }
 
