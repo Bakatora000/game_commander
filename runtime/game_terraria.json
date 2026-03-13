@@ -1,0 +1,36 @@
+{
+  "id": "terraria",
+  "name": "Terraria",
+  "subtitle": "Serveur vanilla",
+  "logo": "🌳",
+  "server": {
+    "binary": "TerrariaServer.bin.x86_64",
+    "service": "terraria-server",
+    "install_dir": "/home/gameserver/terraria_server",
+    "data_dir": "/home/gameserver/terraria_data",
+    "world_name": null,
+    "max_players": 8
+  },
+  "web": {
+    "url_prefix": "/terraria",
+    "flask_port": 5006,
+    "admin_user": "admin"
+  },
+  "features": {
+    "mods": false,
+    "config": true,
+    "console": true,
+    "players": false
+  },
+  "permissions": [
+    "start_server",
+    "stop_server",
+    "restart_server",
+    "manage_config",
+    "console",
+    "manage_users"
+  ],
+  "theme": {
+    "name": "minecraft"
+  }
+}

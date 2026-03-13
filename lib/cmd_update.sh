@@ -29,6 +29,11 @@ update_game_meta() {
             GAME_BINARY="java"
             GAME_SERVICE="minecraft-fabric-server-${INSTANCE_ID}"
             ;;
+        terraria)
+            GAME_LABEL="Terraria"
+            GAME_BINARY="TerrariaServer.bin.x86_64"
+            GAME_SERVICE="terraria-server-${INSTANCE_ID}"
+            ;;
         *)
             die "GAME_ID non supporté pour update : $GAME_ID"
             ;;

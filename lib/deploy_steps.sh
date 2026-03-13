@@ -108,6 +108,115 @@ deploy_step_dependencies() {
 }
 
 deploy_step_game_install() {
+    if [[ "$GAME_ID" == "terraria" ]]; then
+        hdr "ÉTAPE 4 : Installation Terraria"
+        mkdir -p "$SERVER_DIR" "$DATA_DIR"
+        chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR" "$DATA_DIR"
+
+        if [[ -f "$SERVER_DIR/TerrariaServer.bin.x86_64" ]]; then
+            ok "Serveur Terraria déjà présent"
+        else
+            info "Téléchargement du serveur dédié officiel Terraria..."
+            python3 - "$SERVER_DIR" <<'PYEOF' || die "Échec téléchargement serveur Terraria"
+import re
+import shutil
+import sys
+import tempfile
+import urllib.parse
+import urllib.request
+import zipfile
+from pathlib import Path
+
+server_dir = Path(sys.argv[1])
+home_url = "https://terraria.org/"
+headers = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9,fr;q=0.8",
+}
+
+def fetch(url, timeout=20, referer=None):
+    req_headers = dict(headers)
+    if referer:
+        req_headers["Referer"] = referer
+    req = urllib.request.Request(url, headers=req_headers)
+    return urllib.request.urlopen(req, timeout=timeout)
+
+def latest_zip_url():
+    with fetch(home_url, timeout=20) as r:
+        html = r.read().decode("utf-8", errors="ignore")
+
+    matches = re.findall(r'href="([^"]*/api/download/pc-dedicated-server/terraria-server-[^"]+\.zip)"', html)
+    if matches:
+        return urllib.parse.urljoin(home_url, matches[0])
+
+    # Fallback pragmatique : terraria.org suit le schéma
+    # terraria-server-<version_sans_points>.zip.
+    # On teste d'abord les versions récentes plausibles.
+    for compact in (
+        "1459", "1458", "1457", "1456", "1455", "1454", "1453", "1452", "1451", "1450",
+        "1449", "1448", "1447", "1446", "1445", "1444", "1443", "1442", "1441", "1440",
+    ):
+        candidate = f"https://terraria.org/api/download/pc-dedicated-server/terraria-server-{compact}.zip"
+        try:
+            with fetch(candidate, timeout=20, referer=home_url) as r:
+                if getattr(r, "status", 200) == 200:
+                    return candidate
+        except Exception:
+            continue
+
+    raise SystemExit("Lien serveur Terraria introuvable sur terraria.org")
+
+zip_url = latest_zip_url()
+with tempfile.TemporaryDirectory() as tmp:
+    tmp_path = Path(tmp)
+    zip_path = tmp_path / "terraria-server.zip"
+    with fetch(zip_url, timeout=120, referer=home_url) as r, open(zip_path, "wb") as f:
+        f.write(r.read())
+
+    extract_dir = tmp_path / "extract"
+    with zipfile.ZipFile(zip_path) as zf:
+        zf.extractall(extract_dir)
+
+    candidates = list(extract_dir.rglob("TerrariaServer.bin.x86_64"))
+    if not candidates:
+        raise SystemExit("Binaire TerrariaServer.bin.x86_64 introuvable dans l'archive")
+
+    linux_dir = candidates[0].parent
+    for entry in linux_dir.iterdir():
+        dest = server_dir / entry.name
+        if dest.exists():
+            if dest.is_dir():
+                shutil.rmtree(dest)
+            else:
+                dest.unlink()
+        if entry.is_dir():
+            shutil.copytree(entry, dest)
+        else:
+            shutil.copy2(entry, dest)
+
+print(f"[terraria] serveur dédié téléchargé depuis : {zip_url}")
+PYEOF
+            chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
+            chmod +x "$SERVER_DIR/TerrariaServer.bin.x86_64" 2>/dev/null || true
+            ok "Serveur Terraria téléchargé"
+        fi
+
+        if [[ ! -f "$SERVER_DIR/serverconfig.txt" ]]; then
+            python3 "$SCRIPT_DIR/tools/config_gen.py" terraria-cfg \
+                --out "$SERVER_DIR/serverconfig.txt" \
+                --name "$SERVER_NAME" \
+                --port "$SERVER_PORT" \
+                --max-players "$MAX_PLAYERS" \
+                --world-path "$DATA_DIR" \
+                --world-name "$INSTANCE_ID" \
+            || die "Échec génération serverconfig.txt"
+            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/serverconfig.txt"
+            ok "serverconfig.txt généré"
+        fi
+        return
+    fi
+
     if [[ "$GAME_ID" == "minecraft-fabric" ]]; then
         hdr "ÉTAPE 4 : Installation Minecraft Fabric"
         install_pkg "default-jre-headless"
@@ -388,6 +497,80 @@ SVCEOF
         return
     fi
 
+    if [[ "$GAME_ID" == "terraria" ]]; then
+        START_SCRIPT="$SERVER_DIR/start_server.sh"
+        mkdir -p "$SERVER_DIR/logs"
+        cat > "$START_SCRIPT" << STARTEOF
+#!/usr/bin/env bash
+cd "${SERVER_DIR}"
+CFG="${SERVER_DIR}/serverconfig.txt"
+cfg_get() {
+    local key="$1"
+    sed -n "s/^${key}=//p" "$CFG" | head -1
+}
+WORLD="\$(cfg_get world)"
+WORLDPATH="\$(cfg_get worldpath)"
+WORLDNAME="\$(cfg_get worldname)"
+AUTOCREATE="\$(cfg_get autocreate)"
+DIFFICULTY="\$(cfg_get difficulty)"
+PORT="\$(cfg_get port)"
+MAXPLAYERS="\$(cfg_get maxplayers)"
+PASSWORD="\$(cfg_get password)"
+MOTD="\$(cfg_get motd)"
+[[ -z "\$WORLD" && -n "\$WORLDPATH" && -n "\$WORLDNAME" ]] && WORLD="\$WORLDPATH/\$WORLDNAME.wld"
+mkdir -p "\$WORLDPATH" "${SERVER_DIR}/logs"
+ARGS=(
+    -world "\$WORLD"
+    -autocreate "\${AUTOCREATE:-2}"
+    -worldname "\$WORLDNAME"
+    -difficulty "\${DIFFICULTY:-0}"
+    -port "\${PORT:-7777}"
+    -maxplayers "\${MAXPLAYERS:-8}"
+    -motd "\$MOTD"
+    -logpath "${SERVER_DIR}/logs"
+)
+[[ -n "\$PASSWORD" ]] && ARGS+=(-password "\$PASSWORD")
+exec ./TerrariaServer.bin.x86_64 "\${ARGS[@]}"
+STARTEOF
+        chmod +x "$START_SCRIPT"
+        chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
+        ok "Script de démarrage : $START_SCRIPT"
+
+        cat > "/etc/systemd/system/${GAME_SERVICE}.service" << SVCEOF
+[Unit]
+Description=${GAME_LABEL} Dedicated Server
+After=network.target
+
+[Service]
+Type=simple
+User=${SYS_USER}
+WorkingDirectory=${SERVER_DIR}
+ExecStart=${START_SCRIPT}
+Restart=on-failure
+RestartSec=10
+SuccessExitStatus=0 130 143
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=${GAME_SERVICE}
+KillSignal=SIGINT
+KillMode=mixed
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+        systemctl daemon-reload
+        systemctl enable "$GAME_SERVICE"
+        info "Démarrage de $GAME_SERVICE..."
+        systemctl start "$GAME_SERVICE"
+        sleep 5
+        service_active "$GAME_SERVICE" \
+            && ok "Service $GAME_SERVICE actif" \
+            || warn "$GAME_SERVICE pas encore actif — journalctl -u $GAME_SERVICE -f"
+        return
+    fi
+
     START_SCRIPT="$SERVER_DIR/start_server.sh"
     if [[ "$GAME_ID" == "valheim" ]]; then
         CROSSPLAY_FLAG=""
@@ -529,6 +712,7 @@ deploy_step_backups() {
             ;;
         enshrouded) WORLD_DIR="$SERVER_DIR/savegame" ;;
         minecraft|minecraft-fabric) WORLD_DIR="$SERVER_DIR/world" ;;
+        terraria) WORLD_DIR="$DATA_DIR" ;;
     esac
 
     BACKUP_SCRIPT="$APP_DIR/backup_${GAME_ID}.sh"

@@ -59,6 +59,7 @@ runtime/
     enshrouded/config.py   ← enshrouded_server.json
     minecraft/             ← Support Minecraft Java vanilla
     minecraft_fabric/      ← Support Minecraft Fabric + mods Modrinth
+    terraria/              ← Support Terraria vanilla
   templates/
     base/app_base.html     ← Structure commune (Jinja2 blocks)
     base/login_base.html   ← Login commun
@@ -77,7 +78,7 @@ runtime/
 | `id` | Sélectionne les templates et modules runtime/games/{id}/ |
 | `server.binary` | Nom du process pour psutil |
 | `server.service` | Nom du service systemd |
-| `web.url_prefix` | Préfixe des routes Flask (/valheim, /enshrouded) |
+| `web.url_prefix` | Préfixe des routes Flask (/valheim, /enshrouded, /terraria) |
 | `web.flask_port` | Port d'écoute Flask |
 | `features.*` | Active/désactive les onglets (mods, config, console) |
 | `theme.name` | Sélectionne runtime/static/themes/{name}/ |
@@ -187,6 +188,7 @@ La documentation de contexte du projet repose désormais sur :
 | Enshrouded | ✅ 2278520 | — | enshrouded_server.json |
 | Minecraft Java | ✅ vanilla | — | `server.properties` |
 | Minecraft Fabric | ✅ Fabric | ✅ Modrinth | `server.properties` |
+| Terraria | ✅ serveur officiel | — | `serverconfig.txt` |
 
 Note Minecraft Java :
 - le serveur téléchargé automatiquement peut être plus récent que ton client Java local
@@ -198,3 +200,10 @@ Note Minecraft Fabric :
 - l'installation de mods passe par Modrinth
 - les dépendances Fabric requises sont résolues automatiquement, y compris quand elles ne sont pas complètement déclarées dans l'API Modrinth mais présentes dans `fabric.mod.json`
 - les sauvegardes ciblent `world/` et les mêmes fichiers admin utiles que Minecraft Java, sans inclure `mods/`, `libraries/` ou les binaires serveur
+
+Note Terraria :
+- le support actuel cible le serveur dédié vanilla officiel Linux
+- la configuration exposée dans l'UI repose sur `serverconfig.txt`
+- le premier lot couvre déploiement, service systemd, sauvegardes et configuration, sans mods/tModLoader
+- le lancement réel s'appuie sur un `start_server.sh` qui passe les paramètres critiques du monde en ligne de commande au binaire Terraria, en plus de `serverconfig.txt`
+- validé en réel pour l'installation, la création/charge du monde, le service et l'UI Game Commander

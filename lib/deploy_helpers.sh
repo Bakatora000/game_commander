@@ -42,7 +42,7 @@ deploy_handle_special_args() {
 #  Usage : sudo bash game_commander.sh deploy --config env/deploy_config.env
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Jeu : valheim | enshrouded | minecraft | minecraft-fabric
+# Jeu : valheim | enshrouded | minecraft | minecraft-fabric | terraria
 GAME_ID="valheim"
 
 # Utilisateur système
@@ -136,6 +136,13 @@ set_game_defaults() {
             URL_PREFIX="${URL_PREFIX:-/minecraft-fabric}"
             FLASK_PORT="${FLASK_PORT:-5005}"
             SERVER_NAME="${SERVER_NAME:-Mon Serveur Minecraft Fabric}"
+            ;;
+        terraria)
+            SERVER_PORT="${SERVER_PORT:-7777}"
+            MAX_PLAYERS="${MAX_PLAYERS:-8}"
+            URL_PREFIX="${URL_PREFIX:-/terraria}"
+            FLASK_PORT="${FLASK_PORT:-5006}"
+            SERVER_NAME="${SERVER_NAME:-Mon Serveur Terraria}"
             ;;
     esac
 }

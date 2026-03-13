@@ -1,0 +1,88 @@
+{% extends "base/app_base.html" %}
+
+{% block fonts %}family=Press+Start+2P&family=Inter:wght@400;500;600{% endblock %}
+{% block sidebar_logo %}🌳{% endblock %}
+
+{% block config_tab %}
+<div class="panel config-panel" id="configPanel">
+  <div class="panel-header">
+    <span class="panel-title">serverconfig.txt</span>
+    <button class="btn-primary btn-sm" id="btnSaveConfig" data-requires-perm="manage_config">Enregistrer</button>
+  </div>
+  <div id="configFields" class="config-fields"></div>
+  <p class="config-note">Les changements nécessitent un redémarrage du serveur Terraria.</p>
+</div>
+{% endblock %}
+
+{% block game_scripts %}
+<script>
+const CONFIG_SCHEMA = [
+  {key:'worldname',  label:'Nom du monde',   type:'text'},
+  {key:'motd',       label:'MOTD',           type:'text'},
+  {key:'maxplayers', label:'Joueurs max',    type:'number', min:1, max:255},
+  {key:'password',   label:'Mot de passe',   type:'password'},
+  {key:'autocreate', label:'Taille du monde',type:'select', options:[
+    {value:'1', label:'Petit'},
+    {value:'2', label:'Moyen'},
+    {value:'3', label:'Grand'},
+  ]},
+  {key:'difficulty', label:'Difficulté',     type:'select', options:[
+    {value:'0', label:'Classique'},
+    {value:'1', label:'Expert'},
+    {value:'2', label:'Maître'},
+    {value:'3', label:'Journey'},
+  ]},
+];
+let configData = {};
+
+async function loadConfig() {
+  const panel = document.getElementById('configPanel');
+  const r = await fetch(`${PREFIX}/api/config`).catch(() => null);
+  if (!r?.ok) {
+    const d = await r?.json() || {};
+    panel.innerHTML += `<p class="config-notice">⚠ ${d.error || 'Erreur de chargement'}</p>`;
+    return;
+  }
+  configData = await r.json();
+  renderConfigFields();
+}
+
+function renderConfigFields() {
+  const el = document.getElementById('configFields');
+  el.innerHTML = '';
+  CONFIG_SCHEMA.forEach(f => {
+    const val = configData[f.key] ?? '';
+    const row = document.createElement('div');
+    row.className = 'config-row';
+    let input;
+    if (f.type === 'select') {
+      const opts = f.options.map(o => {
+        const value = typeof o === 'string' ? o : o.value;
+        const label = typeof o === 'string' ? o : o.label;
+        return `<option value="${value}"${value===val?' selected':''}>${label}</option>`;
+      }).join('');
+      input = `<select class="config-input" id="cfg_${f.key}">${opts}</select>`;
+    } else {
+      const extra = f.min != null ? `min="${f.min}" max="${f.max}"` : '';
+      input = `<input class="config-input" type="${f.type}" id="cfg_${f.key}" value="${val}" ${extra}>`;
+    }
+    row.innerHTML = `<label class="config-label">${f.label}</label>${input}`;
+    el.appendChild(row);
+  });
+}
+
+document.getElementById('btnSaveConfig')?.addEventListener('click', async () => {
+  const payload = {};
+  CONFIG_SCHEMA.forEach(f => {
+    const inp = document.getElementById(`cfg_${f.key}`);
+    if (inp) payload[f.key] = inp.value;
+  });
+  const r = await fetch(`${PREFIX}/api/config`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload)
+  }).catch(()=>null);
+  showToast(r?.ok ? 'Configuration sauvegardée' : 'Erreur sauvegarde', r?.ok ? 'success' : 'error');
+});
+</script>
+{% endblock %}

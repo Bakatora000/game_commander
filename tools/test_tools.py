@@ -29,6 +29,7 @@ import config_gen
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import players as minecraft_players
 from runtime.games.minecraft_fabric import mods as minecraft_fabric_mods
+from runtime.games.terraria import config as terraria_config
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -432,6 +433,24 @@ class ConfigGenGameJsonTests(unittest.TestCase):
         self.assertEqual(data["theme"]["name"], "minecraft")
         self.assertIn("install_mod", data["permissions"])
 
+    def test_terraria_support(self):
+        out = tmp_path(".json")
+        rc = config_gen.cmd_game_json(make_args(
+            out=out, game_id="terraria", game_label="Terraria",
+            game_binary="TerrariaServer.bin.x86_64", game_service="terraria-server-test",
+            server_dir="/home/gameserver/terraria_server",
+            data_dir="/home/gameserver/terraria_data", world_name="", max_players=8, port=7777,
+            url_prefix="/terraria", flask_port=5006, admin_user="admin",
+            bepinex_path="", steam_appid="", steamcmd_path="",
+        ))
+        self.assertEqual(rc, 0)
+        data = json.loads(Path(out).read_text())
+        self.assertEqual(data["id"], "terraria")
+        self.assertEqual(data["server"]["binary"], "TerrariaServer.bin.x86_64")
+        self.assertTrue(data["features"]["config"])
+        self.assertFalse(data["features"]["players"])
+        self.assertIn("manage_config", data["permissions"])
+
     def test_steamcmd_section(self):
         data = self._gen_valheim()
         self.assertIn("steamcmd", data)
@@ -605,6 +624,26 @@ class ConfigGenMinecraftPropsTests(unittest.TestCase):
         self.assertIn("max-players=20", content)
 
 
+class ConfigGenTerrariaCfgTests(unittest.TestCase):
+
+    def test_basic_generation(self):
+        out = tmp_path(".txt")
+        rc = config_gen.cmd_terraria_cfg(make_args(
+            out=out, name="Mon Serveur Terraria", port=7777, max_players=8,
+            world_path="/home/gameserver/terraria_data", world_name="testworld",
+            password="secret", autocreate=2, difficulty=1,
+        ))
+        self.assertEqual(rc, 0)
+        content = Path(out).read_text()
+        self.assertIn("worldpath=/home/gameserver/terraria_data", content)
+        self.assertIn("worldname=testworld", content)
+        self.assertIn("world=/home/gameserver/terraria_data/testworld.wld", content)
+        self.assertIn("port=7777", content)
+        self.assertIn("maxplayers=8", content)
+        self.assertIn("password=secret", content)
+        self.assertIn("difficulty=1", content)
+
+
 class MinecraftConfigTests(unittest.TestCase):
 
     def _app(self, install_dir):
@@ -674,6 +713,68 @@ class MinecraftConfigTests(unittest.TestCase):
                 })
             self.assertFalse(ok)
             self.assertIn("server-port", err)
+
+
+class TerrariaConfigTests(unittest.TestCase):
+
+    def _app(self, install_dir, data_dir):
+        app = Flask(__name__)
+        app.config["GAME"] = {
+            "id": "terraria",
+            "name": "Terraria",
+            "server": {
+                "install_dir": install_dir,
+                "data_dir": data_dir,
+                "port": 7777,
+                "max_players": 8,
+            },
+        }
+        return app
+
+    def test_read_defaults_when_file_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir, os.path.join(tmpdir, "worlds"))
+            with app.app_context():
+                data, err = terraria_config.read_config()
+            self.assertIsNone(err)
+            self.assertEqual(data["port"], "7777")
+            self.assertEqual(data["maxplayers"], "8")
+
+    def test_write_and_read_config(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir, os.path.join(tmpdir, "worlds"))
+            with app.app_context():
+                ok, err = terraria_config.write_config({
+                    "worldname": "bossrush",
+                    "motd": "Bienvenue",
+                    "maxplayers": "12",
+                    "password": "secret",
+                    "autocreate": "3",
+                    "difficulty": "2",
+                })
+                self.assertTrue(ok)
+                self.assertIsNone(err)
+                data, err = terraria_config.read_config()
+            self.assertIsNone(err)
+            self.assertEqual(data["worldname"], "bossrush")
+            self.assertEqual(data["motd"], "Bienvenue")
+            self.assertEqual(data["difficulty"], "2")
+            self.assertEqual(data["world"], os.path.join(tmpdir, "worlds", "bossrush.wld"))
+
+    def test_validation_rejects_invalid_difficulty(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir, os.path.join(tmpdir, "worlds"))
+            with app.app_context():
+                ok, err = terraria_config.write_config({
+                    "worldname": "bossrush",
+                    "motd": "Bienvenue",
+                    "maxplayers": "12",
+                    "password": "",
+                    "autocreate": "2",
+                    "difficulty": "9",
+                })
+            self.assertFalse(ok)
+            self.assertIn("difficulty", err)
 
 
 class MinecraftPlayersTests(unittest.TestCase):

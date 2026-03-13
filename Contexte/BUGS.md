@@ -23,6 +23,25 @@
 
 ## Bugs résolus
 
+### [14] Terraria — serveur bloqué sur `Choose World:` et CPU à 100%
+- **Statut :** Résolu
+- **Composant :** `lib/deploy_steps.sh` + `tools/config_gen.py`
+- **Instance(s) affectée(s) :** `testterraria`
+- **Symptôme :**
+  - Le service Terraria démarre, mais les logs montrent seulement le menu interactif `n New World`, `d <number> Delete World`, puis `Choose World:`
+  - L'UI Game Commander affiche une charge CPU très élevée, proche de 100%, sans joueur connecté
+- **Cause racine :**
+  - Le serveur dédié Terraria ne démarrait pas réellement en mode headless exploitable
+  - S'appuyer uniquement sur `-config serverconfig.txt` n'était pas suffisant ici
+  - Tant que le monde n'était pas explicitement passé au binaire, le serveur retombait sur son menu interactif et bouclait
+- **Solutions essayées :**
+  - ❌ Générer seulement `worldpath`, `worldname`, `autocreate` dans `serverconfig.txt`
+  - ❌ Ajouter uniquement `world=/.../testterraria.wld` dans `serverconfig.txt`
+  - ✅ Générer `world=/.../<nom>.wld` dans `serverconfig.txt`
+  - ✅ Faire démarrer `TerrariaServer.bin.x86_64` avec les paramètres critiques directement en ligne de commande via `start_server.sh` (`-world`, `-autocreate`, `-worldname`, `-difficulty`, `-port`, `-maxplayers`, `-motd`, `-logpath`)
+  - ✅ Validation réelle effectuée : création du fichier `testterraria.wld`, log `Listening on port 7777`, puis `Server started`
+- **Régression connue :** Ne pas considérer `-config serverconfig.txt` seul comme suffisamment fiable pour un lancement headless automatique de Terraria.
+
 ### [11] Minecraft Java — erreur "Incompatible client" après déploiement réussi
 - **Statut :** Résolu
 - **Composant :** `lib/deploy_steps.sh` + `tools/config_gen.py`

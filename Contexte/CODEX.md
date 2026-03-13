@@ -4,7 +4,7 @@ This file provides guidance to Codex when working with code in this repository.
 
 ## Overview
 
-**Game Commander** is a generic Flask web interface for managing game servers (Valheim, Enshrouded, Minecraft Java, Minecraft Fabric) without AMP. It uses `psutil` + `systemd` + `bcrypt`. One instance of the app manages one game server, selected by `game.json`.
+**Game Commander** is a generic Flask web interface for managing game servers (Valheim, Enshrouded, Minecraft Java, Minecraft Fabric, Terraria) without AMP. It uses `psutil` + `systemd` + `bcrypt`. One instance of the app manages one game server, selected by `game.json`.
 
 Current server state noted in project memory: no active Game Commander instance is deployed
 at the moment; AMP instances still coexist on the same machine and must not be impacted by
@@ -34,6 +34,11 @@ Validated deployment note: Minecraft Java and Minecraft Fabric backups now targe
 world data plus the main administrative files (`server.properties`, `ops.json`,
 `whitelist.json`, `banned-players.json`, `banned-ips.json`, `usercache.json`), not the
 full server directory.
+
+Validated deployment note: Terraria vanilla support is now validated for installation,
+world creation/loading, Linux systemd service, Nginx integration, and the Game Commander
+UI. The startup path was hardened to pass the critical world/server parameters directly
+to `TerrariaServer.bin.x86_64` rather than relying only on `-config serverconfig.txt`.
 
 ## Running the App
 

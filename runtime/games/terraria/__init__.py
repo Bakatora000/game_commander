@@ -1,0 +1,1 @@
+"""Support Terraria vanilla."""

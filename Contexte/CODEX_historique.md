@@ -7,7 +7,7 @@
 ## Contexte du projet
 
 **Game Commander** — Interface web Flask autonome (sans AMP) pour gérer des serveurs de jeux
-dédiés (Valheim, Enshrouded, Minecraft Java, Minecraft Fabric) sur un VPS Hetzner Ubuntu 24.04.
+dédiés (Valheim, Enshrouded, Minecraft Java, Minecraft Fabric, Terraria) sur un VPS Hetzner Ubuntu 24.04.
 
 - **Utilisateur système :** `gameserver`
 - **Domaine :** `gaming.example.com` (multi-instances sous le même domaine)
@@ -274,6 +274,52 @@ le serveur Enshrouded fonctionne encore normalement.
 - Le déploiement installait `unzip` mais pas `zip`, alors que tous les scripts de sauvegarde
   utilisent `zip`
 - `zip` fait maintenant partie des dépendances de base
+
+---
+
+### [14] Terraria — validation réelle du socle deploy + commander
+**État validé :**
+- Déploiement d'une instance `testterraria` OK
+- Téléchargement du serveur dédié officiel Terraria OK
+- UI Game Commander OK
+- Nginx / préfixe `/testterraria` OK
+- service systemd OK
+- création du monde `testterraria.wld` validée
+
+**Bug rencontré puis corrigé :**
+- Le serveur Terraria restait bloqué sur le menu interactif `Choose World:`
+- L'UI remontait alors une charge CPU très élevée, qui ne correspondait pas à un serveur Terraria sain au repos
+
+**Cause réelle :**
+- Le lancement headless basé uniquement sur `-config serverconfig.txt` n'était pas suffisamment fiable ici
+- Même avec `serverconfig.txt` présent, le binaire ne partait pas correctement sans paramètres explicites de monde en ligne de commande
+
+**Solution retenue :**
+- Générer `serverconfig.txt` avec un chemin de monde complet `world=/home/gameserver/.../<monde>.wld`
+- Faire lire ce fichier par `start_server.sh`, puis lancer `TerrariaServer.bin.x86_64` avec :
+  - `-world`
+  - `-autocreate`
+  - `-worldname`
+  - `-difficulty`
+  - `-port`
+  - `-maxplayers`
+  - `-motd`
+  - `-logpath`
+
+**Validation réelle :**
+- logs observés :
+  - `Listening on port 7777`
+  - `Server started`
+- fichier monde créé :
+  - `/home/gameserver/testterraria_data/testterraria.wld`
+
+**Conclusion de contexte :**
+- Le socle Terraria est maintenant validé pour :
+  - installation
+  - service système
+  - UI Game Commander
+  - création/chargement de monde headless
+- La connexion client au monde n'a pas encore été testée, faute de client côté utilisateur au moment de cette validation
 
 ---
 

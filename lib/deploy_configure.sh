@@ -10,7 +10,7 @@ deploy_check_port_conflict() {
 
 deploy_game_port_proto() {
     case "${GAME_ID:-}" in
-        minecraft|minecraft-fabric) printf 't\n' ;;
+        minecraft|minecraft-fabric|terraria) printf 't\n' ;;
         *) printf 'u\n' ;;
     esac
 }
@@ -43,12 +43,14 @@ deploy_select_game() {
         echo -e "  ${CYAN}[2]${RESET} Enshrouded"
         echo -e "  ${CYAN}[3]${RESET} Minecraft Java"
         echo -e "  ${CYAN}[4]${RESET} Minecraft Fabric"
+        echo -e "  ${CYAN}[5]${RESET} Terraria"
         echo ""
         prompt "Votre choix" "1"
         case "$REPLY" in
             2) GAME_ID="enshrouded" ;;
             3) GAME_ID="minecraft" ;;
             4) GAME_ID="minecraft-fabric" ;;
+            5) GAME_ID="terraria" ;;
             *) GAME_ID="valheim" ;;
         esac
     else
@@ -62,6 +64,7 @@ deploy_select_game() {
         enshrouded) GAME_LABEL="Enshrouded"; STEAM_APPID="2278520"; GAME_BINARY="enshrouded_server.exe" ;;
         minecraft)  GAME_LABEL="Minecraft Java";  STEAM_APPID="";        GAME_BINARY="java" ;;
         minecraft-fabric) GAME_LABEL="Minecraft Fabric"; STEAM_APPID=""; GAME_BINARY="java" ;;
+        terraria) GAME_LABEL="Terraria"; STEAM_APPID=""; GAME_BINARY="TerrariaServer.bin.x86_64" ;;
     esac
     ok "Jeu sélectionné : ${BOLD}${GAME_LABEL}${RESET}"
 }
