@@ -1,5 +1,5 @@
-# CLAUDE.md — Game Commander
-> Fichier de mémoire pour Claude Code. Lire intégralement avant toute modification.
+# CODEX.md — Game Commander
+> Fichier de mémoire pour Codex. Lire intégralement avant toute modification.
 > Mettre à jour après chaque correction ou décision importante.
 
 ---
@@ -27,7 +27,7 @@ dédiés (Valheim, Enshrouded, Minecraft) sur un VPS Hetzner Ubuntu 24.04.
 
 ```
 gc/
-├── CLAUDE.md                  # ce fichier
+├── CODEX.md                   # ce fichier
 ├── game_commander.sh          # point d'entrée bash, source les modules lib/
 ├── game_valheim.json          # config template Valheim
 ├── game_enshrouded.json       # config template Enshrouded

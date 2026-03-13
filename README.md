@@ -166,6 +166,15 @@ La modularisation bash est en place :
   applis Flask génériques et processus orphelins
 - la gestion Nginx moderne est centralisée via `tools/nginx_manager.py`
 
+## Documentation de contexte
+
+La documentation de contexte du projet repose désormais sur :
+
+- `CODEX.md` pour le contexte opérationnel concis
+- `CODEX_historique.md` pour la mémoire projet détaillée
+- `BUGS.md` pour les régressions, bugs connus et solutions validées
+- `README.md` pour la vue d'ensemble du dépôt
+
 ### Jeux supportés
 
 | Jeu | Steam | BepInEx | Config |
