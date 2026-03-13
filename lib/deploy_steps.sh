@@ -516,6 +516,9 @@ SVCEOF
 deploy_step_backups() {
     hdr "ÉTAPE 6 : Sauvegardes automatiques"
 
+    mkdir -p "$APP_DIR"
+    chown "$SYS_USER:$SYS_USER" "$APP_DIR"
+
     mkdir -p "$BACKUP_DIR"
     chown "$SYS_USER:$SYS_USER" "$BACKUP_DIR"
 

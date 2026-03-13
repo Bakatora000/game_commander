@@ -57,17 +57,24 @@ The app is deployed behind Nginx (for example `gaming.example.com.conf`). Flask 
 sudo bash game_commander.sh              # interactive menu
 sudo bash game_commander.sh deploy       # guided deploy
 sudo bash game_commander.sh status       # show all instances
+sudo bash game_commander.sh update --instance testfabric
 sudo bash game_commander.sh uninstall --dry-run
 ```
 
 `game_commander.sh` is now a thin entrypoint that sources the bash modules under `lib/`
 (`cmd_deploy.sh`, `deploy_helpers.sh`, `deploy_configure.sh`, `deploy_steps.sh`,
 `cmd_uninstall.sh`, `uninstall_gc.sh`, `uninstall_flask.sh`, `uninstall_orphans.sh`,
+`cmd_update.sh`,
 `cmd_status.sh`, `nginx.sh`).
 
 Nginx management is also split out into `tools/nginx_manager.py`, which maintains a
 manifest and a generated locations file rather than repeatedly editing inline blocks for
 each instance.
+
+Operational note: deployed instances are copies of the runtime app. Repository fixes do
+not update existing instances automatically. The `update` command is now the supported way
+to resync an installed instance runtime and regenerate its `game.json` without reinstalling
+the game server itself.
 
 ## Architecture
 

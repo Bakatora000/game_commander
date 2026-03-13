@@ -229,6 +229,28 @@ le serveur Enshrouded fonctionne encore normalement.
 
 ---
 
+### [12] Commande `update` — mise à jour d'instance sans réinstallation
+**Constat produit :**
+- Les instances déployées embarquent une copie locale de l'application Flask
+- Corriger le dépôt ne met donc pas à jour automatiquement les instances déjà installées
+
+**Solution retenue :**
+- Ajouter `sudo bash game_commander.sh update`
+- Cette commande :
+  - détecte les instances via `deploy_config.env`
+  - resynchronise le runtime depuis le dépôt
+  - régénère `game.json`
+  - redémarre uniquement `game-commander-<instance>`
+  - ne touche pas au serveur de jeu ni au monde
+
+**Validation réelle :**
+- Test effectué sur `testfabric`
+- Un marqueur UI a été modifié dans le dépôt, puis propagé avec :
+  - `sudo bash /home/vhserver/gc/game_commander.sh update --instance testfabric`
+- Le changement est apparu en UI sans réinstallation complète
+
+---
+
 ## Décisions d'architecture
 
 ### Nginx — vhost partagé multi-instances

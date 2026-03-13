@@ -10,6 +10,7 @@
 #    sudo bash game_commander.sh uninstall                # désinstallation guidée
 #    sudo bash game_commander.sh uninstall --dry-run      # simulation
 #    sudo bash game_commander.sh status                   # état de toutes les instances
+#    sudo bash game_commander.sh update                   # met à jour l'app d'une instance
 # ═══════════════════════════════════════════════════════════════════════════════
 set -uo pipefail
 IFS=$'\n\t'
@@ -28,6 +29,7 @@ source "$SCRIPT_DIR/lib/uninstall_flask.sh"
 source "$SCRIPT_DIR/lib/uninstall_orphans.sh"
 source "$SCRIPT_DIR/lib/cmd_deploy.sh"
 source "$SCRIPT_DIR/lib/cmd_uninstall.sh"
+source "$SCRIPT_DIR/lib/cmd_update.sh"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # AIDE
@@ -44,6 +46,9 @@ show_help() {
     uninstall                Désinstallation guidée
     uninstall --dry-run      Simulation (aucune modification)
     status                   Liste l'état de toutes les instances
+    update                   Met à jour l'app d'une instance existante
+    update --instance ID     Met à jour une instance précise
+    update --all             Met à jour toutes les instances
 
   EXEMPLES :
     sudo bash game_commander.sh
@@ -51,6 +56,7 @@ show_help() {
     sudo bash game_commander.sh deploy --config env/deploy_config.env
     sudo bash game_commander.sh uninstall
     sudo bash game_commander.sh status
+    sudo bash game_commander.sh update --instance testfabric
 
 EOF
 }
@@ -63,7 +69,7 @@ REMAINING_ARGS=()
 
 for arg in "$@"; do
     case "$arg" in
-        deploy|uninstall|status) COMMAND="$arg" ;;
+        deploy|uninstall|status|update) COMMAND="$arg" ;;
         --dry-run) DRY_RUN=true ;;
         --help|-h) show_help; exit 0 ;;
         *) REMAINING_ARGS+=("$arg") ;;
@@ -79,6 +85,7 @@ if [[ -z "$COMMAND" ]]; then
     echo -e "  ${CYAN}[1]${RESET} ${BOLD}deploy${RESET}     — Installer une nouvelle instance"
     echo -e "  ${CYAN}[2]${RESET} ${BOLD}uninstall${RESET}  — Désinstaller une instance"
     echo -e "  ${CYAN}[3]${RESET} ${BOLD}status${RESET}     — État de toutes les instances"
+    echo -e "  ${CYAN}[4]${RESET} ${BOLD}update${RESET}     — Mettre à jour une instance existante"
     echo ""
     echo -en "  ${YELLOW}?  Votre choix : ${RESET}"
     read -r _choice
@@ -86,6 +93,7 @@ if [[ -z "$COMMAND" ]]; then
         1) COMMAND="deploy" ;;
         2) COMMAND="uninstall" ;;
         3) COMMAND="status" ;;
+        4) COMMAND="update" ;;
         *) die "Choix invalide." ;;
     esac
 fi
@@ -94,5 +102,6 @@ case "$COMMAND" in
     deploy)    cmd_deploy    "${REMAINING_ARGS[@]:-}" ;;
     uninstall) cmd_uninstall ;;
     status)    cmd_status    ;;
+    update)    cmd_update    "${REMAINING_ARGS[@]:-}" ;;
     *)         show_help; exit 1 ;;
 esac

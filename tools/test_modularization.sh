@@ -43,6 +43,7 @@ test_entrypoint_is_thin() {
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_status.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_deploy.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_uninstall.sh"' "$file" || return 1
+    grep -q 'source "\$SCRIPT_DIR/lib/cmd_update.sh"' "$file" || return 1
 
     if grep -qE 'apt-get|steamcmd|systemctl reload nginx|certbot|journalctl -u' "$file"; then
         return 1
@@ -70,6 +71,7 @@ test_deploy_modules_present() {
     grep -q 'deploy_check_port_conflict()' "$configure_file" || return 1
     grep -q 'deploy_configure_server()' "$configure_file" || return 1
     grep -q 'deploy_step_dependencies()' "$steps_file" || return 1
+    grep -q 'mkdir -p "\$APP_DIR"' "$steps_file" || return 1
     grep -q 'deploy_step_nginx()' "$steps_file" || return 1
     grep -q 'nginx_manifest_add "\$INSTANCE_ID" "\$URL_PREFIX" "\$FLASK_PORT" "\$GAME_LABEL"' "$steps_file" || return 1
     grep -q 'deploy_step_validation()' "$steps_file" || return 1
@@ -94,6 +96,16 @@ test_uninstall_modules_present() {
     grep -q 'nginx_apply' "$gc_file" || return 1
     grep -q 'uninstall_flask_process_entry' "$flask_file" || return 1
     grep -q 'uninstall_orphans_section' "$orphans_file" || return 1
+}
+
+test_update_module_present() {
+    local file="$ROOT_DIR/lib/cmd_update.sh"
+
+    grep -q 'cmd_update()' "$file" || return 1
+    grep -q 'update_collect_configs()' "$file" || return 1
+    grep -q 'rsync -a --delete' "$file" || return 1
+    grep -q 'tools/config_gen.py" game-json' "$file" || return 1
+    grep -q 'systemctl restart "\$GC_SERVICE"' "$file" || return 1
 }
 
 test_nginx_wrappers_call_python_manager() {
@@ -214,6 +226,7 @@ main() {
     run_test "Deploy helper and step modules present" test_deploy_modules_present
     run_test "Uninstall delegates to dedicated modules" test_uninstall_prefers_manifest
     run_test "Uninstall modules keep manifest and process logic" test_uninstall_modules_present
+    run_test "Update command refreshes installed app runtime" test_update_module_present
     run_test "Nginx shell wrappers call python manager" test_nginx_wrappers_call_python_manager
     run_test "Helpers support dry-run and shared-dir detection" test_helpers_dry_run_and_shared_detection
     run_test "Orphan scan skips systemd-managed child processes" test_orphans_skip_systemd_managed_processes

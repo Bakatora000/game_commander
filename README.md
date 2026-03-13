@@ -104,9 +104,10 @@ sudo bash game_commander.sh deploy --config env/deploy_config.env
 # Générer un modèle de config
 sudo bash game_commander.sh deploy --generate-config
 
-# Désinstallation / statut
+# Désinstallation / statut / update
 sudo bash game_commander.sh uninstall
 sudo bash game_commander.sh status
+sudo bash game_commander.sh update --instance testfabric
 ```
 
 ### Ce que fait le script (12 étapes)
@@ -163,6 +164,8 @@ La modularisation bash est en place :
 - le déploiement est séparé entre orchestration, configuration et étapes
 - la désinstallation est séparée entre orchestration, instances Game Commander,
   applis Flask génériques et processus orphelins
+- une commande `update` permet de resynchroniser le runtime d'une instance déjà installée
+  sans réinstaller le serveur de jeu
 - la gestion Nginx moderne est centralisée via `tools/nginx_manager.py`
 
 ## Documentation de contexte
