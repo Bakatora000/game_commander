@@ -305,6 +305,8 @@ le serveur Enshrouded fonctionne encore normalement.
   - `-maxplayers`
   - `-motd`
   - `-logpath`
+- Exécuter le lancement Terraria derrière `script -qefc ...` pour fournir un pseudo-terminal
+  au process et éviter une charge CPU anormale liée au mode headless sans TTY
 
 **Validation réelle :**
 - logs observés :
@@ -312,6 +314,8 @@ le serveur Enshrouded fonctionne encore normalement.
   - `Server started`
 - fichier monde créé :
   - `/home/gameserver/testterraria_data/testterraria.wld`
+- charge CPU observée après stabilisation :
+  - environ 8% dans l'UI Game Commander
 
 **Conclusion de contexte :**
 - Le socle Terraria est maintenant validé pour :

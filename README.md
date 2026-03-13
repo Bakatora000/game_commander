@@ -206,4 +206,5 @@ Note Terraria :
 - la configuration exposée dans l'UI repose sur `serverconfig.txt`
 - le premier lot couvre déploiement, service systemd, sauvegardes et configuration, sans mods/tModLoader
 - le lancement réel s'appuie sur un `start_server.sh` qui passe les paramètres critiques du monde en ligne de commande au binaire Terraria, en plus de `serverconfig.txt`
+- le service Terraria utilise aussi un wrapper PTY (`script -qefc`) pour éviter une charge CPU anormalement élevée en mode headless sans terminal
 - validé en réel pour l'installation, la création/charge du monde, le service et l'UI Game Commander

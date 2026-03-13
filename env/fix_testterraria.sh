@@ -51,9 +51,43 @@ ARGS=(
 exec ./TerrariaServer.bin.x86_64 "${ARGS[@]}"
 EOF
 
+cat > /home/vhserver/testterraria_server/start_server_service.sh <<'EOF'
+#!/usr/bin/env bash
+exec /usr/bin/script -qefc "/home/vhserver/testterraria_server/start_server.sh" /dev/null
+EOF
+
 chown vhserver:vhserver \
   /home/vhserver/testterraria_server/serverconfig.txt \
-  /home/vhserver/testterraria_server/start_server.sh
-chmod +x /home/vhserver/testterraria_server/start_server.sh
+  /home/vhserver/testterraria_server/start_server.sh \
+  /home/vhserver/testterraria_server/start_server_service.sh
+chmod +x \
+  /home/vhserver/testterraria_server/start_server.sh \
+  /home/vhserver/testterraria_server/start_server_service.sh
+
+cat > /etc/systemd/system/terraria-server-testterraria.service <<'EOF'
+[Unit]
+Description=Terraria Dedicated Server
+After=network.target
+
+[Service]
+Type=simple
+User=vhserver
+WorkingDirectory=/home/vhserver/testterraria_server
+ExecStart=/home/vhserver/testterraria_server/start_server_service.sh
+Restart=on-failure
+RestartSec=10
+SuccessExitStatus=0 130 143
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=terraria-server-testterraria
+KillSignal=SIGINT
+KillMode=mixed
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+systemctl daemon-reload
 systemctl restart terraria-server-testterraria
 journalctl -u terraria-server-testterraria -n 60 --no-pager

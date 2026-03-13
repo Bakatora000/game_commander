@@ -37,9 +37,11 @@
 - **Solutions essayées :**
   - ❌ Générer seulement `worldpath`, `worldname`, `autocreate` dans `serverconfig.txt`
   - ❌ Ajouter uniquement `world=/.../testterraria.wld` dans `serverconfig.txt`
+  - ❌ Lancer directement `TerrariaServer.bin.x86_64` sous systemd sans pseudo-terminal — charge CPU encore anormalement élevée
   - ✅ Générer `world=/.../<nom>.wld` dans `serverconfig.txt`
   - ✅ Faire démarrer `TerrariaServer.bin.x86_64` avec les paramètres critiques directement en ligne de commande via `start_server.sh` (`-world`, `-autocreate`, `-worldname`, `-difficulty`, `-port`, `-maxplayers`, `-motd`, `-logpath`)
-  - ✅ Validation réelle effectuée : création du fichier `testterraria.wld`, log `Listening on port 7777`, puis `Server started`
+  - ✅ Fournir un pseudo-terminal via `script -qefc ...` dans le wrapper systemd Terraria
+  - ✅ Validation réelle effectuée : création du fichier `testterraria.wld`, log `Listening on port 7777`, puis `Server started`, avec charge observée redescendue autour de 8% dans l'UI
 - **Régression connue :** Ne pas considérer `-config serverconfig.txt` seul comme suffisamment fiable pour un lancement headless automatique de Terraria.
 
 ### [11] Minecraft Java — erreur "Incompatible client" après déploiement réussi

@@ -499,6 +499,7 @@ SVCEOF
 
     if [[ "$GAME_ID" == "terraria" ]]; then
         START_SCRIPT="$SERVER_DIR/start_server.sh"
+        WRAPPER_SCRIPT="$SERVER_DIR/start_server_service.sh"
         mkdir -p "$SERVER_DIR/logs"
         cat > "$START_SCRIPT" << STARTEOF
 #!/usr/bin/env bash
@@ -536,6 +537,14 @@ STARTEOF
         chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
         ok "Script de démarrage : $START_SCRIPT"
 
+        cat > "$WRAPPER_SCRIPT" << WRAPEOF
+#!/usr/bin/env bash
+exec /usr/bin/script -qefc "${START_SCRIPT}" /dev/null
+WRAPEOF
+        chmod +x "$WRAPPER_SCRIPT"
+        chown "$SYS_USER:$SYS_USER" "$WRAPPER_SCRIPT"
+        ok "Wrapper service : $WRAPPER_SCRIPT"
+
         cat > "/etc/systemd/system/${GAME_SERVICE}.service" << SVCEOF
 [Unit]
 Description=${GAME_LABEL} Dedicated Server
@@ -545,7 +554,7 @@ After=network.target
 Type=simple
 User=${SYS_USER}
 WorkingDirectory=${SERVER_DIR}
-ExecStart=${START_SCRIPT}
+ExecStart=${WRAPPER_SCRIPT}
 Restart=on-failure
 RestartSec=10
 SuccessExitStatus=0 130 143

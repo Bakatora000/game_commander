@@ -39,6 +39,8 @@ Validated deployment note: Terraria vanilla support is now validated for install
 world creation/loading, Linux systemd service, Nginx integration, and the Game Commander
 UI. The startup path was hardened to pass the critical world/server parameters directly
 to `TerrariaServer.bin.x86_64` rather than relying only on `-config serverconfig.txt`.
+The systemd launch also uses a PTY wrapper (`script -qefc`) to avoid the high CPU behavior
+seen when the Terraria server runs headless without a pseudo-terminal.
 
 ## Running the App
 
