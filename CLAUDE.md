@@ -37,7 +37,9 @@ sudo bash game_commander.sh uninstall --dry-run
 ```
 
 `game_commander.sh` is now a thin entrypoint that sources the bash modules under `lib/`
-(`cmd_deploy.sh`, `cmd_uninstall.sh`, `cmd_status.sh`, `nginx.sh`).
+(`cmd_deploy.sh`, `deploy_helpers.sh`, `deploy_configure.sh`, `deploy_steps.sh`,
+`cmd_uninstall.sh`, `uninstall_gc.sh`, `uninstall_flask.sh`, `uninstall_orphans.sh`,
+`cmd_status.sh`, `nginx.sh`).
 
 Nginx management is also split out into `tools/nginx_manager.py`, which maintains a
 manifest and a generated locations file rather than repeatedly editing inline blocks for

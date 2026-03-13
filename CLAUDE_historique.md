@@ -36,8 +36,14 @@ gc/
 ├── lib/
 │   ├── helpers.sh             # logs, prompts, helpers shell communs
 │   ├── nginx.sh               # wrapper bash autour de tools/nginx_manager.py
-│   ├── cmd_deploy.sh          # logique de déploiement
-│   ├── cmd_uninstall.sh       # logique de désinstallation
+│   ├── cmd_deploy.sh          # orchestration du déploiement
+│   ├── deploy_helpers.sh      # defaults, prompts, config file, logging
+│   ├── deploy_configure.sh    # étape 2 interactive / validations de config
+│   ├── deploy_steps.sh        # étapes 3 à 12 du déploiement
+│   ├── cmd_uninstall.sh       # orchestration de la désinstallation
+│   ├── uninstall_gc.sh        # désinstallation des instances Game Commander
+│   ├── uninstall_flask.sh     # désinstallation des applis Flask génériques
+│   ├── uninstall_orphans.sh   # détection/cleanup des processus orphelins
 │   └── cmd_status.sh          # affichage de l'état des instances
 ├── tools/
 │   ├── nginx_manager.py       # manifest nginx + génération locations + migration
@@ -183,6 +189,23 @@ Le but est d'éviter les manipulations répétées et fragiles de blocs inline d
 partagé. Les anciennes corrections liées à l'injection inline restent importantes pour la
 migration et pour les cas de fallback/legacy, mais la source de vérité est maintenant le
 manifest Nginx.
+
+### Modularisation du script bash
+
+La modularisation de `game_commander.sh` est maintenant considérée comme **terminée à un
+bon niveau** :
+- `game_commander.sh` = point d'entrée + dispatch
+- `cmd_deploy.sh` = orchestration du déploiement
+- `deploy_helpers.sh` = helpers de déploiement
+- `deploy_configure.sh` = collecte/validation de configuration
+- `deploy_steps.sh` = exécution des étapes de déploiement
+- `cmd_uninstall.sh` = orchestration de la désinstallation
+- `uninstall_gc.sh`, `uninstall_flask.sh`, `uninstall_orphans.sh` = sous-domaines
+  de désinstallation
+- `nginx.sh` = wrappers bash Nginx
+
+Ce qui reste à faire relève plutôt du raffinage d'architecture et des tests unitaires
+supplémentaires, plus d'une extraction urgente.
 
 ### Mots de passe
 - **Mot de passe jeu** (`SERVER_PASSWORD`) : en clair dans le fichier de config du jeu

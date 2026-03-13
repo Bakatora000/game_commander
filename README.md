@@ -39,8 +39,14 @@ core/
 lib/
   helpers.sh               ← Helpers shell partagés
   nginx.sh                 ← Fonctions Nginx
-  cmd_deploy.sh            ← Déploiement
-  cmd_uninstall.sh         ← Désinstallation
+  cmd_deploy.sh            ← Orchestration du déploiement
+  deploy_helpers.sh        ← Helpers de déploiement
+  deploy_configure.sh      ← Configuration interactive / validations
+  deploy_steps.sh          ← Étapes de déploiement
+  cmd_uninstall.sh         ← Orchestration de la désinstallation
+  uninstall_gc.sh          ← Désinstallation Game Commander
+  uninstall_flask.sh       ← Désinstallation Flask générique
+  uninstall_orphans.sh     ← Processus orphelins
   cmd_status.sh            ← Statut instances
 
 tools/
@@ -149,6 +155,16 @@ Ce script :
 - exécute `./tools/test_modularization.sh`
 
 Un hook `pre-push` versionné est aussi fourni dans `.githooks/pre-push`.
+
+## État de la modularisation
+
+La modularisation bash est en place :
+
+- `game_commander.sh` est un point d'entrée léger
+- le déploiement est séparé entre orchestration, configuration et étapes
+- la désinstallation est séparée entre orchestration, instances Game Commander,
+  applis Flask génériques et processus orphelins
+- la gestion Nginx moderne est centralisée via `tools/nginx_manager.py`
 
 ### Jeux supportés
 
