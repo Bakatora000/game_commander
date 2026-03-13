@@ -100,7 +100,7 @@ sudo bash game_commander.sh
 sudo bash game_commander.sh deploy
 
 # Avec fichier de config (CI/redéploiement)
-sudo bash game_commander.sh deploy --config deploy_game_commander.env
+sudo bash game_commander.sh deploy --config deploy_config.env
 
 # Générer un modèle de config
 sudo bash game_commander.sh deploy --generate-config
@@ -174,6 +174,7 @@ La documentation de contexte du projet repose désormais sur :
 - `CODEX_historique.md` pour la mémoire projet détaillée
 - `BUGS.md` pour les régressions, bugs connus et solutions validées
 - `README.md` pour la vue d'ensemble du dépôt
+- `GUIDE_DEMARRAGE.md` pour une prise en main débutant côté serveur/VPS/SSH
 
 ### Jeux supportés
 

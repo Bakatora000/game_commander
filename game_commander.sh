@@ -48,7 +48,7 @@ show_help() {
   EXEMPLES :
     sudo bash game_commander.sh
     sudo bash game_commander.sh deploy
-    sudo bash game_commander.sh deploy --config deploy_game_commander.env
+    sudo bash game_commander.sh deploy --config deploy_config.env
     sudo bash game_commander.sh uninstall
     sudo bash game_commander.sh status
 
