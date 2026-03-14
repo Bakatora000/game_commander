@@ -42,6 +42,9 @@
       {% if game.features.config %}
       <button class="nav-btn" data-tab="config" id="navBtnConfig"><span class="nav-icon">◈</span><span>Configuration</span></button>
       {% endif %}
+      {% if game.features.saves %}
+      <button class="nav-btn" data-tab="saves" id="navBtnSaves"><span class="nav-icon">⬓</span><span>Sauvegardes</span></button>
+      {% endif %}
       <button class="nav-btn admin-only" data-tab="users" style="display:none"><span class="nav-icon">◉</span><span>Utilisateurs</span></button>
       {% block extra_nav %}{% endblock %}
     </div>
@@ -146,6 +149,26 @@
     </section>
     {% endif %}
 
+    <!-- SAVES -->
+    {% if game.features.saves %}
+    <section class="tab-panel" id="tab-saves">
+      <div class="content-wrap">
+        <div class="panel saves-panel">
+          <div class="panel-header">
+            <span class="panel-title">Save Manager</span>
+            <span class="panel-count" id="saveRootLabel"></span>
+          </div>
+          <div class="saves-toolbar">
+            <select id="saveRootSelect" class="config-input"></select>
+            <button class="btn-ghost btn-sm" id="btnSaveUp" disabled>⬑ Remonter</button>
+            <span class="save-path" id="savePathLabel">/</span>
+          </div>
+          <div id="saveEntries" class="saves-list"></div>
+        </div>
+      </div>
+    </section>
+    {% endif %}
+
     <!-- UTILISATEURS -->
     <section class="tab-panel" id="tab-users">
       <div class="content-wrap">
@@ -240,6 +263,7 @@ function initTabs() {
       if (tab === 'users')   loadUsers();
       if (tab === 'mods')    loadInstalledMods?.();
       if (tab === 'config')  loadConfig?.();
+      if (tab === 'saves')   loadSaveEntries?.();
     });
   });
 }
@@ -276,6 +300,11 @@ async function fetchMe() {
       el.title    = 'Permission insuffisante';
       el.classList.add('btn-disabled');
     });
+  }
+  if (!myPerms.includes('manage_saves')) {
+    document.querySelector('.nav-btn[data-tab="saves"]')?.remove();
+  } else if (FEATURES.saves) {
+    initSaveManager?.();
   }
 
   // Mods — masquer install/delete si pas les perms
@@ -512,6 +541,114 @@ async function sendConsoleCmd() {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({command:cmd})
   }).catch(() => null);
   if (!r?.ok) showToast('Erreur commande', 'error');
+}
+
+// ── SAVES ────────────────────────────────────────────────────────────────────
+let saveRoots = [];
+let saveCurrentRoot = '';
+let saveCurrentPath = '';
+
+function initSaveManager() {
+  saveCurrentPath = '';
+  document.getElementById('saveRootSelect')?.addEventListener('change', e => {
+    saveCurrentRoot = e.target.value;
+    saveCurrentPath = '';
+    loadSaveEntries();
+  });
+  document.getElementById('btnSaveUp')?.addEventListener('click', () => {
+    if (!saveCurrentRoot) return;
+    const parts = (saveCurrentPath || '').split('/').filter(Boolean);
+    parts.pop();
+    saveCurrentPath = parts.join('/');
+    loadSaveEntries();
+  });
+  loadSaveRoots();
+}
+
+async function loadSaveRoots() {
+  const r = await fetch(`${PREFIX}/api/saves`).catch(() => null);
+  if (!r?.ok) return;
+  const d = await r.json();
+  saveRoots = d.roots || [];
+  const select = document.getElementById('saveRootSelect');
+  if (!select) return;
+  select.innerHTML = saveRoots.map(root =>
+    `<option value="${root.id}" ${!root.exists ? 'disabled' : ''}>${root.label}${root.exists ? '' : ' (absent)'}</option>`
+  ).join('');
+  const firstExisting = saveRoots.find(r => r.exists);
+  saveCurrentRoot = firstExisting?.id || '';
+  saveCurrentPath = '';
+  select.value = saveCurrentRoot;
+  loadSaveEntries();
+}
+
+async function loadSaveEntries() {
+  if (!saveCurrentRoot) return;
+  const qs = new URLSearchParams({root: saveCurrentRoot});
+  if (saveCurrentPath) qs.set('path', saveCurrentPath);
+  const r = await fetch(`${PREFIX}/api/saves?${qs.toString()}`).catch(() => null);
+  const list = document.getElementById('saveEntries');
+  const rootLabel = document.getElementById('saveRootLabel');
+  const pathLabel = document.getElementById('savePathLabel');
+  const upBtn = document.getElementById('btnSaveUp');
+  if (!r?.ok) {
+    if (saveCurrentPath) {
+      saveCurrentPath = '';
+      return loadSaveEntries();
+    }
+    if (upBtn) upBtn.disabled = true;
+    if (pathLabel) pathLabel.textContent = '/';
+    if (list) list.innerHTML = '<p class="empty-msg">Aucune sauvegarde accessible</p>';
+    return;
+  }
+  const d = await r.json();
+  saveRoots = d.roots || saveRoots;
+  saveCurrentPath = d.current_path || '';
+  if (rootLabel) rootLabel.textContent = d.root?.label || '';
+  if (pathLabel) pathLabel.textContent = '/' + (saveCurrentPath || '');
+  if (upBtn) upBtn.disabled = !saveCurrentPath;
+  if (!list) return;
+  if (!d.entries?.length) {
+    list.innerHTML = '<p class="empty-msg">Dossier vide</p>';
+    return;
+  }
+  list.innerHTML = '';
+  d.entries.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'save-row';
+    const typeIcon = entry.type === 'dir' ? '📁' : '📄';
+    const meta = entry.type === 'file' && entry.size != null ? formatBytes(entry.size) : 'Dossier';
+    row.innerHTML = `
+      <div class="save-main">
+        <span class="save-icon">${typeIcon}</span>
+        <button class="save-link">${entry.name}</button>
+        <span class="save-meta">${meta}</span>
+      </div>
+      <div class="save-actions">
+        <button class="btn-ghost btn-sm save-download">Télécharger</button>
+      </div>`;
+    row.querySelector('.save-link').addEventListener('click', () => {
+      if (entry.type === 'dir') {
+        saveCurrentPath = entry.path;
+        loadSaveEntries();
+      }
+    });
+    row.querySelector('.save-download').addEventListener('click', () => {
+      const dl = new URL(`${PREFIX}/api/saves/download`, window.location.origin);
+      dl.searchParams.set('root', saveCurrentRoot);
+      dl.searchParams.set('path', entry.path);
+      window.location.href = dl.toString();
+    });
+    list.appendChild(row);
+  });
+}
+
+function formatBytes(n) {
+  if (!n) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let i = 0, v = n;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return `${v >= 10 || i === 0 ? v.toFixed(0) : v.toFixed(1)} ${units[i]}`;
 }
 
 // ── USERS ─────────────────────────────────────────────────────────────────────

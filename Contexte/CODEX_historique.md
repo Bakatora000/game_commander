@@ -470,6 +470,52 @@ supplémentaires, plus d'une extraction urgente.
 ### systemd stop/restart
 Utiliser `--no-block` pour éviter le timeout Flask (30s) sur les serveurs lents à s'arrêter.
 
+### Nouveau mode `attach`
+
+Décision d'architecture validée :
+- ne plus limiter Game Commander au seul modèle “installer le jeu + installer Commander”
+- introduire une séparation explicite entre :
+  - `managed` : Game Commander gère aussi le serveur de jeu
+  - `attach` : Game Commander se branche sur un service jeu existant
+
+Validation réelle effectuée :
+- un second Commander a été attaché à un service Soulmask existant
+- aucun nouveau service jeu n'a été créé
+- `start/stop/restart` depuis l'UI attachée pilotent bien le service existant
+
+Contraintes retenues pour `attach` :
+- conserver `GAME_SERVICE` tel que fourni
+- conserver `SERVER_DIR` / `DATA_DIR` tels que fournis
+- ne pas auto-décaler les ports du serveur de jeu existant
+- seul le port Flask de la nouvelle UI peut être ajusté
+
+### Save manager — sujet à reprendre
+
+Besoin produit noté pour plus tard :
+- ajouter un menu `save manager` dans l'UI
+- exposer les dossiers de sauvegarde réels par jeu
+- permettre le téléchargement via interface graphique
+
+Séparation conceptuelle retenue :
+- `backup manager`
+  - gère les archives `.zip` générées dans `BACKUP_DIR`
+- `save manager`
+  - gère les fichiers source réels des mondes/saves côté serveur
+
+Politique de sauvegarde actuelle à prendre en compte :
+- Valheim
+  - monde serveur uniquement
+  - pas les personnages client
+- Enshrouded
+  - `savegame/`
+- Minecraft Java / Fabric
+  - `world/` + fichiers admin utiles
+- Terraria
+  - monde serveur uniquement
+  - pas les personnages client
+- Soulmask
+  - `LinuxServer/WS/Saved`
+
 ### Refresh rates frontend
 - Statut + compteurs : `setInterval(fetchStatus, 5000)` — 5 secondes
 - Graphe métriques : `setInterval(loadChartData, 30000)` — 30 secondes

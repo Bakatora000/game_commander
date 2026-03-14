@@ -5,7 +5,7 @@ Flask factory. Lit game.json, enregistre toutes les routes communes,
 charge conditionnellement les modules par jeu (mods, config).
 """
 import os, json, importlib
-from flask import Flask, request, jsonify, session, redirect, render_template
+from flask import Flask, request, jsonify, session, redirect, render_template, send_file
 import bcrypt
 
 # ── Chargement de la config jeu ────────────────────────────────────────────────
@@ -34,7 +34,7 @@ app.config['GAME']   = GAME
 app.config['PREFIX'] = PREFIX
 
 # ── Modules core ──────────────────────────────────────────────────────────────
-from core import auth, server, metrics
+from core import auth, server, metrics, saves
 
 metrics.init(os.path.join(_HERE, 'metrics.log'))
 
@@ -165,6 +165,44 @@ def api_console():
         return jsonify({'error': 'empty_command'}), 400
     ok, result = server.send_console_command(cmd)
     return jsonify({'ok': ok, 'result': result})
+
+# ─────────────────────────────────────────────────────────────────────────────
+# API — SAUVEGARDES
+# ─────────────────────────────────────────────────────────────────────────────
+@app.route(f'{PREFIX}/api/saves')
+@auth.require_auth
+@auth.require_perm('manage_saves')
+def api_saves():
+    root_id = request.args.get('root', '').strip()
+    rel_path = request.args.get('path', '')
+    roots = saves.get_save_roots()
+
+    if not root_id:
+        return jsonify({'roots': roots})
+
+    try:
+        data, err = saves.list_entries(root_id, rel_path)
+    except ValueError:
+        return jsonify({'error': 'invalid_path', 'roots': roots}), 400
+    if err:
+        return jsonify({'error': err, 'roots': roots}), 404
+    data['roots'] = roots
+    return jsonify(data)
+
+
+@app.route(f'{PREFIX}/api/saves/download')
+@auth.require_auth
+@auth.require_perm('manage_saves')
+def api_saves_download():
+    root_id = request.args.get('root', '').strip()
+    rel_path = request.args.get('path', '')
+    try:
+        target, filename, err = saves.get_download_target(root_id, rel_path)
+    except ValueError:
+        return jsonify({'error': 'invalid_path'}), 400
+    if err:
+        return jsonify({'error': err}), 404
+    return send_file(target, as_attachment=True, download_name=filename)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # API — UTILISATEURS

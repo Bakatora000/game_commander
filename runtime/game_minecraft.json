@@ -21,11 +21,12 @@
     "mods":    false,
     "config":  true,
     "console": true,
-    "players": true
+    "players": true,
+    "saves":   true
   },
 
   "permissions": [
-    "start_server", "stop_server", "restart_server", "manage_config", "console", "manage_users"
+    "start_server", "stop_server", "restart_server", "manage_config", "manage_saves", "console", "manage_users"
   ],
 
   "theme": { "name": "minecraft" }

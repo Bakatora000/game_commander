@@ -20,13 +20,15 @@
     "mods": false,
     "config": true,
     "console": true,
-    "players": false
+    "players": false,
+    "saves": true
   },
   "permissions": [
     "start_server",
     "stop_server",
     "restart_server",
     "manage_config",
+    "manage_saves",
     "console",
     "manage_users"
   ],

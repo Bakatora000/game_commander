@@ -103,6 +103,12 @@ sudo bash game_commander.sh deploy
 # Avec fichier de config (CI/redéploiement)
 sudo bash game_commander.sh deploy --config env/deploy_config.env
 
+# Attacher seulement Commander à un service jeu existant
+sudo bash game_commander.sh deploy --attach
+
+# Variante attach avec fichier de config
+sudo bash game_commander.sh deploy --config env/deploy_attach.env
+
 # Générer un modèle de config
 sudo bash game_commander.sh deploy --generate-config
 
@@ -129,6 +135,31 @@ sudo bash game_commander.sh update --instance testfabric
 | 10 | SSL (certbot / existing / none) |
 | 11 | Règles sudoers (systemctl + BepInEx pour Valheim) |
 | 12 | Sauvegarde deploy_config.env |
+
+### Modes de déploiement
+
+Le script supporte maintenant deux modes :
+
+- `managed`
+  - Game Commander installe et gère aussi le serveur de jeu
+  - création du service jeu + service Flask
+
+- `attach`
+  - Game Commander se branche sur un service jeu déjà existant
+  - aucun nouveau service jeu n'est créé
+  - le serveur de jeu n'est pas réinstallé
+  - seul le runtime Commander, son service Flask, Nginx et la config associée sont déployés
+
+Le mode `attach` est utile pour :
+- rattacher Commander à un serveur déjà présent sur la machine
+- séparer clairement “hébergement du jeu” et “interface Commander”
+- préparer à terme un rattachement à des installations non créées par `game_commander.sh`
+
+Comportement important du mode `attach` :
+- `GAME_SERVICE` est conservé tel que fourni
+- `SERVER_DIR` et `DATA_DIR` sont conservés tels que fournis
+- les ports du serveur existant ne sont pas auto-décalés
+- seul le port Flask de la nouvelle UI Commander peut être ajusté si déjà utilisé
 
 ### Nginx multi-instances
 
@@ -168,6 +199,8 @@ La modularisation bash est en place :
   applis Flask génériques et processus orphelins
 - une commande `update` permet de resynchroniser le runtime d'une instance déjà installée
   sans réinstaller le serveur de jeu
+- `update` préserve aussi un `GAME_SERVICE` personnalisé, nécessaire pour les instances
+  déployées en mode `attach`
 - la gestion Nginx moderne est centralisée via `tools/nginx_manager.py`
 
 ## Documentation de contexte
@@ -221,3 +254,28 @@ Note Soulmask :
 - un bug de launcher a été corrigé : le wrapper Game Commander appelle maintenant `WSServer.sh` avec un jeu d'arguments propre, au lieu d'empiler des flags dupliqués sur `StartServer.sh`
 - la charge CPU au repos reste à surveiller plus tard en condition réelle avec joueur connecté
 - en validation réelle, Soulmask a aussi montré des phases de démarrage et d'arrêt sensiblement plus lentes que les autres jeux déjà supportés ; il faut laisser quelques minutes avant de juger la charge CPU juste après un `start` ou `restart`
+
+### Politique actuelle de sauvegarde
+
+- Valheim
+  - sauvegarde le monde serveur (`worlds_local/` ou `worlds/`)
+  - cible surtout les fichiers du monde (`.db`, `.fwl`, `.old`)
+  - les personnages restent en pratique côté client
+
+- Enshrouded
+  - sauvegarde `savegame/`
+
+- Minecraft Java
+  - sauvegarde `world/`
+  - inclut aussi `server.properties`, `ops.json`, `whitelist.json`, `banned-players.json`, `banned-ips.json`, `usercache.json`
+
+- Minecraft Fabric
+  - même politique que Minecraft Java
+  - sans inclure `mods/`, `libraries/`, `logs/` ni les binaires
+
+- Terraria
+  - sauvegarde le dossier de monde/données du serveur
+  - les personnages restent en pratique côté client
+
+- Soulmask
+  - sauvegarde `LinuxServer/WS/Saved`

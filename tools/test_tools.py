@@ -29,6 +29,7 @@ import config_gen
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import players as minecraft_players
 from runtime.games.minecraft_fabric import mods as minecraft_fabric_mods
+from runtime.core import saves as core_saves
 from runtime.games.soulmask import config as soulmask_config
 from runtime.games.terraria import config as terraria_config
 
@@ -388,12 +389,14 @@ class ConfigGenGameJsonTests(unittest.TestCase):
         data = self._gen_valheim()
         self.assertIn("install_mod", data["permissions"])
         self.assertIn("remove_mod", data["permissions"])
+        self.assertIn("manage_saves", data["permissions"])
 
     def test_valheim_bepinex_section(self):
         data = self._gen_valheim()
         self.assertIn("mods", data)
         self.assertEqual(data["mods"]["platform"], "thunderstore")
         self.assertTrue(data["features"]["mods"])
+        self.assertTrue(data["features"]["saves"])
 
     def test_valheim_no_bepinex(self):
         data = self._gen_valheim(bepinex_path="")
@@ -450,6 +453,7 @@ class ConfigGenGameJsonTests(unittest.TestCase):
         self.assertEqual(data["server"]["binary"], "TerrariaServer.bin.x86_64")
         self.assertTrue(data["features"]["config"])
         self.assertFalse(data["features"]["players"])
+        self.assertTrue(data["features"]["saves"])
         self.assertIn("manage_config", data["permissions"])
 
     def test_soulmask_support(self):
@@ -491,6 +495,7 @@ class ConfigGenUsersJsonTests(unittest.TestCase):
         data = json.loads(Path(out).read_text())
         self.assertIn("admin", data)
         self.assertIn("install_mod", data["admin"]["permissions"])
+        self.assertIn("manage_saves", data["admin"]["permissions"])
         self.assertEqual(data["admin"]["password_hash"], "$2b$fakehash")
 
     def test_enshrouded_permissions(self):
@@ -500,7 +505,58 @@ class ConfigGenUsersJsonTests(unittest.TestCase):
         ))
         data = json.loads(Path(out).read_text())
         self.assertNotIn("install_mod", data["admin"]["permissions"])
+        self.assertIn("manage_saves", data["admin"]["permissions"])
         self.assertIn("manage_config", data["admin"]["permissions"])
+
+
+class SaveManagerTests(unittest.TestCase):
+
+    def setUp(self):
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmpdir.name)
+        self.app = Flask(__name__)
+        self.app.config["GAME"] = {
+            "id": "minecraft-fabric",
+            "server": {
+                "install_dir": str(self.root / "server"),
+                "data_dir": str(self.root / "data"),
+                "world_name": None,
+            }
+        }
+        (self.root / "server" / "world" / "playerdata").mkdir(parents=True)
+        (self.root / "server" / "world" / "level.dat").write_text("level")
+        (self.root / "server" / "world" / "playerdata" / "abc.dat").write_text("player")
+
+    def tearDown(self):
+        self.tmpdir.cleanup()
+
+    def test_get_save_roots_for_minecraft_fabric(self):
+        with self.app.app_context():
+            roots = core_saves.get_save_roots()
+        self.assertEqual([r["id"] for r in roots], ["world", "playerdata"])
+        self.assertTrue(all(r["exists"] for r in roots))
+
+    def test_list_entries_returns_directory_content(self):
+        with self.app.app_context():
+            data, err = core_saves.list_entries("world", "")
+        self.assertIsNone(err)
+        self.assertEqual(data["current_path"], "")
+        names = [e["name"] for e in data["entries"]]
+        self.assertIn("level.dat", names)
+        self.assertIn("playerdata", names)
+
+    def test_list_entries_blocks_path_traversal(self):
+        with self.app.app_context():
+            with self.assertRaises(ValueError):
+                core_saves.list_entries("world", "../../etc")
+
+    def test_download_directory_creates_zip(self):
+        with self.app.test_request_context():
+            target, filename, err = core_saves.get_download_target("world", "playerdata")
+        self.assertIsNone(err)
+        self.assertEqual(filename, "playerdata.zip")
+        with zipfile.ZipFile(target) as zf:
+            self.assertIn("playerdata/abc.dat", zf.namelist())
 
 
 class ConfigGenEnshroudedCfgTests(unittest.TestCase):
@@ -1328,14 +1384,16 @@ if __name__ == "__main__":
         ConfigGenPatchBepinexTests,
         ConfigGenMinecraftPropsTests,
         MinecraftConfigTests,
+        TerrariaConfigTests,
         MinecraftPlayersTests,
         MinecraftFabricModsTests,
+        SaveManagerTests,
     ]
     if len(sys.argv) > 1:
         names = sys.argv[1:]
         test_classes = [c for c in test_classes if c.__name__ in names]
         if not test_classes:
-            print(f"Classes disponibles : {[c.__name__ for c in test_classes]}")
+            print(f"Classes disponibles : {[c.__name__ for c in [NginxInjectTests, NginxRemoveTests, NginxFindConfTests, NginxManifestTests, ConfigGenGameJsonTests, ConfigGenUsersJsonTests, ConfigGenEnshroudedCfgTests, ConfigGenPatchBepinexTests, ConfigGenMinecraftPropsTests, MinecraftConfigTests, TerrariaConfigTests, MinecraftPlayersTests, MinecraftFabricModsTests, SaveManagerTests]]}")
             sys.exit(1)
 
     for cls in test_classes:

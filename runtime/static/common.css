@@ -426,6 +426,61 @@ html, body {
 .config-input { width: 100%; }
 .config-note  { font-size: .72rem; color: var(--color-warning); padding: .5rem 1rem .75rem; border-top: 1px solid var(--color-border); }
 
+/* ── SAVES ───────────────────────────────────────────────────────── */
+.saves-toolbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 260px) auto 1fr;
+  gap: .75rem;
+  align-items: center;
+  padding: .75rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.save-path {
+  font-size: .78rem;
+  color: var(--color-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.saves-list { padding: .25rem 0; }
+.save-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .55rem 1rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.save-row:last-child { border-bottom: none; }
+.save-main {
+  display: flex;
+  align-items: center;
+  gap: .75rem;
+  min-width: 0;
+  flex: 1;
+}
+.save-icon { flex-shrink: 0; }
+.save-link {
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.save-link:hover { color: var(--color-primary); }
+.save-meta {
+  font-size: .72rem;
+  color: var(--color-muted);
+  flex-shrink: 0;
+}
+.save-actions { display: flex; gap: .35rem; }
+
 /* ── USERS ───────────────────────────────────────────────────────── */
 .user-row {
   display: flex;
@@ -566,6 +621,9 @@ input::placeholder { color: var(--color-muted); }
   .gauge-value  { font-size: .68rem; }
   .config-row   { grid-template-columns: 1fr; }
   .form-row     { grid-template-columns: 1fr; }
+  .saves-toolbar { grid-template-columns: 1fr; }
+  .save-row { align-items: flex-start; flex-direction: column; }
+  .save-main { width: 100%; }
 }
 
 /* ── WORLD MODIFIERS ─────────────────────────────────────────────────────── */

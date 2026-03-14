@@ -104,6 +104,15 @@ not update existing instances automatically. The `update` command is now the sup
 to resync an installed instance runtime and regenerate its `game.json` without reinstalling
 the game server itself.
 
+Validated deployment note: a new `attach` deployment mode now exists. It deploys only the
+Commander runtime/UI on top of an existing game systemd service, without reinstalling the
+game server or creating a new game service. This was validated in real conditions by
+attaching a second Commander instance to an existing Soulmask service and exercising
+`start/stop/restart` through the attached UI.
+
+Operational note: the `update` command now preserves a custom `GAME_SERVICE`, which is
+required for instances deployed in `attach` mode.
+
 ## Architecture
 
 ### Config-driven game selection (`runtime/game.json`)
@@ -126,6 +135,9 @@ All routes are prefixed with `PREFIX` from `game.json`. Common routes:
 - `GET {PREFIX}/api/players` (Valheim / Enshrouded / Minecraft Java / Minecraft Fabric)
 - `POST {PREFIX}/api/update` → SteamCMD update in background thread
 
+Planned next feature: a `save manager` view/API to expose the real world/save directories
+per game and the generated backup archives through the web UI.
+
 ### Auth (`runtime/core/auth.py`)
 
 Users stored in `runtime/users.json` (bcrypt hashed passwords). The `admin_user` (from `runtime/game.json`) always receives all permissions listed in `runtime/game.json["permissions"]`. Non-admin users have an explicit permission list. Two decorators: `@auth.require_auth` (session check) and `@auth.require_perm('perm_name')`.
@@ -147,6 +159,13 @@ Each game can provide:
 - `world_modifiers.py` — `read_modifiers()`, `write_modifiers(data)`, `get_schema()` (Valheim only)
 
 Modules are conditionally imported at startup based on `features.*` flags. Missing modules produce a `[WARN]` log and disable the feature.
+
+Current backup policy by game:
+- Valheim: world files only (`.db`, `.fwl`, `.old`)
+- Enshrouded: `savegame/`
+- Minecraft Java / Fabric: `world/` + main admin files
+- Terraria: server world/data directory
+- Soulmask: `LinuxServer/WS/Saved`
 
 ### Templates and themes
 

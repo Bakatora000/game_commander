@@ -20,7 +20,8 @@
     "mods": true,
     "config": true,
     "console": true,
-    "players": false
+    "players": false,
+    "saves": true
   },
   "permissions": [
     "start_server",
@@ -29,6 +30,7 @@
     "install_mod",
     "remove_mod",
     "manage_config",
+    "manage_saves",
     "console",
     "manage_users"
   ],

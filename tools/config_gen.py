@@ -86,6 +86,7 @@ def cmd_game_json(args):
             "config":  game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria", "soulmask"),
             "console": True,
             "players": game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric"),
+            "saves":   game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria", "soulmask"),
         },
         "theme": {"name": theme_name if theme_name in ("valheim", "enshrouded", "minecraft") else "valheim"},
     }
@@ -101,32 +102,32 @@ def cmd_game_json(args):
     if game_id == "valheim":
         game["permissions"] = [
             "start_server", "stop_server", "restart_server",
-            "install_mod", "remove_mod", "manage_config", "console", "manage_users",
+            "install_mod", "remove_mod", "manage_config", "manage_saves", "console", "manage_users",
         ]
     elif game_id == "enshrouded":
         game["permissions"] = [
             "start_server", "stop_server", "restart_server",
-            "manage_config", "console", "manage_users",
+            "manage_config", "manage_saves", "console", "manage_users",
         ]
     elif game_id == "minecraft":
         game["permissions"] = [
             "start_server", "stop_server", "restart_server",
-            "manage_config", "console", "manage_users",
+            "manage_config", "manage_saves", "console", "manage_users",
         ]
     elif game_id == "minecraft-fabric":
         game["permissions"] = [
             "start_server", "stop_server", "restart_server",
-            "install_mod", "remove_mod", "manage_config", "console", "manage_users",
+            "install_mod", "remove_mod", "manage_config", "manage_saves", "console", "manage_users",
         ]
     elif game_id == "terraria":
         game["permissions"] = [
             "start_server", "stop_server", "restart_server",
-            "manage_config", "console", "manage_users",
+            "manage_config", "manage_saves", "console", "manage_users",
         ]
     elif game_id == "soulmask":
         game["permissions"] = [
             "start_server", "stop_server", "restart_server",
-            "manage_config", "console", "manage_users",
+            "manage_config", "manage_saves", "console", "manage_users",
         ]
     else:
         game["permissions"] = [
@@ -169,12 +170,12 @@ def cmd_users_json(args):
     if game_id == "valheim":
         perms = [
             "start_server", "stop_server", "restart_server",
-            "install_mod", "remove_mod", "manage_config", "console", "manage_users",
+            "install_mod", "remove_mod", "manage_config", "manage_saves", "console", "manage_users",
         ]
     else:
         perms = [
             "start_server", "stop_server", "restart_server",
-            "manage_config", "console", "manage_users",
+            "manage_config", "manage_saves", "console", "manage_users",
         ]
 
     data = {args.admin: {"password_hash": args.hash, "permissions": perms}}
