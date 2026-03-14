@@ -165,7 +165,7 @@ Current backup policy by game:
 - Enshrouded: `savegame/`
 - Minecraft Java / Fabric: `world/` + main admin files
 - Terraria: server world/data directory
-- Soulmask: `LinuxServer/WS/Saved`
+- Soulmask: `WS/Saved`
 
 ### Templates and themes
 

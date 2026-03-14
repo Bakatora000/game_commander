@@ -17,6 +17,7 @@ import unittest
 import zipfile
 from pathlib import Path
 from flask import Flask
+from werkzeug.datastructures import FileStorage
 
 # Ajouter le répertoire tools/ au path pour importer les modules
 TOOLS_DIR = Path(__file__).parent
@@ -562,6 +563,70 @@ class SaveManagerTests(unittest.TestCase):
         with zipfile.ZipFile(target) as zf:
             self.assertIn("playerdata/abc.dat", zf.namelist())
 
+    def test_upload_plain_file_into_current_directory(self):
+        upload = FileStorage(stream=io.BytesIO(b"newdata"), filename="new.dat")
+        with self.app.app_context():
+            analysis, err = core_saves.analyze_uploads("world", "playerdata", [upload])
+            data = core_saves.save_uploads(analysis)
+        self.assertIsNone(err)
+        self.assertEqual(data["count"], 1)
+        self.assertTrue((self.root / "server" / "world" / "playerdata" / "new.dat").exists())
+
+    def test_upload_zip_extracts_safely(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("world/level.dat", b"123")
+            zf.writestr("world/region/r.0.0.mca", b"456")
+        buf.seek(0)
+        upload = FileStorage(stream=buf, filename="restore.zip")
+        with self.app.app_context():
+            analysis, err = core_saves.analyze_uploads("world", "", [upload])
+            data = core_saves.save_uploads(analysis)
+        self.assertIsNone(err)
+        self.assertEqual(data["count"], 1)
+        self.assertIn("level.dat", data["extracted"])
+        self.assertTrue((self.root / "server" / "world" / "level.dat").exists())
+        self.assertTrue((self.root / "server" / "world" / "region" / "r.0.0.mca").exists())
+
+    def test_upload_zip_blocks_traversal(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("../escape.txt", b"x")
+        buf.seek(0)
+        upload = FileStorage(stream=buf, filename="bad.zip")
+        with self.app.app_context():
+            with self.assertRaises(ValueError):
+                core_saves.analyze_uploads("world", "", [upload])
+
+    def test_upload_zip_rejects_invalid_minecraft_world_layout(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("random/file.txt", b"x")
+        buf.seek(0)
+        upload = FileStorage(stream=buf, filename="bad-layout.zip")
+        with self.app.app_context():
+            with self.assertRaises(ValueError):
+                core_saves.analyze_uploads("world", "", [upload])
+
+    def test_upload_zip_rejects_archive_restore_inside_subdirectory(self):
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("world/level.dat", b"123")
+        buf.seek(0)
+        upload = FileStorage(stream=buf, filename="bad-subdir.zip")
+        with self.app.app_context():
+            with self.assertRaises(ValueError):
+                core_saves.analyze_uploads("world", "playerdata", [upload])
+
+    def test_analyze_upload_detects_collision(self):
+        upload = FileStorage(stream=io.BytesIO(b"replacement"), filename="level.dat")
+        with self.app.app_context():
+            data, err = core_saves.analyze_uploads("world", "", [upload], extract_archives=False)
+            core_saves.cleanup_upload_analysis(data)
+        self.assertIsNone(err)
+        self.assertEqual(data["collision_count"], 1)
+        self.assertIn("level.dat", data["collisions"])
+
 
 class ConfigGenEnshroudedCfgTests(unittest.TestCase):
 
@@ -971,7 +1036,6 @@ class SoulmaskPlayersTests(unittest.TestCase):
 
         def fake_run(*args, **kwargs):
             return types.SimpleNamespace(stdout="\n".join([
-                "[2026.03.14-13.59.20:637][280]LogNet: Login request: ?EncryptionToken=1?PSW=74657374746573743031?Name=SyNTaX?culture=fr-FR?gg=0?cn=0 userId: steam:UNKNOWN [0x11000010146932C] platform: steam",
                 "[2026.03.14-13.59.22:480][335]logStoreGamemode: player ready. Addr:88.120.128.49, Netuid:76561197981668140, Name:SyNTaX",
                 "[2026.03.14-14.04.33:060][614]logStoreGamemode: Display: player leave world. 76561197981668140",
             ]))
@@ -983,6 +1047,27 @@ class SoulmaskPlayersTests(unittest.TestCase):
             soulmask_players.subprocess.run = original_run
 
         self.assertEqual(players, [])
+
+    def test_tracks_multiple_players_and_precise_disconnect(self):
+        original_run = soulmask_players.subprocess.run
+
+        def fake_run(*args, **kwargs):
+            return types.SimpleNamespace(stdout="\n".join([
+                "[2026.03.14-13.59.22:479][335]logStoreGamemode: FirstLoginGame: Addr:88.120.128.49, Netuid:111, Name:Alice",
+                "[2026.03.14-13.59.22:480][335]logStoreGamemode: player ready. Addr:88.120.128.49, Netuid:111, Name:Alice",
+                "[2026.03.14-14.00.00:000][399]LogNet: Login request: ?Name=ClientOne?culture=fr-FR",
+                "[2026.03.14-14.00.10:100][400]logStoreGamemode: FirstLoginGame: Addr:88.120.128.50, Netuid:222, Name:Bob",
+                "[2026.03.14-14.00.10:101][400]logStoreGamemode: player ready. Addr:88.120.128.50, Netuid:222, Name:Bob",
+                "[2026.03.14-14.01.00:000][500]logStoreGamemode: Display: player leave world. 111",
+            ]))
+
+        soulmask_players.subprocess.run = fake_run
+        try:
+            players = soulmask_players.get_players()
+        finally:
+            soulmask_players.subprocess.run = original_run
+
+        self.assertEqual(players, [{'name': 'Bob'}])
 
 
 class MinecraftFabricModsTests(unittest.TestCase):

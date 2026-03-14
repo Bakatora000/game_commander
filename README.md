@@ -278,4 +278,4 @@ Note Soulmask :
   - les personnages restent en pratique côté client
 
 - Soulmask
-  - sauvegarde `LinuxServer/WS/Saved`
+  - sauvegarde `WS/Saved`

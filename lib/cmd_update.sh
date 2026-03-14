@@ -120,6 +120,8 @@ update_process_config() {
     chown "$SYS_USER:$SYS_USER" "$APP_DIR/game.json"
     ok "game.json régénéré"
 
+    deploy_step_backups
+
     systemctl restart "$GC_SERVICE"
     if service_active "$GC_SERVICE"; then
         ok "Service $GC_SERVICE redémarré"

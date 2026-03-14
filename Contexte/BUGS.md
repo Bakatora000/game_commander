@@ -23,6 +23,25 @@
 
 ## Bugs résolus
 
+### [15] Soulmask — suivi des joueurs encore irrégulier selon les patterns de logs
+- **Statut :** En cours
+- **Composant :** `runtime/games/soulmask/players.py`
+- **Instance(s) affectée(s) :** `testsoul`
+- **Symptôme :**
+  - Le panneau `Joueurs connectés` peut être vide alors qu'un joueur est en ligne
+  - Des noms incohérents peuvent apparaître si l'on se base sur les premières lignes de login
+  - Le cas multi-joueurs n'est pas encore considéré comme fiable
+- **Cause racine :**
+  - Soulmask n'émet pas un pattern unique et stable pour toute la séquence de connexion
+  - `Login request ... ?Name=...` ne représente pas forcément le nom final à afficher
+  - Les logs utiles sont répartis entre `FirstLoginGame`, `player ready`, `Join succeeded`, `player leave world`
+- **Solutions essayées :**
+  - ❌ Utiliser `Login request` comme source directe du pseudo connecté
+  - ❌ Fallback simple "s'il n'y a qu'un joueur, le retirer sur fermeture générique" — insuffisant pour le multi-joueurs
+  - ✅ Orienter le parser vers une corrélation `Netuid/SteamID <-> pseudo`
+  - ✅ Utiliser `player leave world. <steamid>` comme signal de sortie plus fiable
+- **Régression connue :** Ne pas considérer le support multi-joueurs Soulmask comme totalement validé tant que la corrélation SteamID/pseudo n'est pas stabilisée sur plusieurs cas réels.
+
 ### [14] Terraria — serveur bloqué sur `Choose World:` et CPU à 100%
 - **Statut :** Résolu
 - **Composant :** `lib/deploy_steps.sh` + `tools/config_gen.py`

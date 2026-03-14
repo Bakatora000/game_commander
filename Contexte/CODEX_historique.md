@@ -76,6 +76,45 @@ gc/
 
 ## Bugs résolus — NE PAS RÉINTRODUIRE
 
+### [2026-03-14] Session de validation Soulmask / attach / sauvegardes
+**État général validé :**
+- Le mode `attach` est validé en réel sur Soulmask :
+  - déploiement Commander-only sur un service jeu existant
+  - aucun nouveau service jeu créé
+  - `start/stop/restart` via l'UI OK
+- Le premier lot `save manager` est validé en réel :
+  - onglet `Sauvegardes`
+  - navigation lecture seule
+  - téléchargement fichier
+  - téléchargement dossier en zip
+- Le panneau `Connexion` a été déplacé en haut du dashboard et le layout est à conserver pour tous les jeux.
+
+**Soulmask — état retenu :**
+- Déploiement OK
+- UI OK
+- Restart/config OK
+- Connexion jeu finalement validée
+- Le serveur est joignable après ouverture correcte des ports côté réseau externe
+- Le serveur est visible via le code unique Steam et la connexion en jeu a été validée
+
+**Soulmask — observations runtime :**
+- Le démarrage et l'arrêt sont lents
+- La charge CPU juste après `start/restart` peut être très élevée puis redescendre après stabilisation
+- La RAM observée autour de 8.2 GiB RSS est réelle, pas un bug d'affichage Game Commander
+
+**Soulmask — joueurs connectés :**
+- Le cas simple 1 joueur connecté est validé :
+  - le panneau apparaît
+  - le joueur remonte
+  - le compteur global `Joueurs` suit bien le provider générique
+- Le suivi multi-joueurs est encore en cours de fiabilisation
+- Décision technique retenue :
+  - ne plus considérer `Login request ... ?Name=...` comme source fiable du pseudo connecté
+  - corréler plutôt `Netuid` / SteamID et pseudo via les lignes `FirstLoginGame`, `player ready`, `player leave world`
+
+**Fichiers locaux non poussés à conserver hors Git :**
+- `env/fix_testsoul.sh`
+
 ### [1] wine64 absent du PATH après installation (Ubuntu 24.04)
 **Symptôme :** `wine64: not found` dans journalctl malgré `apt install wine64`
 **Cause :** Le paquet `wine64` sur Ubuntu 24.04 installe les libs (`/usr/lib/wine/wine64`)
@@ -343,7 +382,7 @@ Constats retenus :
   - `Port` UDP
   - `QueryPort` UDP
   - `EchoPort` TCP
-- données/saves sous `LinuxServer/WS/Saved`
+- données/saves sous `WS/Saved`
 - logs utiles sous `WS/Saved/Logs/WS.log`
 
 Décision d'architecture prise avant implémentation :
@@ -514,7 +553,7 @@ Politique de sauvegarde actuelle à prendre en compte :
   - monde serveur uniquement
   - pas les personnages client
 - Soulmask
-  - `LinuxServer/WS/Saved`
+  - `WS/Saved`
 
 ### Refresh rates frontend
 - Statut + compteurs : `setInterval(fetchStatus, 5000)` — 5 secondes

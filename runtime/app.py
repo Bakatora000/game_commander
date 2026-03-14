@@ -4,7 +4,7 @@ Game Commander — app.py
 Flask factory. Lit game.json, enregistre toutes les routes communes,
 charge conditionnellement les modules par jeu (mods, config).
 """
-import os, json, importlib
+import os, json, importlib, subprocess
 from flask import Flask, request, jsonify, session, redirect, render_template, send_file
 import bcrypt
 
@@ -203,6 +203,88 @@ def api_saves_download():
     if err:
         return jsonify({'error': err}), 404
     return send_file(target, as_attachment=True, download_name=filename)
+
+
+@app.route(f'{PREFIX}/api/saves/analyze', methods=['POST'])
+@auth.require_auth
+@auth.require_perm('manage_saves')
+def api_saves_analyze():
+    root_id = request.form.get('root', '').strip()
+    rel_path = request.form.get('path', '')
+    extract_archives = request.form.get('extract_archives', 'true').lower() != 'false'
+    files = request.files.getlist('files')
+    if not files:
+        return jsonify({'error': 'no_files'}), 400
+    try:
+        result, err = saves.analyze_uploads(root_id, rel_path, files, extract_archives=extract_archives)
+    except ValueError as exc:
+        return jsonify({'error': str(exc) or 'invalid_upload'}), 400
+    if err:
+        return jsonify({'error': err}), 404
+    response = {
+        'ok': True,
+        'count': result.get('count', 0),
+        'collision_count': result.get('collision_count', 0),
+        'write_count': result.get('write_count', 0),
+        'collisions': result.get('collisions', [])[:20],
+        'added': result.get('added', [])[:20],
+        'server_running': server.get_status().get('state') == 20,
+    }
+    saves.cleanup_upload_analysis(result)
+    return jsonify(response)
+
+
+@app.route(f'{PREFIX}/api/saves/upload', methods=['POST'])
+@auth.require_auth
+@auth.require_perm('manage_saves')
+def api_saves_upload():
+    root_id = request.form.get('root', '').strip()
+    rel_path = request.form.get('path', '')
+    extract_archives = request.form.get('extract_archives', 'true').lower() != 'false'
+    confirm_restore = request.form.get('confirm_restore', 'false').lower() == 'true'
+    stop_if_running = request.form.get('stop_if_running', 'true').lower() != 'false'
+    backup_before_restore = request.form.get('backup_before_restore', 'true').lower() != 'false'
+    files = request.files.getlist('files')
+    if not files:
+        return jsonify({'error': 'no_files'}), 400
+    try:
+        analysis, err = saves.analyze_uploads(root_id, rel_path, files, extract_archives=extract_archives)
+    except ValueError as exc:
+        return jsonify({'error': str(exc) or 'invalid_upload'}), 400
+    if err:
+        return jsonify({'error': err}), 404
+    if not confirm_restore:
+        saves.cleanup_upload_analysis(analysis)
+        return jsonify({'error': 'restore_confirmation_required'}), 400
+
+    server_running = server.get_status().get('state') == 20
+    server_stopped = False
+    backup_created = None
+    try:
+        if server_running and stop_if_running:
+            ok, err = server.stop()
+            if not ok:
+                saves.cleanup_upload_analysis(analysis)
+                return jsonify({'error': 'stop_failed', 'detail': err}), 502
+            server_stopped = True
+
+        if backup_before_restore:
+            backup_script = os.path.join(_HERE, f'backup_{GAME_ID}.sh')
+            if not os.path.isfile(backup_script):
+                saves.cleanup_upload_analysis(analysis)
+                return jsonify({'error': 'backup_script_missing'}), 500
+            result = subprocess.run(['bash', backup_script], capture_output=True, text=True, timeout=300)
+            if result.returncode != 0:
+                saves.cleanup_upload_analysis(analysis)
+                return jsonify({'error': 'backup_failed', 'detail': (result.stderr or result.stdout).strip()}), 502
+            out = (result.stdout or '').strip().splitlines()
+            backup_created = out[-1] if out else None
+
+        result = saves.save_uploads(analysis)
+        return jsonify({'ok': True, 'server_stopped': server_stopped, 'backup_created': backup_created, **result})
+    except ValueError as exc:
+        saves.cleanup_upload_analysis(analysis)
+        return jsonify({'error': str(exc) or 'restore_failed'}), 400
 
 # ─────────────────────────────────────────────────────────────────────────────
 # API — UTILISATEURS

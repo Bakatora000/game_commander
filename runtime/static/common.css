@@ -258,6 +258,22 @@ html, body {
 .panel-title { font-family: var(--font-main); font-size: .75rem; letter-spacing: .1em; text-transform: uppercase; color: var(--color-text); }
 .panel-controls { display: flex; gap: .5rem; }
 
+.save-upload-dropzone {
+  margin: .9rem 1rem 0;
+  padding: 1rem;
+  border: 1px dashed var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: .2rem;
+  transition: border-color .15s, background .15s;
+}
+.save-upload-dropzone.dragover {
+  border-color: var(--color-primary);
+  background: rgba(255,255,255,.04);
+}
+.save-upload-title { font-size: .82rem; color: var(--color-text); }
+.save-upload-subtitle { font-size: .72rem; color: var(--color-muted); }
+
 /* ── CHART COLORS (override per theme) ──────────────────────────── */
 :root {
   --color-chart-cpu: var(--color-primary);

@@ -628,8 +628,8 @@ SVCEOF
     if [[ "$GAME_ID" == "soulmask" ]]; then
         START_SCRIPT="$SERVER_DIR/start_server.sh"
         SOULMASK_CFG="$SERVER_DIR/soulmask_server.json"
-        SOULMASK_LOG_DIR="$SERVER_DIR/LinuxServer/WS/Saved/Logs"
-        SOULMASK_SAVED_DIR="$SERVER_DIR/LinuxServer/WS/Saved"
+        SOULMASK_LOG_DIR="$SERVER_DIR/WS/Saved/Logs"
+        SOULMASK_SAVED_DIR="$SERVER_DIR/WS/Saved"
         mkdir -p "$SOULMASK_LOG_DIR" "$SOULMASK_SAVED_DIR"
 
         python3 "$SCRIPT_DIR/tools/config_gen.py" soulmask-cfg \
@@ -871,7 +871,7 @@ deploy_step_backups() {
         enshrouded) WORLD_DIR="$SERVER_DIR/savegame" ;;
         minecraft|minecraft-fabric) WORLD_DIR="$SERVER_DIR/world" ;;
         terraria) WORLD_DIR="$DATA_DIR" ;;
-        soulmask) WORLD_DIR="$SERVER_DIR/LinuxServer/WS/Saved" ;;
+        soulmask) WORLD_DIR="$SERVER_DIR/WS/Saved" ;;
     esac
 
     BACKUP_SCRIPT="$APP_DIR/backup_${GAME_ID}.sh"

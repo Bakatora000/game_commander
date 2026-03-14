@@ -29,7 +29,7 @@ deploy_set_defaults() {
     FLASK_PORT=""
     SSL_MODE="existing"
     ADMIN_LOGIN="admin"
-    ADMIN_PASSWORD=""
+    ADMIN_PASSWORD="${ADMIN_PASSWORD:-}"
     AUTO_INSTALL_DEPS=true
     AUTO_INSTALL_STEAMCMD=true
     AUTO_INSTALL_BEPINEX=true

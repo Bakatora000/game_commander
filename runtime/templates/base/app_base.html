@@ -168,7 +168,13 @@
           <div class="saves-toolbar">
             <select id="saveRootSelect" class="config-input"></select>
             <button class="btn-ghost btn-sm" id="btnSaveUp" disabled>⬑ Remonter</button>
+            <button class="btn-primary btn-sm" id="btnSaveUpload">Uploader</button>
             <span class="save-path" id="savePathLabel">/</span>
+          </div>
+          <div class="save-upload-dropzone" id="saveUploadDropzone">
+            <input type="file" id="saveUploadInput" multiple hidden>
+            <span class="save-upload-title">Glisse-dépose tes sauvegardes ici</span>
+            <span class="save-upload-subtitle">Les fichiers sont copiés tels quels. Les archives .zip sont extraites automatiquement dans le dossier courant.</span>
           </div>
           <div id="saveEntries" class="saves-list"></div>
         </div>
@@ -602,7 +608,128 @@ function initSaveManager() {
     saveCurrentPath = parts.join('/');
     loadSaveEntries();
   });
+  document.getElementById('btnSaveUpload')?.addEventListener('click', () => {
+    document.getElementById('saveUploadInput')?.click();
+  });
+  document.getElementById('saveUploadInput')?.addEventListener('change', e => {
+    const files = [...(e.target.files || [])];
+    if (!files.length) return;
+    offerSaveUpload(files);
+    e.target.value = '';
+  });
+  initSaveDropzone();
   loadSaveRoots();
+}
+
+function initSaveDropzone() {
+  const dz = document.getElementById('saveUploadDropzone');
+  if (!dz) return;
+  ['dragenter', 'dragover'].forEach(evt => dz.addEventListener(evt, e => {
+    e.preventDefault();
+    dz.classList.add('dragover');
+  }));
+  ['dragleave', 'drop'].forEach(evt => dz.addEventListener(evt, e => {
+    e.preventDefault();
+    dz.classList.remove('dragover');
+  }));
+  dz.addEventListener('drop', e => {
+    const files = [...(e.dataTransfer?.files || [])];
+    if (!files.length) return;
+    offerSaveUpload(files);
+  });
+}
+
+function offerSaveUpload(files) {
+  analyzeSaveUpload(files);
+}
+
+async function analyzeSaveUpload(files) {
+  if (!saveCurrentRoot) {
+    showToast('Aucune racine de sauvegarde active', 'error');
+    return;
+  }
+  const form = new FormData();
+  form.set('root', saveCurrentRoot);
+  form.set('path', saveCurrentPath || '');
+  form.set('extract_archives', 'true');
+  files.forEach(file => form.append('files', file));
+  const r = await fetch(`${PREFIX}/api/saves/analyze`, {
+    method: 'POST',
+    body: form,
+  }).catch(() => null);
+  if (!r?.ok) {
+    const d = await r?.json().catch(() => ({})) || {};
+    showToast(formatSaveUploadError(d.error), 'error');
+    return;
+  }
+  const d = await r.json();
+  const lines = [];
+  lines.push(`${d.write_count || 0} élément(s) vont être restaurés.`);
+  if (d.collision_count) {
+    lines.push(`${d.collision_count} fichier(s) existant(s) seront remplacés.`);
+    if (d.collisions?.length) lines.push(`Exemples: ${d.collisions.slice(0,3).join(', ')}`);
+  } else {
+    lines.push('Aucun fichier existant ne sera écrasé.');
+  }
+  if (d.server_running) {
+    lines.push('Le serveur sera arrêté avant restauration.');
+  }
+  lines.push('Une sauvegarde automatique sera créée avant écrasement.');
+  lines.push('Confirmer la restauration ?');
+  confirmThen(lines.join('\n'), () => performSaveUpload(files));
+}
+
+async function performSaveUpload(files) {
+  closeModal();
+  if (!saveCurrentRoot) {
+    showToast('Aucune racine de sauvegarde active', 'error');
+    return;
+  }
+  const form = new FormData();
+  form.set('root', saveCurrentRoot);
+  form.set('path', saveCurrentPath || '');
+  form.set('extract_archives', 'true');
+  form.set('confirm_restore', 'true');
+  form.set('stop_if_running', 'true');
+  form.set('backup_before_restore', 'true');
+  files.forEach(file => form.append('files', file));
+  const r = await fetch(`${PREFIX}/api/saves/upload`, {
+    method: 'POST',
+    body: form,
+  }).catch(() => null);
+  if (!r?.ok) {
+    const d = await r?.json().catch(() => ({})) || {};
+    showToast(formatSaveUploadError(d.error), 'error');
+    return;
+  }
+  const d = await r.json();
+  const extracted = d.extracted?.length ? `, ${d.extracted.length} élément(s) extrait(s)` : '';
+  const stopped = d.server_stopped ? ', serveur arrêté' : '';
+  const backup = d.backup_created ? ', backup créé' : '';
+  showToast(`${d.count || files.length} fichier(s) restauré(s)${extracted}${stopped}${backup}`, 'success');
+  loadSaveEntries();
+  setTimeout(fetchStatus, 1500);
+}
+
+function formatSaveUploadError(code) {
+  const map = {
+    no_files: 'Aucun fichier reçu',
+    invalid_path: 'Chemin de destination invalide',
+    invalid_upload: 'Upload invalide',
+    invalid_archive_path: 'Archive invalide: chemin interdit',
+    invalid_archive_layout: 'Archive invalide: arborescence incompatible avec ce jeu',
+    empty_archive: 'Archive vide',
+    archive_upload_requires_root: 'Un zip doit être restauré à la racine de la sauvegarde',
+    restore_confirmation_required: 'Confirmation de restauration requise',
+    stop_failed: 'Impossible d’arrêter le serveur avant restauration',
+    backup_script_missing: 'Script de backup introuvable',
+    backup_failed: 'Échec de la sauvegarde automatique avant restauration',
+    unknown_root: 'Racine de sauvegarde inconnue',
+    missing_root: 'Racine de sauvegarde absente',
+    missing_path: 'Dossier cible introuvable',
+    not_a_directory: 'Le chemin cible n’est pas un dossier',
+  };
+  return map[code] || code || 'Erreur upload sauvegarde';
 }
 
 async function loadSaveRoots() {

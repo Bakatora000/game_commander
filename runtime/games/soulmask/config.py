@@ -13,7 +13,7 @@ def _cfg_path():
 
 def _defaults():
     install_dir = current_app.config['GAME']['server']['install_dir']
-    saved_dir = os.path.join(install_dir, 'LinuxServer', 'WS', 'Saved')
+    saved_dir = os.path.join(install_dir, 'WS', 'Saved')
     return {
         'server_name': current_app.config['GAME']['name'],
         'max_players': current_app.config['GAME']['server'].get('max_players', 50),
