@@ -10,12 +10,13 @@ import re
 import subprocess
 
 
-_RE_READY = re.compile(r'player ready\..*?Name:([^\s,]+)')
+_RE_READY = re.compile(r'player ready\..*?Netuid:(\d+), Name:([^\s,]+)')
+_RE_FIRST_LOGIN = re.compile(r'FirstLoginGame: Addr:[^,]+, Netuid:(\d+), Name:([^\s,]+)')
+_RE_AUTH = re.compile(r'AUTH HANDLER: Sending auth result to user (\d+) with flag success\?\s*1')
 _RE_JOIN = re.compile(r'Join succeeded:\s*([^\s,]+)')
-_RE_LOGIN = re.compile(r'Login request: .*?\?Name=([^?\\s]+)')
 _RE_CLOSE = re.compile(r'CloseBunch.*Name=([^\s,]+)')
 _RE_GENERIC_CLOSE = re.compile(r'Bunch\.bClose == true.*ConditionalCleanUp')
-_RE_LEAVE_WORLD = re.compile(r'player leave world\.')
+_RE_LEAVE_WORLD = re.compile(r'player leave world\.\s*(\d+)')
 
 
 def get_players():
@@ -30,38 +31,58 @@ def get_players():
         return []
 
     connected = []
+    steam_to_name = {}
+
+    def add_player(name, steamid=None):
+        if steamid:
+            old_name = steam_to_name.get(steamid)
+            if old_name and old_name != name:
+                remove_player_by_name(old_name)
+            steam_to_name[steamid] = name
+        if name and name not in connected:
+            connected.append(name)
+
+    def remove_player_by_name(name):
+        if name in connected:
+            connected.remove(name)
+
+    def remove_player_by_steamid(steamid):
+        name = steam_to_name.pop(steamid, None)
+        if name:
+            remove_player_by_name(name)
 
     for line in lines:
+        auth = _RE_AUTH.search(line)
+        if auth:
+            steamid = auth.group(1).strip()
+            add_player(f"Steam:{steamid}", steamid)
+            continue
+
+        first_login = _RE_FIRST_LOGIN.search(line)
+        if first_login:
+            add_player(first_login.group(2).strip(), first_login.group(1).strip())
+            continue
+
         ready = _RE_READY.search(line)
         if ready:
-            name = ready.group(1).strip()
-            if name and name not in connected:
-                connected.append(name)
+            add_player(ready.group(2).strip(), ready.group(1).strip())
             continue
 
         joined = _RE_JOIN.search(line)
         if joined:
-            name = joined.group(1).strip()
-            if name and name not in connected:
-                connected.append(name)
-            continue
-
-        login = _RE_LOGIN.search(line)
-        if login:
-            name = login.group(1).strip()
-            if name and name not in connected:
-                connected.append(name)
+            add_player(joined.group(1).strip())
             continue
 
         closed = _RE_CLOSE.search(line)
         if closed:
-            name = closed.group(1).strip()
-            if name in connected:
-                connected.remove(name)
+            remove_player_by_name(closed.group(1).strip())
             continue
 
-        if _RE_LEAVE_WORLD.search(line) and len(connected) == 1:
-            connected.clear()
+        leave = _RE_LEAVE_WORLD.search(line)
+        if leave:
+            remove_player_by_steamid(leave.group(1).strip())
+            if len(connected) == 1 and not steam_to_name:
+                connected.clear()
             continue
 
         # Soulmask logue parfois une fermeture générique sans pseudo.

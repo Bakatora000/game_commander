@@ -1036,6 +1036,7 @@ class SoulmaskPlayersTests(unittest.TestCase):
 
         def fake_run(*args, **kwargs):
             return types.SimpleNamespace(stdout="\n".join([
+                "[2026.03.14-13.59.20:000][334]LogOnline: STEAM: AUTH HANDLER: Sending auth result to user 76561197981668140 with flag success? 1",
                 "[2026.03.14-13.59.22:480][335]logStoreGamemode: player ready. Addr:88.120.128.49, Netuid:76561197981668140, Name:SyNTaX",
                 "[2026.03.14-14.04.33:060][614]logStoreGamemode: Display: player leave world. 76561197981668140",
             ]))
@@ -1047,6 +1048,22 @@ class SoulmaskPlayersTests(unittest.TestCase):
             soulmask_players.subprocess.run = original_run
 
         self.assertEqual(players, [])
+
+    def test_uses_auth_handler_as_temporary_presence_when_no_name_is_known(self):
+        original_run = soulmask_players.subprocess.run
+
+        def fake_run(*args, **kwargs):
+            return types.SimpleNamespace(stdout="\n".join([
+                "[2026.03.14-22.54.04:332][338]LogOnline: STEAM: AUTH HANDLER: Sending auth result to user 76561197981668140 with flag success? 1",
+            ]))
+
+        soulmask_players.subprocess.run = fake_run
+        try:
+            players = soulmask_players.get_players()
+        finally:
+            soulmask_players.subprocess.run = original_run
+
+        self.assertEqual(players, [{'name': 'Steam:76561197981668140'}])
 
     def test_tracks_multiple_players_and_precise_disconnect(self):
         original_run = soulmask_players.subprocess.run
