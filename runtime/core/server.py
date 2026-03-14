@@ -3,6 +3,7 @@ core/server.py — Contrôle du serveur via psutil + systemd.
 Sans dépendance AMP. Le binaire et le service sont lus depuis game.json.
 """
 import subprocess, time
+import importlib
 import psutil
 from flask import current_app
 
@@ -51,13 +52,12 @@ def _get_process():
 def _player_count():
     """Retourne le nombre de joueurs connectés si le module players est disponible."""
     try:
-        game_id = _game().get('id', '')
-        if game_id == 'valheim':
-            from games.valheim.players import get_players
-            return len(get_players())
-        if game_id == 'enshrouded':
-            from games.enshrouded.players import get_players
-            return len(get_players())
+        game = _game()
+        if not game.get('features', {}).get('players'):
+            return 0
+        module_id = game.get('module_id') or game.get('id', '').replace('-', '_')
+        players_module = importlib.import_module(f'games.{module_id}.players')
+        return len(players_module.get_players())
     except Exception:
         pass
     return 0
