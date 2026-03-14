@@ -352,6 +352,23 @@ async function doAction(action) {
   showToast(r.ok ? `Commande envoyée : ${action}` : (d.error || `Erreur ${action}`), r.ok ? 'success' : 'error');
   setTimeout(fetchStatus, 1500);
 }
+function requestRestartConfirmation(msg='Redémarrer le serveur ?') {
+  confirmThen(msg, () => doAction('restart'));
+}
+function offerRestartAfterChange(msg) {
+  if (currentState !== 20 || !myPerms.includes('restart_server')) return;
+  requestRestartConfirmation(msg);
+}
+async function handleConfigSaveResponse(response, successMsg='Configuration sauvegardée') {
+  const data = await response?.json().catch(() => ({})) || {};
+  if (!response?.ok) {
+    showToast(data.error || 'Erreur sauvegarde', 'error');
+    return {ok:false, data};
+  }
+  showToast(successMsg, 'success');
+  offerRestartAfterChange('Configuration sauvegardée.\nRedémarrer le serveur maintenant pour appliquer les changements ?');
+  return {ok:true, data};
+}
 
 // ── CHART ─────────────────────────────────────────────────────────────────────
 function initChart() {

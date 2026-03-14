@@ -154,9 +154,7 @@ async function installMod(ns, name, version, btn) {
   btn.disabled = false; btn.textContent = `Installer v${version}`;
   if (r?.ok) {
     loadInstalledMods();
-    if (confirm(`${name} installé.\nRedémarrer le serveur maintenant pour activer le mod ?`)) {
-      await doAction('restart');
-    }
+    offerRestartAfterChange(`${name} installé.\nRedémarrer le serveur maintenant pour activer le mod ?`);
   }
 }
 
@@ -244,7 +242,7 @@ document.getElementById('btnSaveConfig')?.addEventListener('click', async () => 
   const r = await fetch(`${PREFIX}/api/config`, {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
   }).catch(()=>null);
-  showToast(r?.ok ? 'Configuration sauvegardée' : 'Erreur sauvegarde', r?.ok ? 'success' : 'error');
+  await handleConfigSaveResponse(r);
 });
 
 // ── MISE À JOUR SERVEUR ───────────────────────────────────────────────────────
@@ -373,7 +371,7 @@ async function saveWorldModifiers() {
   if (r?.ok) {
     showToast('Modificateurs sauvegardés — redémarrage requis', 'success');
     if (d.warning) showToast(`⚠ ${d.warning}`, 'error');
-    if (confirm('Redémarrer le serveur pour appliquer les modificateurs ?')) doAction('restart');
+    offerRestartAfterChange('Modificateurs sauvegardés.\nRedémarrer le serveur maintenant pour les appliquer ?');
   } else {
     showToast(d.error||'Erreur', 'error');
   }

@@ -151,9 +151,7 @@ async function installMod(ns, name, version, btn) {
   btn.textContent = 'Installer';
   if (r?.ok) {
     loadInstalledMods();
-    if (confirm(`${name} installé.\nRedémarrer le serveur maintenant pour charger le mod ?`)) {
-      await doAction('restart');
-    }
+    offerRestartAfterChange(`${name} installé.\nRedémarrer le serveur maintenant pour charger le mod ?`);
   }
 }
 
@@ -204,7 +202,7 @@ document.getElementById('btnSaveConfig')?.addEventListener('click', async () => 
   const r = await fetch(`${PREFIX}/api/config`, {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
   }).catch(()=>null);
-  showToast(r?.ok ? 'Configuration sauvegardée' : 'Erreur', r?.ok ? 'success' : 'error');
+  await handleConfigSaveResponse(r);
 });
 </script>
 {% endblock %}
