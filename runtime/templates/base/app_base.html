@@ -77,6 +77,13 @@
     <!-- DASHBOARD -->
     <section class="tab-panel active" id="tab-dashboard">
       <div class="content-wrap">
+        <div class="panel connection-panel" id="connectionPanel">
+          <div class="panel-header">
+            <span class="panel-title">Connexion</span>
+          </div>
+          <div class="connection-grid" id="connectionGrid"></div>
+        </div>
+
         <div class="gauges-row">
           {% for id, label in [('Cpu','CPU'), ('Ram','RAM'), ('Players','Joueurs')] %}
           <div class="gauge-card">
@@ -225,6 +232,7 @@ const PREFIX   = '{{ prefix }}';
 const GAME_ID  = '{{ game_id }}';
 const FEATURES = {{ game.features | tojson }};
 const ALL_PERMS = {{ game.permissions | tojson }};
+const GAME_SERVER = {{ game.server | tojson }};
 
 let currentState = 0;
 let myPerms      = [];
@@ -238,6 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initModal();
   initUsers();
   if (FEATURES.console) initConsole();
+  renderConnectionInfo();
 
   document.getElementById('menuToggle').addEventListener('click', () =>
     document.getElementById('sidebar').classList.toggle('open'));
@@ -248,6 +257,37 @@ document.addEventListener('DOMContentLoaded', () => {
     startChartRefresh();
   });
 });
+
+function renderConnectionInfo() {
+  const el = document.getElementById('connectionGrid');
+  if (!el) return;
+  const host = window.location.hostname || '127.0.0.1';
+  const rows = [{label:'Hôte', value: host}];
+
+  if (GAME_ID === 'minecraft' || GAME_ID === 'minecraft-fabric' || GAME_ID === 'terraria') {
+    rows.push({label:'Connexion jeu', value: `${host}:${GAME_SERVER.port} (${GAME_ID === 'terraria' ? 'TCP' : 'TCP'})`});
+  } else if (GAME_ID === 'enshrouded') {
+    const queryPort = GAME_SERVER.query_port || (GAME_SERVER.port + 1);
+    rows.push({label:'Port jeu', value: `${GAME_SERVER.port}/UDP`});
+    rows.push({label:'Découverte', value: `${host}:${queryPort}`});
+  } else if (GAME_ID === 'soulmask') {
+    rows.push({label:'Port jeu', value: `${GAME_SERVER.port}/UDP`});
+    if (GAME_SERVER.query_port) rows.push({label:'Query', value: `${GAME_SERVER.query_port}/UDP`});
+    if (GAME_SERVER.echo_port) rows.push({label:'Echo', value: `${GAME_SERVER.echo_port}/TCP`});
+    rows.push({label:'Connexion', value: `${host}:${GAME_SERVER.port}`});
+  } else {
+    rows.push({label:'Port principal', value: `${GAME_SERVER.port}/UDP`});
+    rows.push({label:'Port secondaire', value: `${GAME_SERVER.port + 1}/UDP`});
+    rows.push({label:'Connexion', value: `${host}:${GAME_SERVER.port}`});
+  }
+
+  el.innerHTML = rows.map(r => `
+    <div class="connection-row">
+      <span class="connection-label">${r.label}</span>
+      <code class="connection-value">${r.value}</code>
+    </div>
+  `).join('');
+}
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
 function initTabs() {

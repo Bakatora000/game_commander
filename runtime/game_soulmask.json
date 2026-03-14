@@ -21,7 +21,7 @@
     "mods": false,
     "config": true,
     "console": true,
-    "players": false,
+    "players": true,
     "saves": true
   },
   "permissions": [

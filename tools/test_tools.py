@@ -30,6 +30,7 @@ from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import players as minecraft_players
 from runtime.games.minecraft_fabric import mods as minecraft_fabric_mods
 from runtime.core import saves as core_saves
+from runtime.games.soulmask import players as soulmask_players
 from runtime.games.soulmask import config as soulmask_config
 from runtime.games.terraria import config as terraria_config
 
@@ -410,13 +411,14 @@ class ConfigGenGameJsonTests(unittest.TestCase):
             game_binary="enshrouded_server.exe",
             game_service="enshrouded-server-enshrouded2",
             server_dir="/home/gameserver/enshrouded2_server",
-            data_dir="", world_name="", max_players=16, port=15639,
+            data_dir="", world_name="", max_players=16, port=15639, query_port=None, echo_port=None,
             url_prefix="/enshrouded2", flask_port=5004, admin_user="admin",
             bepinex_path="", steam_appid="2278520", steamcmd_path="",
         ))
         self.assertEqual(rc, 0)
         data = json.loads(Path(out).read_text())
         self.assertIsNone(data["server"]["world_name"])
+        self.assertEqual(data["server"]["query_port"], 15640)
         self.assertNotIn("install_mod", data["permissions"])
 
     def test_minecraft_fabric_support(self):
@@ -461,7 +463,7 @@ class ConfigGenGameJsonTests(unittest.TestCase):
         rc = config_gen.cmd_game_json(make_args(
             out=out, game_id="soulmask", game_label="Soulmask",
             game_binary="StartServer.sh", game_service="soulmask-server-test",
-            server_dir="/home/gameserver/soulmask_server",
+            server_dir="/home/gameserver/soulmask_server", query_port=27015, echo_port=18888,
             data_dir="/home/gameserver/soulmask_data", world_name="", max_players=50, port=8777,
             url_prefix="/soulmask", flask_port=5011, admin_user="admin",
             bepinex_path="", steam_appid="3017300", steamcmd_path="/home/gameserver/steamcmd/steamcmd.sh",
@@ -473,6 +475,8 @@ class ConfigGenGameJsonTests(unittest.TestCase):
         self.assertFalse(data["features"]["mods"])
         self.assertEqual(data["theme"]["name"], "enshrouded")
         self.assertEqual(data["steamcmd"]["app_id"], "3017300")
+        self.assertEqual(data["server"]["query_port"], 27015)
+        self.assertEqual(data["server"]["echo_port"], 18888)
 
     def test_steamcmd_section(self):
         data = self._gen_valheim()
@@ -958,6 +962,27 @@ class MinecraftPlayersTests(unittest.TestCase):
             minecraft_players.subprocess.run = original_run
 
         self.assertEqual(players, [{'name': 'alex'}])
+
+
+class SoulmaskPlayersTests(unittest.TestCase):
+
+    def test_tracks_connected_players_from_logs(self):
+        original_run = soulmask_players.subprocess.run
+
+        def fake_run(*args, **kwargs):
+            return types.SimpleNamespace(stdout="\n".join([
+                "[2026.03.14-13.59.20:637][280]LogNet: Login request: ?EncryptionToken=1?PSW=74657374746573743031?Name=SyNTaX?culture=fr-FR?gg=0?cn=0 userId: steam:UNKNOWN [0x11000010146932C] platform: steam",
+                "[2026.03.14-13.59.22:480][335]logStoreGamemode: player ready. Addr:88.120.128.49, Netuid:76561197981668140, Name:SyNTaX",
+                "[2026.03.14-14.04.33:060][614]logStoreGamemode: Display: player leave world. 76561197981668140",
+            ]))
+
+        soulmask_players.subprocess.run = fake_run
+        try:
+            players = soulmask_players.get_players()
+        finally:
+            soulmask_players.subprocess.run = original_run
+
+        self.assertEqual(players, [])
 
 
 class MinecraftFabricModsTests(unittest.TestCase):

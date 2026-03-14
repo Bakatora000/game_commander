@@ -94,6 +94,10 @@ update_process_config() {
         gc_bepinex_path="${SERVER_DIR}/BepInEx"
     fi
 
+    local -a game_json_extra_args=()
+    [[ -n "${QUERY_PORT:-}" ]] && game_json_extra_args+=(--query-port "$QUERY_PORT")
+    [[ -n "${ECHO_PORT:-}" ]] && game_json_extra_args+=(--echo-port "$ECHO_PORT")
+
     python3 "$SCRIPT_DIR/tools/config_gen.py" game-json \
         --out           "$APP_DIR/game.json" \
         --game-id       "$GAME_ID" \
@@ -105,6 +109,7 @@ update_process_config() {
         --world-name    "${WORLD_NAME:-}" \
         --max-players   "${MAX_PLAYERS:-20}" \
         --port          "$SERVER_PORT" \
+        "${game_json_extra_args[@]}" \
         --url-prefix    "$URL_PREFIX" \
         --flask-port    "$FLASK_PORT" \
         --admin-user    "$ADMIN_LOGIN" \

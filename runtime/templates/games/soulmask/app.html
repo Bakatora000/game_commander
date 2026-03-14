@@ -3,6 +3,16 @@
 {% block fonts %}family=Cinzel:wght@400;600&family=Inter:wght@400;500;600{% endblock %}
 {% block sidebar_logo %}🗿{% endblock %}
 
+{% block dashboard_extra %}
+<div class="panel players-panel" id="playersPanel" style="display:none">
+  <div class="panel-header">
+    <span class="panel-title">Joueurs connectés</span>
+    <span class="panel-count" id="playersCount"></span>
+  </div>
+  <div id="playersList" class="players-list"></div>
+</div>
+{% endblock %}
+
 {% block config_tab %}
 <div class="panel config-panel" id="configPanel">
   <div class="panel-header">
@@ -39,6 +49,23 @@ const CONFIG_SCHEMA = [
   {key:'backup_interval', label:'Intervalle backup (s)', type:'number', min:60, max:86400},
 ];
 let configData = {};
+
+async function loadPlayers() {
+  const r = await fetch(`${PREFIX}/api/players`).catch(() => null);
+  if (!r?.ok) return;
+  const {players} = await r.json();
+  const panel = document.getElementById('playersPanel');
+  const list  = document.getElementById('playersList');
+  const count = document.getElementById('playersCount');
+  if (!panel) return;
+  panel.style.display = players.length > 0 ? '' : 'none';
+  count.textContent = `${players.length} en ligne`;
+  list.innerHTML = players.length
+    ? players.map(p => `<div class="player-row"><span class="player-dot">●</span><span class="player-name">${p.name}</span></div>`).join('')
+    : '';
+}
+setTimeout(() => { if (typeof currentState !== 'undefined' && currentState === 20) loadPlayers(); }, 1000);
+setInterval(() => { if (typeof currentState !== 'undefined' && currentState === 20) loadPlayers(); }, 15000);
 
 async function loadConfig() {
   const panel = document.getElementById('configPanel');

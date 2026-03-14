@@ -973,6 +973,10 @@ deploy_step_app_files() {
         GC_BEPINEX_PATH=""
         [[ "$GAME_ID" == "valheim" ]] && $BEPINEX && GC_BEPINEX_PATH="${SERVER_DIR}/BepInEx"
 
+        local -a game_json_extra_args=()
+        [[ -n "${QUERY_PORT:-}" ]] && game_json_extra_args+=(--query-port "$QUERY_PORT")
+        [[ -n "${ECHO_PORT:-}" ]] && game_json_extra_args+=(--echo-port "$ECHO_PORT")
+
         python3 "$SCRIPT_DIR/tools/config_gen.py" game-json \
             --out          "$APP_DIR/game.json" \
             --game-id      "$GAME_ID" \
@@ -984,6 +988,7 @@ deploy_step_app_files() {
             --world-name   "${WORLD_NAME:-}" \
             --max-players  "$MAX_PLAYERS" \
             --port         "$SERVER_PORT" \
+            "${game_json_extra_args[@]}" \
             --url-prefix   "$URL_PREFIX" \
             --flask-port   "$FLASK_PORT" \
             --admin-user   "$ADMIN_LOGIN" \

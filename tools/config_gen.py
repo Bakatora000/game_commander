@@ -85,7 +85,7 @@ def cmd_game_json(args):
             "mods":    (game_id == "valheim" and bool(args.bepinex_path)) or game_id == "minecraft-fabric",
             "config":  game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria", "soulmask"),
             "console": True,
-            "players": game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric"),
+            "players": game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "soulmask"),
             "saves":   game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria", "soulmask"),
         },
         "theme": {"name": theme_name if theme_name in ("valheim", "enshrouded", "minecraft") else "valheim"},
@@ -97,6 +97,12 @@ def cmd_game_json(args):
     elif game_id == "soulmask":
         theme_name = "enshrouded"
         game["theme"]["name"] = theme_name
+
+    if game_id == "enshrouded":
+        game["server"]["query_port"] = args.port + 1
+    elif game_id == "soulmask":
+        game["server"]["query_port"] = args.query_port if args.query_port is not None else args.port + 1
+        game["server"]["echo_port"] = args.echo_port if args.echo_port is not None else None
 
     # Permissions
     if game_id == "valheim":
@@ -376,6 +382,8 @@ def main():
     p.add_argument("--world-name",    default="")
     p.add_argument("--max-players",   required=True, type=int)
     p.add_argument("--port",          required=True, type=int)
+    p.add_argument("--query-port",    type=int, default=None)
+    p.add_argument("--echo-port",     type=int, default=None)
     p.add_argument("--url-prefix",    required=True)
     p.add_argument("--flask-port",    required=True, type=int)
     p.add_argument("--admin-user",    required=True)

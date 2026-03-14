@@ -332,6 +332,37 @@ html, body {
 }
 .graph-wrap canvas { display: block; }
 
+/* ── CONNECTION ──────────────────────────────────────────────────── */
+.connection-panel { margin-bottom: 0; }
+.connection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: .75rem;
+  padding: .85rem 1rem 1rem;
+}
+.connection-row {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  padding: .75rem .85rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface2);
+}
+.connection-label {
+  font-size: .68rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+.connection-value {
+  font-family: var(--font-mono, "Courier New", monospace);
+  font-size: .88rem;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── PLAYERS ─────────────────────────────────────────────────────── */
 .players-panel { margin-bottom: 0; }
 .panel-count { font-size: .75rem; color: var(--color-primary); }
