@@ -54,6 +54,9 @@ Validated so far:
 - launcher fix to avoid duplicated flags passed to the official startup wrapper
 Remaining point to validate later:
 - real in-game connection and CPU behavior with one or more players connected
+Observed behavior during real validation:
+- Soulmask starts and stops noticeably more slowly than the other currently supported games
+- CPU must be evaluated only after a few minutes of stabilization following `start`/`restart`
 
 ## Running the App
 

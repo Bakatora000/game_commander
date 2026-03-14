@@ -421,6 +421,9 @@ Hors périmètre initial :
 - `max_players` a été vérifié en réel après modification
 - l'instance repart correctement avec les 3 ports attendus
 - la charge CPU au repos reste relativement élevée et devra être réévaluée plus tard avec un vrai joueur connecté
+- comportement observé en validation réelle :
+  - Soulmask met nettement plus de temps à démarrer et à s'arrêter que les autres jeux déjà validés
+  - un `100%` CPU juste après `start`/`restart` ne doit pas être interprété trop vite ; il faut attendre la stabilisation
 
 ### Nginx — vhost partagé multi-instances
 Toutes les instances Game Commander sur `gaming.example.com` partagent **un seul fichier**

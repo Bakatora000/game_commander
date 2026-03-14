@@ -220,3 +220,4 @@ Note Soulmask :
 - le lot actuel couvre l'installation SteamCMD, le service systemd, les sauvegardes, la config UI et la validation des groupes de ports
 - un bug de launcher a été corrigé : le wrapper Game Commander appelle maintenant `WSServer.sh` avec un jeu d'arguments propre, au lieu d'empiler des flags dupliqués sur `StartServer.sh`
 - la charge CPU au repos reste à surveiller plus tard en condition réelle avec joueur connecté
+- en validation réelle, Soulmask a aussi montré des phases de démarrage et d'arrêt sensiblement plus lentes que les autres jeux déjà supportés ; il faut laisser quelques minutes avant de juger la charge CPU juste après un `start` ou `restart`
