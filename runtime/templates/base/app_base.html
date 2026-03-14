@@ -178,6 +178,14 @@
           </div>
           <div id="saveEntries" class="saves-list"></div>
         </div>
+        <div class="panel backups-panel">
+          <div class="panel-header">
+            <span class="panel-title">Backups</span>
+            <button class="btn-primary btn-sm" id="btnRunBackup">Sauvegarder maintenant</button>
+          </div>
+          <div class="backups-meta" id="backupsMeta"></div>
+          <div id="backupEntries" class="saves-list"></div>
+        </div>
       </div>
     </section>
     {% endif %}
@@ -617,8 +625,12 @@ function initSaveManager() {
     offerSaveUpload(files);
     e.target.value = '';
   });
+  document.getElementById('btnRunBackup')?.addEventListener('click', () => {
+    confirmThen('Créer une sauvegarde maintenant ?', runManualBackup);
+  });
   initSaveDropzone();
   loadSaveRoots();
+  loadBackups();
 }
 
 function initSaveDropzone() {
@@ -705,9 +717,11 @@ async function performSaveUpload(files) {
   const d = await r.json();
   const extracted = d.extracted?.length ? `, ${d.extracted.length} élément(s) extrait(s)` : '';
   const stopped = d.server_stopped ? ', serveur arrêté' : '';
+  const restarted = d.server_restarted ? ', serveur relancé' : '';
   const backup = d.backup_created ? ', backup créé' : '';
-  showToast(`${d.count || files.length} fichier(s) restauré(s)${extracted}${stopped}${backup}`, 'success');
+  showToast(`${d.count || files.length} fichier(s) restauré(s)${extracted}${stopped}${restarted}${backup}`, 'success');
   loadSaveEntries();
+  loadBackups();
   setTimeout(fetchStatus, 1500);
 }
 
@@ -722,6 +736,7 @@ function formatSaveUploadError(code) {
     archive_upload_requires_root: 'Un zip doit être restauré à la racine de la sauvegarde',
     restore_confirmation_required: 'Confirmation de restauration requise',
     stop_failed: 'Impossible d’arrêter le serveur avant restauration',
+    restart_failed: 'Restauration faite, mais impossible de relancer le serveur',
     backup_script_missing: 'Script de backup introuvable',
     backup_failed: 'Échec de la sauvegarde automatique avant restauration',
     unknown_root: 'Racine de sauvegarde inconnue',
@@ -730,6 +745,57 @@ function formatSaveUploadError(code) {
     not_a_directory: 'Le chemin cible n’est pas un dossier',
   };
   return map[code] || code || 'Erreur upload sauvegarde';
+}
+
+async function loadBackups() {
+  const r = await fetch(`${PREFIX}/api/backups`).catch(() => null);
+  const list = document.getElementById('backupEntries');
+  const meta = document.getElementById('backupsMeta');
+  if (!list || !meta) return;
+  if (!r?.ok) {
+    list.innerHTML = '<p class="empty-msg">Impossible de charger les backups</p>';
+    return;
+  }
+  const d = await r.json();
+  meta.textContent = d.backup_dir || '';
+  if (!d.entries?.length) {
+    list.innerHTML = '<p class="empty-msg">Aucun backup disponible</p>';
+    return;
+  }
+  list.innerHTML = '';
+  d.entries.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'save-row';
+    row.innerHTML = `
+      <div class="save-main">
+        <span class="save-icon">🗄</span>
+        <span class="save-link static">${entry.label}</span>
+        <span class="save-meta">${formatBytes(entry.size)}</span>
+      </div>
+      <div class="save-actions">
+        <button class="btn-ghost btn-sm backup-download">Télécharger</button>
+      </div>`;
+    row.querySelector('.backup-download').addEventListener('click', () => {
+      const dl = new URL(`${PREFIX}/api/backups/download`, window.location.origin);
+      dl.searchParams.set('name', entry.name);
+      window.location.href = dl.toString();
+    });
+    list.appendChild(row);
+  });
+}
+
+async function runManualBackup() {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/backups/run`, {method:'POST'}).catch(() => null);
+  if (!r?.ok) {
+    const d = await r?.json().catch(() => ({})) || {};
+    showToast(d.error || 'Erreur sauvegarde manuelle', 'error');
+    return;
+  }
+  const d = await r.json();
+  const label = d.latest?.label ? ` (${d.latest.label})` : '';
+  showToast(`Backup créé${label}`, 'success');
+  loadBackups();
 }
 
 async function loadSaveRoots() {

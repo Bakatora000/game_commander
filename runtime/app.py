@@ -205,6 +205,36 @@ def api_saves_download():
     return send_file(target, as_attachment=True, download_name=filename)
 
 
+@app.route(f'{PREFIX}/api/backups')
+@auth.require_auth
+@auth.require_perm('manage_saves')
+def api_backups():
+    data, err = saves.list_backups()
+    return jsonify(data) if not err else (jsonify({'error': err}), 404)
+
+
+@app.route(f'{PREFIX}/api/backups/download')
+@auth.require_auth
+@auth.require_perm('manage_saves')
+def api_backups_download():
+    filename = request.args.get('name', '').strip()
+    try:
+        target, download_name, err = saves.get_backup_download_target(filename)
+    except ValueError:
+        return jsonify({'error': 'invalid_backup'}), 400
+    if err:
+        return jsonify({'error': err}), 404
+    return send_file(target, as_attachment=True, download_name=download_name)
+
+
+@app.route(f'{PREFIX}/api/backups/run', methods=['POST'])
+@auth.require_auth
+@auth.require_perm('manage_saves')
+def api_backups_run():
+    data, err = saves.run_backup()
+    return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 502)
+
+
 @app.route(f'{PREFIX}/api/saves/analyze', methods=['POST'])
 @auth.require_auth
 @auth.require_perm('manage_saves')
@@ -259,10 +289,11 @@ def api_saves_upload():
 
     server_running = server.get_status().get('state') == 20
     server_stopped = False
+    server_restarted = False
     backup_created = None
     try:
         if server_running and stop_if_running:
-            ok, err = server.stop()
+            ok, err = server.stop(wait=True, timeout=300)
             if not ok:
                 saves.cleanup_upload_analysis(analysis)
                 return jsonify({'error': 'stop_failed', 'detail': err}), 502
@@ -281,7 +312,26 @@ def api_saves_upload():
             backup_created = out[-1] if out else None
 
         result = saves.save_uploads(analysis)
-        return jsonify({'ok': True, 'server_stopped': server_stopped, 'backup_created': backup_created, **result})
+        if server_running and stop_if_running:
+            ok, err = server.start(wait=True, timeout=300)
+            if not ok:
+                return jsonify({
+                    'ok': False,
+                    'error': 'restart_failed',
+                    'detail': err,
+                    'server_stopped': server_stopped,
+                    'backup_created': backup_created,
+                    **result,
+                }), 502
+            server_restarted = True
+
+        return jsonify({
+            'ok': True,
+            'server_stopped': server_stopped,
+            'server_restarted': server_restarted,
+            'backup_created': backup_created,
+            **result,
+        })
     except ValueError as exc:
         saves.cleanup_upload_analysis(analysis)
         return jsonify({'error': str(exc) or 'restore_failed'}), 400

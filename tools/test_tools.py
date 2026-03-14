@@ -535,6 +535,12 @@ class SaveManagerTests(unittest.TestCase):
     def tearDown(self):
         self.tmpdir.cleanup()
 
+    def _write_deploy_config(self):
+        (self.root / "deploy_config.env").write_text(
+            'BACKUP_DIR="%s"\n' % (self.root / "backups"),
+            encoding="utf-8",
+        )
+
     def test_get_save_roots_for_minecraft_fabric(self):
         with self.app.app_context():
             roots = core_saves.get_save_roots()
@@ -626,6 +632,28 @@ class SaveManagerTests(unittest.TestCase):
         self.assertIsNone(err)
         self.assertEqual(data["collision_count"], 1)
         self.assertIn("level.dat", data["collisions"])
+
+    def test_list_backups_returns_simplified_labels(self):
+        self._write_deploy_config()
+        backups = self.root / "backups"
+        backups.mkdir()
+        (backups / "minecraft-fabric_save_20260314_223346.zip").write_text("x")
+        with self.app.app_context():
+            data, err = core_saves.list_backups()
+        self.assertIsNone(err)
+        self.assertEqual(len(data["entries"]), 1)
+        self.assertEqual(data["entries"][0]["label"], "14/03/2026 22:33:46")
+
+    def test_get_backup_download_target_uses_backup_dir(self):
+        self._write_deploy_config()
+        backups = self.root / "backups"
+        backups.mkdir()
+        path = backups / "minecraft-fabric_save_20260314_223346.zip"
+        path.write_text("x")
+        with self.app.app_context():
+            target, filename, err = core_saves.get_backup_download_target(path.name)
+        self.assertIsNone(err)
+        self.assertEqual(filename, path.name)
 
 
 class ConfigGenEnshroudedCfgTests(unittest.TestCase):

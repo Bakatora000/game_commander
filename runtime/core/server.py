@@ -140,20 +140,83 @@ def get_status():
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return {'state': 0, 'uptime': '0:00:00:00', 'metrics': {}}
 
-def _systemctl(action):
+def _service_state():
     service = _game()['server']['service']
     try:
         r = subprocess.run(
-            ['sudo', '/usr/bin/systemctl', action, service],
-            capture_output=True, text=True, timeout=30
+            ['systemctl', 'show', service, '--property=ActiveState,SubState'],
+            capture_output=True, text=True, timeout=3
+        )
+        state = {}
+        for line in r.stdout.splitlines():
+            if '=' in line:
+                k, v = line.split('=', 1)
+                state[k] = v.strip()
+        return state
+    except Exception:
+        return {}
+
+def _wait_until_stopped(timeout=180):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        proc = _get_process()
+        state = _service_state()
+        active = state.get('ActiveState', '')
+        sub = state.get('SubState', '')
+        if not proc and active in {'inactive', 'failed'}:
+            return True
+        if active == 'inactive' and sub == 'dead':
+            return True
+        time.sleep(2)
+    return False
+
+def _wait_until_started(timeout=180):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        proc = _get_process()
+        state = _service_state()
+        if proc:
+            return True
+        if state.get('ActiveState', '') == 'active':
+            return True
+        time.sleep(2)
+    return False
+
+def _systemctl(action, timeout=30, no_block=False):
+    service = _game()['server']['service']
+    try:
+        cmd = ['sudo', '/usr/bin/systemctl', action]
+        if no_block:
+            cmd.append('--no-block')
+        cmd.append(service)
+        r = subprocess.run(
+            cmd,
+            capture_output=True, text=True, timeout=timeout
         )
         return r.returncode == 0, r.stderr.strip()
     except Exception as e:
         return False, str(e)
 
-def start():   return _systemctl('start')
-def stop():    return _systemctl('stop')
-def restart(): return _systemctl('restart')
+def start(wait=False, timeout=180):
+    ok, err = _systemctl('start', timeout=30, no_block=wait)
+    if not ok or not wait:
+        return ok, err
+    started = _wait_until_started(timeout)
+    return started, '' if started else 'start_timeout'
+
+def stop(wait=False, timeout=180):
+    ok, err = _systemctl('stop', timeout=30, no_block=wait)
+    if not ok or not wait:
+        return ok, err
+    stopped = _wait_until_stopped(timeout)
+    return stopped, '' if stopped else 'stop_timeout'
+
+def restart(wait=False, timeout=180):
+    ok, err = _systemctl('restart', timeout=30, no_block=wait)
+    if not ok or not wait:
+        return ok, err
+    started = _wait_until_started(timeout)
+    return started, '' if started else 'restart_timeout'
 
 def get_console_entries(n=100, after_cursor=None):
     """

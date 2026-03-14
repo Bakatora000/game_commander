@@ -273,6 +273,14 @@ html, body {
 }
 .save-upload-title { font-size: .82rem; color: var(--color-text); }
 .save-upload-subtitle { font-size: .72rem; color: var(--color-muted); }
+.backups-meta {
+  padding: .75rem 1rem 0;
+  font-size: .72rem;
+  color: var(--color-muted);
+}
+.save-link.static {
+  cursor: default;
+}
 
 /* ── CHART COLORS (override per theme) ──────────────────────────── */
 :root {

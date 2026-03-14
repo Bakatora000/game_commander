@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import tempfile
 import zipfile
+import re
 from pathlib import Path
 
 from flask import after_this_request, current_app
@@ -27,6 +29,60 @@ def _data_dir() -> Path:
 
 def _world_name() -> str:
     return _game()["server"].get("world_name") or ""
+
+
+def _app_dir() -> Path:
+    return Path(current_app.root_path)
+
+
+def _deploy_cfg_path() -> Path:
+    candidates = [
+        _app_dir() / "deploy_config.env",
+        _server_dir().parent / "deploy_config.env",
+    ]
+    for path in candidates:
+        if path.is_file():
+            return path
+    return candidates[0]
+
+
+def _deploy_cfg_value(key: str, default: str = "") -> str:
+    path = _deploy_cfg_path()
+    if not path.is_file():
+        return default
+    pattern = re.compile(rf'^{re.escape(key)}="?(.*?)"?$')
+    for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        m = pattern.match(line.strip())
+        if m:
+            return m.group(1)
+    return default
+
+
+def _backup_dir() -> Path:
+    path = _deploy_cfg_value("BACKUP_DIR")
+    if path:
+        return Path(path)
+    return _server_dir().parent / "gamebackups"
+
+
+def _backup_script_path() -> Path:
+    return _app_dir() / f'backup_{_game()["id"]}.sh'
+
+
+def _backup_pattern() -> str:
+    game_id = _game()["id"]
+    if game_id == "valheim":
+        world_name = _world_name()
+        return f"{world_name}_*.zip" if world_name else "*.zip"
+    return f"{game_id}_save_*.zip"
+
+
+def _backup_label(path: Path) -> str:
+    m = re.search(r'(\d{8})_(\d{6})', path.name)
+    if not m:
+        return path.name
+    d, t = m.groups()
+    return f"{d[6:8]}/{d[4:6]}/{d[0:4]} {t[0:2]}:{t[2:4]}:{t[4:6]}"
 
 
 def get_save_roots():
@@ -160,6 +216,56 @@ def get_download_target(root_id: str, rel_path: str):
         return response
 
     return tmp_path, f"{target.name}.zip", None
+
+
+def list_backups():
+    backup_dir = _backup_dir()
+    if not backup_dir.exists():
+        return {
+            "backup_dir": str(backup_dir),
+            "entries": [],
+        }, None
+
+    entries = []
+    for path in sorted(backup_dir.glob(_backup_pattern()), key=lambda p: p.stat().st_mtime, reverse=True):
+        stat = path.stat()
+        entries.append({
+            "name": path.name,
+            "label": _backup_label(path),
+            "size": stat.st_size,
+            "mtime": int(stat.st_mtime),
+        })
+    return {
+        "backup_dir": str(backup_dir),
+        "entries": entries,
+    }, None
+
+
+def get_backup_download_target(filename: str):
+    if not filename or "/" in filename or "\\" in filename:
+        return None, None, "invalid_backup"
+    path = (_backup_dir() / filename).resolve()
+    root = _backup_dir().resolve()
+    if path != root and root not in path.parents:
+        return None, None, "invalid_backup"
+    if not path.exists() or not path.is_file():
+        return None, None, "missing_backup"
+    return path, path.name, None
+
+
+def run_backup():
+    script = _backup_script_path()
+    if not script.is_file():
+        return None, "backup_script_missing"
+    result = subprocess.run(["bash", str(script)], capture_output=True, text=True, timeout=300)
+    if result.returncode != 0:
+        return None, (result.stderr or result.stdout).strip() or "backup_failed"
+    backups, _err = list_backups()
+    latest = backups["entries"][0] if backups["entries"] else None
+    return {
+        "output": (result.stdout or "").strip(),
+        "latest": latest,
+    }, None
 
 
 def _safe_zip_members(zf: zipfile.ZipFile):
