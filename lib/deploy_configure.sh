@@ -155,6 +155,20 @@ deploy_select_game() {
     ok "Jeu sélectionné : ${BOLD}${GAME_LABEL}${RESET}"
 }
 
+deploy_configure_mode() {
+    echo ""
+    info "Mode de déploiement"
+    if $CONFIG_MODE; then
+        echo -e "  ${DIM}  (config) Mode : ${BOLD}${DEPLOY_MODE}${RESET}"
+    else
+        echo -e "  ${CYAN}[1]${RESET} managed  — installer et gérer le serveur de jeu + Commander"
+        echo -e "  ${CYAN}[2]${RESET} attach   — brancher Commander sur un service de jeu existant"
+        prompt "Votre choix" "$([[ "$DEPLOY_MODE" == "attach" ]] && echo 2 || echo 1)"
+        [[ "$REPLY" == "2" ]] && DEPLOY_MODE="attach" || DEPLOY_MODE="managed"
+    fi
+    ok "Mode sélectionné : ${BOLD}${DEPLOY_MODE}${RESET}"
+}
+
 deploy_configure_user() {
     echo ""
     info "Utilisateur système"
@@ -198,19 +212,35 @@ deploy_prepare_instance_defaults() {
     [[ -z "$APP_DIR"    ]] && APP_DIR="$HOME_DIR/game-commander-${INSTANCE_ID}"
     [[ -z "$SRC_DIR"    ]] && SRC_DIR="$SCRIPT_DIR"
 
-    GAME_SERVICE="${GAME_ID}-server-${INSTANCE_ID}"
+    [[ -z "$GAME_SERVICE" ]] && GAME_SERVICE="${GAME_ID}-server-${INSTANCE_ID}"
     GC_SERVICE="game-commander-${INSTANCE_ID}"
 }
 
 deploy_configure_paths() {
+    local prev_instance prev_server_dir prev_data_dir prev_app_dir prev_game_service
+
     echo ""
     info "Instance"
+    prev_instance="$INSTANCE_ID"
+    prev_server_dir="$SERVER_DIR"
+    prev_data_dir="$DATA_DIR"
+    prev_app_dir="$APP_DIR"
+    prev_game_service="$GAME_SERVICE"
     prompt "Identifiant d'instance (unique par serveur)" "${INSTANCE_ID}"
     INSTANCE_ID="$REPLY"
-    [[ "$SERVER_DIR" == *"_server" ]] && SERVER_DIR="$HOME_DIR/${INSTANCE_ID}_server"
-    [[ "$DATA_DIR" == *"_data" ]] && DATA_DIR="$HOME_DIR/${INSTANCE_ID}_data"
-    [[ "$APP_DIR" == *"game-commander-"* ]] && APP_DIR="$HOME_DIR/game-commander-${INSTANCE_ID}"
-    GAME_SERVICE="${GAME_ID}-server-${INSTANCE_ID}"
+
+    if [[ -z "$prev_server_dir" || "$prev_server_dir" == "$HOME_DIR/${prev_instance}_server" ]]; then
+        SERVER_DIR="$HOME_DIR/${INSTANCE_ID}_server"
+    fi
+    if [[ -z "$prev_data_dir" || "$prev_data_dir" == "$HOME_DIR/${prev_instance}_data" ]]; then
+        DATA_DIR="$HOME_DIR/${INSTANCE_ID}_data"
+    fi
+    if [[ -z "$prev_app_dir" || "$prev_app_dir" == "$HOME_DIR/game-commander-${prev_instance}" ]]; then
+        APP_DIR="$HOME_DIR/game-commander-${INSTANCE_ID}"
+    fi
+    if [[ -z "$prev_game_service" || "$prev_game_service" == "${GAME_ID}-server-${prev_instance}" ]]; then
+        GAME_SERVICE="${GAME_ID}-server-${INSTANCE_ID}"
+    fi
     GC_SERVICE="game-commander-${INSTANCE_ID}"
 
     info "Chemins"
@@ -234,6 +264,14 @@ deploy_configure_paths() {
         DEPLOY_APP=true
         ok "Sources Game Commander trouvées"
     fi
+
+    if [[ "$DEPLOY_MODE" == "attach" ]]; then
+        prompt "Nom du service systemd existant" "${GAME_SERVICE}"
+        GAME_SERVICE="$REPLY"
+        systemctl list-unit-files "${GAME_SERVICE}.service" 2>/dev/null | grep -qv "not-found" \
+            && ok "Service existant détecté : $GAME_SERVICE" \
+            || warn "Service systemd non détecté : $GAME_SERVICE"
+    fi
 }
 
 deploy_configure_server() {
@@ -250,7 +288,7 @@ deploy_configure_server() {
         SERVER_ADMIN_PASSWORD="$REPLY"
     fi
 
-    if conflict="$(deploy_first_port_group_conflict)"; then
+    if [[ "$DEPLOY_MODE" != "attach" ]] && conflict="$(deploy_first_port_group_conflict)"; then
         IFS='|' read -r spec proto label port <<< "$conflict"
         deploy_suggest_port_group
         warn "${label} ${port}/$([[ "$proto" == "t" ]] && echo TCP || echo UDP) déjà utilisé — groupe de ports suggéré mis à jour"
@@ -264,7 +302,7 @@ deploy_configure_server() {
         prompt "Port Echo" "${ECHO_PORT}"
         ECHO_PORT="$REPLY"
     fi
-    deploy_warn_port_group_conflicts
+    [[ "$DEPLOY_MODE" != "attach" ]] && deploy_warn_port_group_conflicts
     prompt "Joueurs max" "${MAX_PLAYERS}"
     MAX_PLAYERS="$REPLY"
 
@@ -370,6 +408,7 @@ deploy_print_summary() {
     hdr "RÉCAPITULATIF"
     echo ""
     echo -e "  ${BOLD}Jeu               :${RESET} $GAME_LABEL"
+    echo -e "  ${BOLD}Mode              :${RESET} $DEPLOY_MODE"
     echo -e "  ${BOLD}Utilisateur       :${RESET} $SYS_USER ($HOME_DIR)"
     echo -e "  ${BOLD}Serveur           :${RESET} $SERVER_DIR"
     [[ "$GAME_ID" != "enshrouded" ]] && echo -e "  ${BOLD}Données           :${RESET} $DATA_DIR"
@@ -387,6 +426,7 @@ deploy_print_summary() {
         echo -e "  ${BOLD}BepInEx           :${RESET} $($BEPINEX && echo "Oui" || echo "Non")"
     }
     echo -e "  ${BOLD}Sauvegardes       :${RESET} $BACKUP_DIR (7j)"
+    echo -e "  ${BOLD}Service jeu       :${RESET} $GAME_SERVICE"
     echo -e "  ${BOLD}Game Commander    :${RESET} $APP_DIR"
     echo -e "  ${BOLD}URL               :${RESET} $DOMAIN${URL_PREFIX}"
     echo -e "  ${BOLD}Port Flask        :${RESET} $FLASK_PORT"
@@ -399,6 +439,7 @@ deploy_print_summary() {
 deploy_step_configuration() {
     hdr "ÉTAPE 2 : Configuration"
     deploy_select_game
+    deploy_configure_mode
     deploy_configure_user
     deploy_prepare_instance_defaults
     deploy_configure_paths

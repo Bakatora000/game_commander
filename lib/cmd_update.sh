@@ -12,32 +12,32 @@ update_game_meta() {
         valheim)
             GAME_LABEL="Valheim"
             GAME_BINARY="valheim_server.x86_64"
-            GAME_SERVICE="valheim-server-${INSTANCE_ID}"
+            GAME_SERVICE="${GAME_SERVICE:-valheim-server-${INSTANCE_ID}}"
             ;;
         enshrouded)
             GAME_LABEL="Enshrouded"
             GAME_BINARY="enshrouded_server.exe"
-            GAME_SERVICE="enshrouded-server-${INSTANCE_ID}"
+            GAME_SERVICE="${GAME_SERVICE:-enshrouded-server-${INSTANCE_ID}}"
             ;;
         minecraft)
             GAME_LABEL="Minecraft Java"
             GAME_BINARY="java"
-            GAME_SERVICE="minecraft-server-${INSTANCE_ID}"
+            GAME_SERVICE="${GAME_SERVICE:-minecraft-server-${INSTANCE_ID}}"
             ;;
         minecraft-fabric)
             GAME_LABEL="Minecraft Fabric"
             GAME_BINARY="java"
-            GAME_SERVICE="minecraft-fabric-server-${INSTANCE_ID}"
+            GAME_SERVICE="${GAME_SERVICE:-minecraft-fabric-server-${INSTANCE_ID}}"
             ;;
         terraria)
             GAME_LABEL="Terraria"
             GAME_BINARY="TerrariaServer.bin.x86_64"
-            GAME_SERVICE="terraria-server-${INSTANCE_ID}"
+            GAME_SERVICE="${GAME_SERVICE:-terraria-server-${INSTANCE_ID}}"
             ;;
         soulmask)
             GAME_LABEL="Soulmask"
             GAME_BINARY="StartServer.sh"
-            GAME_SERVICE="soulmask-server-${INSTANCE_ID}"
+            GAME_SERVICE="${GAME_SERVICE:-soulmask-server-${INSTANCE_ID}}"
             ;;
         *)
             die "GAME_ID non supporté pour update : $GAME_ID"
@@ -50,7 +50,7 @@ update_process_config() {
     unset GAME_ID INSTANCE_ID SYS_USER SERVER_DIR DATA_DIR BACKUP_DIR APP_DIR SRC_DIR \
           WORLD_NAME SERVER_NAME SERVER_PASSWORD SERVER_ADMIN_PASSWORD SERVER_PORT QUERY_PORT ECHO_PORT \
           MAX_PLAYERS SERVER_MODE BACKUP_ENABLED SAVING_ENABLED BACKUP_INTERVAL CROSSPLAY BEPINEX DOMAIN \
-          URL_PREFIX FLASK_PORT SSL_MODE ADMIN_LOGIN STEAM_APPID STEAMCMD_PATH
+          URL_PREFIX FLASK_PORT SSL_MODE ADMIN_LOGIN STEAM_APPID STEAMCMD_PATH DEPLOY_MODE GAME_SERVICE
 
     source <(grep -E '^[A-Z_]+=' "$cfg" 2>/dev/null)
 
@@ -62,6 +62,8 @@ update_process_config() {
     DATA_DIR="${DATA_DIR:-$SERVER_DIR}"
     SRC_DIR="${SRC_DIR:-$SCRIPT_DIR}"
     ADMIN_LOGIN="${ADMIN_LOGIN:-admin}"
+    DEPLOY_MODE="${DEPLOY_MODE:-managed}"
+    GAME_SERVICE="${GAME_SERVICE:-}"
     GC_SERVICE="game-commander-${INSTANCE_ID}"
 
     [[ -n "$GAME_ID" && -n "$INSTANCE_ID" && -n "$APP_DIR" ]] || {

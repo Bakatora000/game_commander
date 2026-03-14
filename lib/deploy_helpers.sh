@@ -35,8 +35,10 @@ deploy_set_defaults() {
     AUTO_INSTALL_BEPINEX=true
     AUTO_UPDATE_SERVER=false
     AUTO_CONFIRM=false
+    DEPLOY_MODE="managed"
     CONFIG_MODE=false
     CONFIG_FILE_DEPLOY=""
+    GAME_SERVICE=""
 }
 
 deploy_handle_special_args() {
@@ -52,6 +54,9 @@ deploy_handle_special_args() {
 # Jeu : valheim | enshrouded | minecraft | minecraft-fabric | terraria | soulmask
 GAME_ID="valheim"
 
+# Mode de déploiement : managed | attach
+DEPLOY_MODE="managed"
+
 # Utilisateur système
 SYS_USER="gameserver"
 
@@ -62,6 +67,7 @@ DATA_DIR=""
 BACKUP_DIR=""
 APP_DIR=""
 SRC_DIR=""          # racine du projet Game Commander ou dossier runtime
+GAME_SERVICE=""     # vide = nom par défaut, utile en mode attach
 
 # Configuration du serveur de jeu
 SERVER_NAME="Mon Serveur Valheim"

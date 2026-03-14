@@ -80,6 +80,31 @@ test_deploy_modules_present() {
     grep -q 'deploy_step_validation()' "$steps_file" || return 1
 }
 
+test_attach_mode_present() {
+    local helpers_file="$ROOT_DIR/lib/deploy_helpers.sh"
+    local configure_file="$ROOT_DIR/lib/deploy_configure.sh"
+    local deploy_file="$ROOT_DIR/lib/cmd_deploy.sh"
+    local steps_file="$ROOT_DIR/lib/deploy_steps.sh"
+    local update_file="$ROOT_DIR/lib/cmd_update.sh"
+
+    grep -q 'DEPLOY_MODE="managed"' "$helpers_file" || return 1
+    grep -q 'GAME_SERVICE=""' "$helpers_file" || return 1
+    grep -q 'DEPLOY_MODE="managed"' "$helpers_file" || return 1
+    grep -q 'deploy_configure_mode()' "$configure_file" || return 1
+    grep -q 'Mode sélectionné :' "$configure_file" || return 1
+    grep -q 'prev_server_dir' "$configure_file" || return 1
+    grep -q 'if \[\[ "\$DEPLOY_MODE" != "attach" \]\] && conflict=' "$configure_file" || return 1
+    grep -q '\[\[ "\$DEPLOY_MODE" != "attach" \]\] && deploy_warn_port_group_conflicts' "$configure_file" || return 1
+    grep -q -- '--attach\|--existing-server' "$deploy_file" || return 1
+    grep -q '\[\[ "\$DEPLOY_MODE" == "attach" \]\]' "$steps_file" || return 1
+    grep -q 'Mode attach — installation/mise à jour du serveur ignorée' "$steps_file" || return 1
+    grep -q 'Mode attach — service de jeu existant conservé' "$steps_file" || return 1
+    grep -q 'echo "DEPLOY_MODE=\\"${DEPLOY_MODE}\\""' "$steps_file" || return 1
+    grep -q 'echo "GAME_SERVICE=\\"${GAME_SERVICE}\\""' "$steps_file" || return 1
+    grep -q 'DEPLOY_MODE GAME_SERVICE' "$update_file" || return 1
+    grep -q 'GAME_SERVICE="${GAME_SERVICE:-valheim-server-${INSTANCE_ID}}"' "$update_file" || return 1
+}
+
 test_uninstall_prefers_manifest() {
     local file="$ROOT_DIR/lib/cmd_uninstall.sh"
 
@@ -254,6 +279,7 @@ main() {
     run_test "Thin game_commander.sh entrypoint" test_entrypoint_is_thin
     run_test "Deploy delegates to modular steps" test_deploy_uses_nginx_module
     run_test "Deploy helper and step modules present" test_deploy_modules_present
+    run_test "Attach mode is wired through deploy and update" test_attach_mode_present
     run_test "Uninstall delegates to dedicated modules" test_uninstall_prefers_manifest
     run_test "Uninstall modules keep manifest and process logic" test_uninstall_modules_present
     run_test "Interactive prompt helper falls back to stdin" test_gc_read_falls_back_to_stdin

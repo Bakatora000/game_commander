@@ -19,7 +19,7 @@ deploy_step_dependencies() {
 
     for pkg in python3 python3-pip nginx curl zip unzip jq; do install_pkg "$pkg"; done
 
-    if [[ -n "$STEAM_APPID" ]]; then
+    if [[ "$DEPLOY_MODE" != "attach" && -n "$STEAM_APPID" ]]; then
         dpkg --print-foreign-architectures | grep -q i386 || {
             info "Activation i386..."
             dpkg --add-architecture i386
@@ -51,7 +51,7 @@ deploy_step_dependencies() {
 
     [[ "$SSL_MODE" == "certbot" ]] && { install_pkg certbot; install_pkg python3-certbot-nginx; }
 
-    if [[ "$GAME_ID" == "enshrouded" ]]; then
+    if [[ "$DEPLOY_MODE" != "attach" && "$GAME_ID" == "enshrouded" ]]; then
         info "Enshrouded requiert Wine (binaire Windows) + Xvfb..."
         if ! cmd_exists wine64 || ! dpkg -l wine64 2>/dev/null | grep -q "^ii"; then
             warn "wine64 absent — installation depuis les dépôts système..."
@@ -86,7 +86,7 @@ deploy_step_dependencies() {
     fi
 
     STEAMCMD_PATH=""
-    if [[ -n "$STEAM_APPID" ]]; then
+    if [[ "$DEPLOY_MODE" != "attach" && -n "$STEAM_APPID" ]]; then
         if cmd_exists steamcmd; then
             STEAMCMD_PATH=$(command -v steamcmd); ok "SteamCMD : $STEAMCMD_PATH"
         elif [[ -f "$HOME_DIR/steamcmd/steamcmd.sh" ]]; then
@@ -108,6 +108,12 @@ deploy_step_dependencies() {
 }
 
 deploy_step_game_install() {
+    if [[ "$DEPLOY_MODE" == "attach" ]]; then
+        hdr "ÉTAPE 4 : Installation $GAME_LABEL"
+        info "Mode attach — installation/mise à jour du serveur ignorée"
+        return
+    fi
+
     if [[ "$GAME_ID" == "soulmask" ]]; then
         hdr "ÉTAPE 4 : Installation Soulmask"
         mkdir -p "$SERVER_DIR" "$DATA_DIR"
@@ -438,6 +444,11 @@ EOF
 
 deploy_step_game_service() {
     hdr "ÉTAPE 5 : Service $GAME_LABEL"
+
+    if [[ "$DEPLOY_MODE" == "attach" ]]; then
+        info "Mode attach — service de jeu existant conservé : $GAME_SERVICE"
+        return
+    fi
 
     if [[ "$GAME_ID" == "minecraft" ]]; then
         START_SCRIPT="$SERVER_DIR/start_server.sh"
@@ -1110,6 +1121,7 @@ deploy_step_save_config() {
         echo "# Redéploiement : sudo bash game_commander.sh deploy --config $CONFIG_SAVE"
         echo ""
         echo "GAME_ID=\"${GAME_ID}\""
+        echo "DEPLOY_MODE=\"${DEPLOY_MODE}\""
         echo "INSTANCE_ID=\"${INSTANCE_ID}\""
         echo "SYS_USER=\"${SYS_USER}\""
         echo "SERVER_DIR=\"${SERVER_DIR}\""
@@ -1117,13 +1129,23 @@ deploy_step_save_config() {
         echo "BACKUP_DIR=\"${BACKUP_DIR}\""
         echo "APP_DIR=\"${APP_DIR}\""
         echo "SRC_DIR=\"${SRC_DIR}\""
+        echo "GAME_SERVICE=\"${GAME_SERVICE}\""
         echo "SERVER_NAME=\"${SERVER_NAME}\""
         echo "SERVER_PORT=\"${SERVER_PORT}\""
+        [[ -n "${QUERY_PORT:-}" ]] && echo "QUERY_PORT=\"${QUERY_PORT}\""
+        [[ -n "${ECHO_PORT:-}" ]] && echo "ECHO_PORT=\"${ECHO_PORT}\""
         echo "MAX_PLAYERS=\"${MAX_PLAYERS}\""
         [[ "$GAME_ID" == "valheim" ]] && {
             echo "WORLD_NAME=\"${WORLD_NAME}\""
             echo "CROSSPLAY=${CROSSPLAY}"
             echo "BEPINEX=${BEPINEX}"
+        }
+        [[ "$GAME_ID" == "soulmask" ]] && {
+            echo "SERVER_ADMIN_PASSWORD=\"\""
+            echo "SERVER_MODE=\"${SERVER_MODE}\""
+            echo "BACKUP_ENABLED=${BACKUP_ENABLED}"
+            echo "SAVING_ENABLED=${SAVING_ENABLED}"
+            echo "BACKUP_INTERVAL=\"${BACKUP_INTERVAL}\""
         }
         echo "DOMAIN=\"${DOMAIN}\""
         echo "URL_PREFIX=\"${URL_PREFIX}\""

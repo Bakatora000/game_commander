@@ -13,6 +13,9 @@ cmd_deploy() {
                 CONFIG_FILE_DEPLOY="${_args[$i]}"
                 CONFIG_MODE=true
                 ;;
+            --attach|--existing-server)
+                DEPLOY_MODE="attach"
+                ;;
             --generate-config)
                 deploy_handle_special_args "${_args[$((i+1))]:-env/deploy_config.env}"
                 return 0
