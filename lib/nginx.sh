@@ -4,6 +4,7 @@
 
 GC_NGINX_MANIFEST="/etc/nginx/game-commander-manifest.json"
 GC_NGINX_LOC_FILE="/etc/nginx/game-commander-locations.conf"
+GC_NGINX_HUB_FILE="/etc/nginx/game-commander-hub.html"
 GC_NGINX_BACKUP_DIR="/etc/nginx/backups"
 
 # ── nginx_ensure_init ─────────────────────────────────────────────────────────
@@ -17,6 +18,7 @@ nginx_ensure_init() {
         --domain     "$domain" \
         --manifest   "$GC_NGINX_MANIFEST" \
         --loc-file   "$GC_NGINX_LOC_FILE" \
+        --hub-file   "$GC_NGINX_HUB_FILE" \
         --backup-dir "$GC_NGINX_BACKUP_DIR" \
     || { err "nginx_ensure_init échoué pour $domain"; return 1; }
 }
@@ -62,6 +64,7 @@ nginx_regenerate_locations() {
     python3 "$SCRIPT_DIR/tools/nginx_manager.py" regenerate \
         --manifest "$GC_NGINX_MANIFEST" \
         --out      "$GC_NGINX_LOC_FILE" \
+        --hub-file "$GC_NGINX_HUB_FILE" \
     || { err "nginx_regenerate_locations échoué"; return 1; }
 }
 

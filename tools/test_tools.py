@@ -1768,10 +1768,10 @@ server {
 }
 """
 
-    def _make_init_args(self, domain, manifest, loc_file, backup_dir):
+    def _make_init_args(self, domain, manifest, loc_file, hub_file, backup_dir):
         return make_args(
             domain=domain, manifest=manifest,
-            loc_file=loc_file, backup_dir=backup_dir,
+            loc_file=loc_file, hub_file=hub_file, backup_dir=backup_dir,
         )
 
     def _make_manifest_add_args(self, manifest, instance_id, prefix, port, game):
@@ -1786,8 +1786,8 @@ server {
     def _make_manifest_check_args(self, manifest, instance_id):
         return make_args(manifest=manifest, instance_id=instance_id)
 
-    def _make_regenerate_args(self, manifest, out):
-        return make_args(manifest=manifest, out=out)
+    def _make_regenerate_args(self, manifest, out, hub_file):
+        return make_args(manifest=manifest, out=out, hub_file=hub_file)
 
     # ── manifest-add / manifest-remove / manifest-check ──────────────────────
 
@@ -1864,6 +1864,7 @@ server {
         with tempfile.TemporaryDirectory() as d:
             manifest = os.path.join(d, "manifest.json")
             loc_file = os.path.join(d, "locations.conf")
+            hub_file = os.path.join(d, "hub.html")
             nginx_manager.save_manifest(manifest, {
                 "vhost": "gaming.example.com",
                 "instances": [
@@ -1871,24 +1872,36 @@ server {
                     {"name": "e1", "prefix": "/ens1",     "flask_port": 5003, "game": "Enshrouded"},
                 ],
             })
-            rc = nginx_manager.cmd_regenerate(self._make_regenerate_args(manifest, loc_file))
+            rc = nginx_manager.cmd_regenerate(self._make_regenerate_args(manifest, loc_file, hub_file))
             self.assertEqual(rc, 0)
             content = Path(loc_file).read_text()
+            hub = Path(hub_file).read_text()
+            self.assertIn("location = /commander {", content)
+            self.assertIn(f"root {os.path.dirname(hub_file)};", content)
+            self.assertIn(f"try_files /{os.path.basename(hub_file)} =404;", content)
             self.assertIn("location /valheim8 {", content)
             self.assertIn("location /ens1 {", content)
             self.assertIn("proxy_pass         http://127.0.0.1:5002", content)
             self.assertIn("proxy_pass         http://127.0.0.1:5003", content)
+            self.assertIn("Game Commander Hub", hub)
+            self.assertIn('href="/valheim8"', hub)
+            self.assertIn('href="/ens1"', hub)
+            self.assertIn('data-field="status"', hub)
+            self.assertIn('data-field="players"', hub)
 
     def test_regenerate_empty_manifest_produces_header_only(self):
         with tempfile.TemporaryDirectory() as d:
             manifest = os.path.join(d, "manifest.json")
             loc_file = os.path.join(d, "locations.conf")
+            hub_file = os.path.join(d, "hub.html")
             nginx_manager.save_manifest(manifest, {"vhost": "x.com", "instances": []})
-            rc = nginx_manager.cmd_regenerate(self._make_regenerate_args(manifest, loc_file))
+            rc = nginx_manager.cmd_regenerate(self._make_regenerate_args(manifest, loc_file, hub_file))
             self.assertEqual(rc, 0)
             content = Path(loc_file).read_text()
             self.assertIn("NE PAS ÉDITER MANUELLEMENT", content)
-            self.assertNotIn("location /", content)
+            self.assertIn("location = /commander {", content)
+            self.assertNotIn("location /valheim8 {", content)
+            self.assertIn("Aucune instance Game Commander disponible.", Path(hub_file).read_text())
 
     # ── init ─────────────────────────────────────────────────────────────────
 
@@ -1896,14 +1909,16 @@ server {
         with tempfile.TemporaryDirectory() as d:
             manifest = os.path.join(d, "manifest.json")
             loc_file = os.path.join(d, "locations.conf")
+            hub_file = os.path.join(d, "hub.html")
             backup_dir = os.path.join(d, "backups")
             # Pas de fichier nginx réel — init doit quand même créer manifest + loc-file
             rc = nginx_manager.cmd_init(self._make_init_args(
-                "gaming.example.com", manifest, loc_file, backup_dir,
+                "gaming.example.com", manifest, loc_file, hub_file, backup_dir,
             ))
             self.assertEqual(rc, 0)
             self.assertTrue(Path(manifest).is_file())
             self.assertTrue(Path(loc_file).is_file())
+            self.assertTrue(Path(hub_file).is_file())
 
     def test_init_adds_include_in_ssl_block(self):
         with tempfile.TemporaryDirectory() as d:
@@ -1912,6 +1927,7 @@ server {
             Path(conf).write_text(self.NGINX_WITH_SSL)
             manifest = os.path.join(d, "manifest.json")
             loc_file = os.path.join(d, "locations.conf")
+            hub_file = os.path.join(d, "hub.html")
             backup_dir = os.path.join(d, "backups")
 
             # Patcher find_nginx_conf pour retourner notre faux fichier
@@ -1919,7 +1935,7 @@ server {
             nginx_manager.find_nginx_conf = lambda domain: conf
             try:
                 rc = nginx_manager.cmd_init(self._make_init_args(
-                    "gaming.example.com", manifest, loc_file, backup_dir,
+                    "gaming.example.com", manifest, loc_file, hub_file, backup_dir,
                 ))
             finally:
                 nginx_manager.find_nginx_conf = original
@@ -1935,16 +1951,17 @@ server {
             Path(conf).write_text(self.NGINX_WITH_SSL)
             manifest = os.path.join(d, "manifest.json")
             loc_file = os.path.join(d, "locations.conf")
+            hub_file = os.path.join(d, "hub.html")
             backup_dir = os.path.join(d, "backups")
 
             original = nginx_manager.find_nginx_conf
             nginx_manager.find_nginx_conf = lambda domain: conf
             try:
                 nginx_manager.cmd_init(self._make_init_args(
-                    "gaming.example.com", manifest, loc_file, backup_dir,
+                    "gaming.example.com", manifest, loc_file, hub_file, backup_dir,
                 ))
                 rc = nginx_manager.cmd_init(self._make_init_args(
-                    "gaming.example.com", manifest, loc_file, backup_dir,
+                    "gaming.example.com", manifest, loc_file, hub_file, backup_dir,
                 ))
             finally:
                 nginx_manager.find_nginx_conf = original
@@ -1975,13 +1992,14 @@ server {
             Path(conf).write_text(nginx_with_old_blocks)
             manifest = os.path.join(d, "manifest.json")
             loc_file = os.path.join(d, "locations.conf")
+            hub_file = os.path.join(d, "hub.html")
             backup_dir = os.path.join(d, "backups")
 
             original = nginx_manager.find_nginx_conf
             nginx_manager.find_nginx_conf = lambda domain: conf
             try:
                 nginx_manager.cmd_init(self._make_init_args(
-                    "gaming.example.com", manifest, loc_file, backup_dir,
+                    "gaming.example.com", manifest, loc_file, hub_file, backup_dir,
                 ))
             finally:
                 nginx_manager.find_nginx_conf = original
@@ -1999,6 +2017,7 @@ server {
             Path(conf).write_text(self.NGINX_WITH_SSL)
             manifest = os.path.join(d, "manifest.json")
             loc_file = os.path.join(d, "locations.conf")
+            hub_file = os.path.join(d, "hub.html")
             backup_dir = os.path.join(d, "backups")
 
             original = nginx_manager.find_nginx_conf
@@ -2006,18 +2025,18 @@ server {
             try:
                 # Deploy instance 1
                 nginx_manager.cmd_init(self._make_init_args(
-                    "gaming.example.com", manifest, loc_file, backup_dir,
+                    "gaming.example.com", manifest, loc_file, hub_file, backup_dir,
                 ))
                 nginx_manager.cmd_manifest_add(self._make_manifest_add_args(
                     manifest, "valheim8", "/valheim8", 5002, "Valheim",
                 ))
-                nginx_manager.cmd_regenerate(self._make_regenerate_args(manifest, loc_file))
+                nginx_manager.cmd_regenerate(self._make_regenerate_args(manifest, loc_file, hub_file))
 
                 # Deploy instance 2
                 nginx_manager.cmd_manifest_add(self._make_manifest_add_args(
                     manifest, "ens1", "/ens1", 5003, "Enshrouded",
                 ))
-                nginx_manager.cmd_regenerate(self._make_regenerate_args(manifest, loc_file))
+                nginx_manager.cmd_regenerate(self._make_regenerate_args(manifest, loc_file, hub_file))
 
                 loc_content = Path(loc_file).read_text()
                 self.assertIn("location /valheim8 {", loc_content)
@@ -2025,7 +2044,7 @@ server {
 
                 # Uninstall instance 1
                 nginx_manager.cmd_manifest_remove(self._make_manifest_remove_args(manifest, "valheim8"))
-                nginx_manager.cmd_regenerate(self._make_regenerate_args(manifest, loc_file))
+                nginx_manager.cmd_regenerate(self._make_regenerate_args(manifest, loc_file, hub_file))
 
                 loc_content = Path(loc_file).read_text()
                 self.assertNotIn("location /valheim8 {", loc_content)
@@ -2033,7 +2052,7 @@ server {
 
                 # Uninstall instance 2
                 nginx_manager.cmd_manifest_remove(self._make_manifest_remove_args(manifest, "ens1"))
-                nginx_manager.cmd_regenerate(self._make_regenerate_args(manifest, loc_file))
+                nginx_manager.cmd_regenerate(self._make_regenerate_args(manifest, loc_file, hub_file))
 
                 loc_content = Path(loc_file).read_text()
                 self.assertNotIn("location /ens1 {", loc_content)

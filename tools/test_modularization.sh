@@ -213,11 +213,11 @@ nginx_regenerate_locations
 nginx_apply
 EOF
 
-    grep -q 'tools/nginx_manager.py init --domain gaming.example.com --manifest /etc/nginx/game-commander-manifest.json --loc-file /etc/nginx/game-commander-locations.conf --backup-dir /etc/nginx/backups' "$sandbox/calls.log" || return 1
+    grep -q 'tools/nginx_manager.py init --domain gaming.example.com --manifest /etc/nginx/game-commander-manifest.json --loc-file /etc/nginx/game-commander-locations.conf --hub-file /etc/nginx/game-commander-hub.html --backup-dir /etc/nginx/backups' "$sandbox/calls.log" || return 1
     grep -q 'tools/nginx_manager.py manifest-add --manifest /etc/nginx/game-commander-manifest.json --instance-id valheim8 --prefix /valheim8 --port 5002 --game Valheim' "$sandbox/calls.log" || return 1
     grep -q 'tools/nginx_manager.py manifest-check --manifest /etc/nginx/game-commander-manifest.json --instance-id valheim8' "$sandbox/calls.log" || return 1
     grep -q 'tools/nginx_manager.py manifest-remove --manifest /etc/nginx/game-commander-manifest.json --instance-id valheim8' "$sandbox/calls.log" || return 1
-    grep -q 'tools/nginx_manager.py regenerate --manifest /etc/nginx/game-commander-manifest.json --out /etc/nginx/game-commander-locations.conf' "$sandbox/calls.log" || return 1
+    grep -q 'tools/nginx_manager.py regenerate --manifest /etc/nginx/game-commander-manifest.json --out /etc/nginx/game-commander-locations.conf --hub-file /etc/nginx/game-commander-hub.html' "$sandbox/calls.log" || return 1
     grep -q '^nginx -t$' "$sandbox/calls.log" || return 1
     grep -q '^systemctl reload nginx$' "$sandbox/calls.log" || return 1
 }

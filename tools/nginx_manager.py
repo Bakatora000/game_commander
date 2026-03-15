@@ -97,6 +97,190 @@ def build_location_block(instance_id: str, prefix: str, port: int, game: str) ->
     )
 
 
+def build_hub_location_block(hub_file: str) -> str:
+    """Bloc nginx pour la page hub /commander."""
+    hub_path = Path(hub_file)
+    hub_root = str(hub_path.parent)
+    hub_name = hub_path.name
+    return (
+        "\n"
+        "    # ── Game Commander Hub ─────────────────────────────────────────────────\n"
+        "    location = /commander {\n"
+        "        return 302 /commander/;\n"
+        "    }\n"
+        "    location = /commander/ {\n"
+        f"        root {hub_root};\n"
+        f"        try_files /{hub_name} =404;\n"
+        "        add_header Cache-Control \"no-store\";\n"
+    "    }\n"
+        "    # ───────────────────────────────────────────────────────────────────────\n"
+    )
+
+
+def build_hub_html(vhost: str, instances: list[dict]) -> str:
+    cards = []
+    for inst in sorted(instances, key=lambda i: (i.get("game", "").lower(), i.get("name", "").lower())):
+        name = inst.get("name", "?")
+        game = inst.get("game", "?")
+        prefix = inst.get("prefix", "/")
+        cards.append(
+            f"""
+      <article class="card" data-prefix="{prefix}">
+        <div class="card-meta">{game}</div>
+        <h2>{name}</h2>
+        <dl class="card-stats">
+          <div><dt>Statut</dt><dd data-field="status">Chargement…</dd></div>
+          <div><dt>Joueurs</dt><dd data-field="players">—</dd></div>
+        </dl>
+        <a class="card-link" href="{prefix}">Ouvrir</a>
+      </article>""".rstrip()
+        )
+    cards_html = "\n".join(cards) if cards else '<p class="empty">Aucune instance Game Commander disponible.</p>'
+    return f"""<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Game Commander Hub</title>
+  <style>
+    :root {{
+      --bg: #0f1419;
+      --panel: #18212a;
+      --panel-2: #21303d;
+      --text: #eef4f8;
+      --muted: #9cb1c0;
+      --accent: #4fc3a1;
+      --border: rgba(255,255,255,.08);
+    }}
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(79,195,161,.14), transparent 35%),
+        linear-gradient(180deg, #0c1116, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+    }}
+    .wrap {{
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 48px 20px 64px;
+    }}
+    .hero {{ margin-bottom: 28px; }}
+    h1 {{
+      margin: 0 0 .5rem;
+      font-size: clamp(2rem, 4vw, 3.2rem);
+      line-height: 1;
+    }}
+    .subtitle {{
+      color: var(--muted);
+      max-width: 62ch;
+      line-height: 1.5;
+      margin: 0;
+    }}
+    .meta {{
+      margin-top: 1rem;
+      color: var(--muted);
+      font-size: .95rem;
+    }}
+    .grid {{
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-top: 28px;
+    }}
+    .card {{
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, .18);
+    }}
+    .card-meta {{
+      color: var(--accent);
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: .7rem;
+    }}
+    .card h2 {{ margin: 0 0 .5rem; font-size: 1.25rem; }}
+    .card-stats {{
+      display: grid;
+      gap: .55rem;
+      margin: 0 0 1rem;
+    }}
+    .card-stats div {{
+      display: flex;
+      justify-content: space-between;
+      gap: 1rem;
+      color: var(--muted);
+      font-size: .92rem;
+    }}
+    .card-stats dt {{
+      margin: 0;
+    }}
+    .card-stats dd {{
+      margin: 0;
+      color: var(--text);
+      font-weight: 600;
+    }}
+    .card-link {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 112px;
+      padding: .7rem 1rem;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #09201a;
+      text-decoration: none;
+      font-weight: 700;
+    }}
+    .empty {{ color: var(--muted); margin-top: 24px; }}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>Game Commander Hub</h1>
+      <p class="subtitle">Point d’entrée unique vers les interfaces d’instances déjà déployées. Cette page liste les Commander disponibles pour <strong>{vhost}</strong>.</p>
+      <div class="meta">{len(instances)} instance(s) disponible(s)</div>
+    </section>
+    <section class="grid">
+      {cards_html}
+    </section>
+  </main>
+  <script>
+    const STATE_LABELS = {{ 0: 'Hors ligne', 10: 'Démarrage', 20: 'En ligne', 30: 'Arrêt', 40: 'Busy' }};
+    async function loadCard(card) {{
+      const prefix = card.dataset.prefix;
+      const statusEl = card.querySelector('[data-field="status"]');
+      const playersEl = card.querySelector('[data-field="players"]');
+      try {{
+        const r = await fetch(`${{prefix}}/api/status`, {{ credentials: 'same-origin' }});
+        if (!r.ok) throw new Error(`status_${{r.status}}`);
+        const data = await r.json();
+        const state = Number(data?.state || 0);
+        statusEl.textContent = STATE_LABELS[state] || `État ${{state}}`;
+        const players = data?.metrics?.players;
+        if (players && Number.isFinite(players.value) && Number.isFinite(players.max)) {{
+          playersEl.textContent = `${{players.value}} / ${{players.max}}`;
+        }} else {{
+          playersEl.textContent = '—';
+        }}
+      }} catch (e) {{
+        statusEl.textContent = 'Indisponible';
+        playersEl.textContent = '—';
+      }}
+    }}
+    document.querySelectorAll('.card[data-prefix]').forEach(loadCard);
+  </script>
+</body>
+</html>
+"""
+
+
 def _is_active_conf(p: str) -> bool:
     """Exclut les backups (.bak, .old, .disabled) et les non-fichiers."""
     path = Path(p)
@@ -317,6 +501,7 @@ def cmd_init(args):
     domain     = args.domain
     manifest_p = Path(args.manifest)
     loc_file_p = Path(args.loc_file)
+    hub_file_p = Path(args.hub_file)
     backup_dir = args.backup_dir
 
     Path(backup_dir).mkdir(parents=True, exist_ok=True)
@@ -336,6 +521,7 @@ def cmd_init(args):
         print(f"[nginx_manager] Fichier locations créé : {loc_file_p}")
     else:
         print(f"[nginx_manager] Fichier locations existant : {loc_file_p}")
+    hub_file_p.write_text(build_hub_html(domain, []))
 
     # Trouver le fichier nginx du domaine
     conf_path = find_nginx_conf(domain)
@@ -462,14 +648,17 @@ def cmd_regenerate(args):
 
     manifest = load_manifest(str(manifest_p))
     instances = manifest.get("instances", [])
+    hub_file_p = Path(args.hub_file)
 
     lines = ["# Game Commander — locations auto-générées — NE PAS ÉDITER MANUELLEMENT"]
+    lines.append(build_hub_location_block(str(hub_file_p)))
     for inst in instances:
         lines.append(build_location_block(
             inst["name"], inst["prefix"], inst["flask_port"], inst["game"]
         ))
 
     Path(args.out).write_text("\n".join(lines) + "\n")
+    hub_file_p.write_text(build_hub_html(manifest.get("vhost", ""), instances))
     print(f"[nginx_manager] OK: {len(instances)} instance(s) → {args.out}")
     return 0
 
@@ -506,6 +695,7 @@ def main():
     p.add_argument("--domain",      required=True)
     p.add_argument("--manifest",    required=True)
     p.add_argument("--loc-file",    required=True)
+    p.add_argument("--hub-file",    required=True)
     p.add_argument("--backup-dir",  required=True)
 
     p = sub.add_parser("manifest-add")
@@ -526,6 +716,7 @@ def main():
     p = sub.add_parser("regenerate")
     p.add_argument("--manifest",    required=True)
     p.add_argument("--out",         required=True)
+    p.add_argument("--hub-file",    required=True)
 
     args = parser.parse_args()
 
