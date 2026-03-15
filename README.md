@@ -7,12 +7,12 @@ basée sur `systemd`, `psutil`, `Flask`, `bcrypt` et Nginx.
 
 L’entrée utilisateur normale est maintenant :
 
-- `https://gaming.expevay.net/commander`
+- `https://<domaine>/commander`
 
 Cette page hub liste les instances disponibles et ouvre ensuite leur interface dédiée :
 
-- `/valheim2`
-- `/testsoul`
+- `https://<domaine>/valheim2`
+- `https://<domaine>/testsoul`
 - etc.
 
 Les URLs d’instance existent toujours, mais `/commander` est désormais la porte d’entrée
