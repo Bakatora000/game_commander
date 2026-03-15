@@ -1,7 +1,7 @@
 # Game Commander
 
-Suite de déploiement et d’administration de serveurs de jeu.
-Sans AMP, basée sur `systemd`, `psutil`, `Flask`, `bcrypt` et Nginx.
+Suite de déploiement et d’administration de serveurs de jeu,
+basée sur `systemd`, `psutil`, `Flask`, `bcrypt` et Nginx.
 
 ## Point d'entrée recommandé
 

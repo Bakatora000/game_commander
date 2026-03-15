@@ -12,9 +12,9 @@ This file provides guidance to Codex when working with code in this repository.
 One Flask instance still manages one game server, selected by `game.json`, but the normal
 user-facing entrypoint is now the shared hub URL rather than direct instance URLs.
 
-Current server state noted in project memory: no active Game Commander instance is deployed
-at the moment; AMP instances still coexist on the same machine and must not be impacted by
-tests or fixes.
+Current server state noted in project memory: Game Commander is now treated as the primary
+stack. Historical coexistence constraints with older external managers should no longer
+shape normal product or documentation decisions.
 
 Validated deployment note: Enshrouded discovery depends on `queryPort` (`SERVER_PORT + 1`),
 not only the base game port. With a firewall range limited to `15636-15639`, use
@@ -158,7 +158,7 @@ Finds the game process by binary name + port via `psutil`, with a fallback to `s
 
 ### Metrics (`runtime/core/metrics.py`)
 
-Append-only JSON Lines file (`metrics.log`). Background thread polls every 30s, purges entries older than 24h every ~30 minutes. `state=20` means online (AMP-compatible convention).
+Append-only JSON Lines file (`metrics.log`). Background thread polls every 30s, purges entries older than 24h every ~30 minutes. `state=20` means online.
 
 ### Game modules (`runtime/games/{id}/`)
 

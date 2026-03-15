@@ -1,6 +1,6 @@
 """
 core/server.py — Contrôle du serveur via psutil + systemd.
-Sans dépendance AMP. Le binaire et le service sont lus depuis game.json.
+Le binaire et le service sont lus depuis game.json.
 """
 import subprocess, time
 import importlib
@@ -64,9 +64,9 @@ def _player_count():
 
 def get_status():
     """
-    Retourne un dict de statut compatible avec l'ancien format AMP :
+    Retourne un dict de statut standardisé pour l'UI :
     { state: int, uptime: str, metrics: { cpu, ram, players } }
-    State : 0=arrêté, 20=en ligne (même convention qu'AMP pour la compatibilité JS)
+    State : 0=arrêté, 20=en ligne
     """
     proc = _get_process()
     if not proc:
@@ -84,7 +84,7 @@ def get_status():
         # On cherche en plus tous les process du même utilisateur qui ont
         # le chemin du serveur dans leur cmdline (ex: enshrouded_server.exe)
         # Filtrer uniquement sur install_dir pour éviter de capturer
-        # d'autres instances du même jeu (ex: AMP avec le même binaire)
+        # d'autres instances du même jeu qui partagent le même binaire.
         # Wine re-parente enshrouded_server.exe hors de l'arbre systemd.
         # Sa cmdline contient le chemin Wine "Z:\home\..." donc on cherche
         # à la fois le chemin Linux et son équivalent Wine Z:
