@@ -9,6 +9,7 @@ On reconstruit l'état courant depuis les logs récents du service.
 """
 import re
 import subprocess
+import psutil
 
 
 _RE_JOIN = re.compile(r': ([^:[]+?) joined the game$')
@@ -18,11 +19,13 @@ _RE_LEFT = re.compile(r': ([^:[]+?) left the game$')
 
 def get_players():
     try:
-        result = subprocess.run(
-            ['journalctl', '-u', _service_name(), '--since', '1 hour ago',
-             '--no-pager', '-o', 'cat'],
-            capture_output=True, text=True, timeout=5
-        )
+        cmd = ['journalctl', '-u', _service_name(), '--no-pager', '-o', 'cat']
+        since_arg = _current_session_since()
+        if since_arg:
+            cmd.extend(['--since', since_arg])
+        else:
+            cmd.extend(['--since', '1 hour ago'])
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
         lines = result.stdout.splitlines()
     except Exception:
         return []
@@ -59,3 +62,22 @@ def _service_name():
         return current_app.config['GAME']['server']['service']
     except Exception:
         return 'minecraft-server'
+
+
+def _current_session_since():
+    try:
+        result = subprocess.run(
+            ['systemctl', 'show', _service_name(), '--property=MainPID'],
+            capture_output=True, text=True, timeout=3
+        )
+        pid = 0
+        for line in result.stdout.splitlines():
+            if line.startswith('MainPID='):
+                pid = int(line.split('=', 1)[1].strip() or '0')
+                break
+        if pid <= 0:
+            return None
+        started = psutil.Process(pid).create_time()
+        return f"@{max(int(started) - 5, 0)}"
+    except Exception:
+        return None

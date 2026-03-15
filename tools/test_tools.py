@@ -29,6 +29,7 @@ import nginx_manager
 import config_gen
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
+from runtime.games.minecraft import console as minecraft_console
 from runtime.games.minecraft import players as minecraft_players
 from runtime.games.minecraft_fabric import mods as minecraft_fabric_mods
 from runtime.games.valheim import mods as valheim_mods
@@ -1536,6 +1537,7 @@ class MinecraftPlayersTests(unittest.TestCase):
 
     def test_removes_player_on_lost_connection_without_left_line(self):
         original_run = minecraft_players.subprocess.run
+        original_since = minecraft_players._current_session_since
 
         def fake_run(*args, **kwargs):
             return types.SimpleNamespace(stdout="\n".join([
@@ -1544,12 +1546,34 @@ class MinecraftPlayersTests(unittest.TestCase):
             ]))
 
         minecraft_players.subprocess.run = fake_run
+        minecraft_players._current_session_since = lambda: None
         try:
             players = minecraft_players.get_players()
         finally:
             minecraft_players.subprocess.run = original_run
+            minecraft_players._current_session_since = original_since
 
         self.assertEqual(players, [])
+
+    def test_uses_current_session_when_available(self):
+        original_run = minecraft_players.subprocess.run
+        original_since = minecraft_players._current_session_since
+        calls = []
+
+        def fake_run(args, **kwargs):
+            calls.append(args)
+            return types.SimpleNamespace(stdout="")
+
+        minecraft_players.subprocess.run = fake_run
+        minecraft_players._current_session_since = lambda: "@123456"
+        try:
+            minecraft_players.get_players()
+        finally:
+            minecraft_players.subprocess.run = original_run
+            minecraft_players._current_session_since = original_since
+
+        self.assertIn("--since", calls[0])
+        self.assertIn("@123456", calls[0])
 
 
 class MinecraftAdminsTests(unittest.TestCase):
@@ -1578,7 +1602,7 @@ class MinecraftAdminsTests(unittest.TestCase):
 
     def test_add_and_remove_admin(self):
         with self.app.app_context():
-            data, err = minecraft_admins.add_admin("Alex")
+            data, err = minecraft_admins.add_admin("Alex", 3)
             listed, err2 = minecraft_admins.list_admins()
             removed, err3 = minecraft_admins.remove_admin("Alex")
         self.assertIsNone(err)
@@ -1587,7 +1611,18 @@ class MinecraftAdminsTests(unittest.TestCase):
         self.assertFalse(data["already_present"])
         self.assertEqual(listed["entries"][0]["name"], "Alex")
         self.assertEqual(listed["entries"][0]["uuid"], "uuid-alex")
+        self.assertEqual(listed["entries"][0]["level"], 3)
         self.assertEqual(removed["name"], "Alex")
+
+    def test_add_admin_updates_level_when_already_present(self):
+        with self.app.app_context():
+            minecraft_admins.add_admin("Alex", 2)
+            data, err = minecraft_admins.add_admin("Alex", 4)
+            listed, _ = minecraft_admins.list_admins()
+        self.assertIsNone(err)
+        self.assertTrue(data["already_present"])
+        self.assertEqual(data["level"], 4)
+        self.assertEqual(listed["entries"][0]["level"], 4)
 
     def test_add_whitelist_and_ban(self):
         with self.app.app_context():
@@ -1607,6 +1642,49 @@ class MinecraftAdminsTests(unittest.TestCase):
             data, err = minecraft_admins.add_admin("Unknown")
         self.assertIsNone(data)
         self.assertEqual(err, "unknown_player")
+
+
+class MinecraftConsoleTests(unittest.TestCase):
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.app = Flask(__name__)
+        self.app.config["GAME"] = {
+            "id": "minecraft",
+            "server": {
+                "install_dir": str(self.root / "server"),
+                "data_dir": "",
+                "world_name": None,
+            }
+        }
+        server = self.root / "server"
+        server.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_rcon_disabled_returns_explicit_error(self):
+        (self.root / "server" / "server.properties").write_text(
+            "enable-rcon=false\n",
+            encoding="utf-8",
+        )
+        with self.app.app_context():
+            ok, err = minecraft_console.send_console_command("whitelist reload")
+        self.assertFalse(ok)
+        self.assertEqual(err, "rcon_disabled")
+
+    def test_missing_rcon_password_returns_explicit_error(self):
+        (self.root / "server" / "server.properties").write_text(
+            "enable-rcon=true\n"
+            "rcon.port=25575\n"
+            "rcon.password=\n",
+            encoding="utf-8",
+        )
+        with self.app.app_context():
+            ok, err = minecraft_console.send_console_command("whitelist reload")
+        self.assertFalse(ok)
+        self.assertEqual(err, "rcon_password_missing")
 
 
 class SoulmaskPlayersTests(unittest.TestCase):
@@ -2210,6 +2288,7 @@ if __name__ == "__main__":
         TerrariaConfigTests,
         MinecraftPlayersTests,
         MinecraftAdminsTests,
+        MinecraftConsoleTests,
         MinecraftFabricModsTests,
         SaveManagerTests,
     ]
@@ -2217,7 +2296,7 @@ if __name__ == "__main__":
         names = sys.argv[1:]
         test_classes = [c for c in test_classes if c.__name__ in names]
         if not test_classes:
-            print(f"Classes disponibles : {[c.__name__ for c in [NginxInjectTests, NginxRemoveTests, NginxFindConfTests, NginxManifestTests, ConfigGenGameJsonTests, ConfigGenUsersJsonTests, ConfigGenEnshroudedCfgTests, ConfigGenPatchBepinexTests, ConfigGenMinecraftPropsTests, MinecraftConfigTests, TerrariaConfigTests, MinecraftPlayersTests, MinecraftAdminsTests, MinecraftFabricModsTests, SaveManagerTests]]}")
+            print(f"Classes disponibles : {[c.__name__ for c in [NginxInjectTests, NginxRemoveTests, NginxFindConfTests, NginxManifestTests, ConfigGenGameJsonTests, ConfigGenUsersJsonTests, ConfigGenEnshroudedCfgTests, ConfigGenPatchBepinexTests, ConfigGenMinecraftPropsTests, MinecraftConfigTests, TerrariaConfigTests, MinecraftPlayersTests, MinecraftAdminsTests, MinecraftConsoleTests, MinecraftFabricModsTests, SaveManagerTests]]}")
             sys.exit(1)
 
     for cls in test_classes:

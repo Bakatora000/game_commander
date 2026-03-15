@@ -73,17 +73,36 @@
 {% block game_scripts %}
 <script>
 const CONFIG_SCHEMA = [
-  {section:'Server', key:'max-players', label:'Joueurs max', type:'number'},
-  {section:'Server', key:'difficulty', label:'Difficulté', type:'select', options:['peaceful','easy','normal','hard']},
-  {section:'Server', key:'gamemode', label:'Mode de jeu', type:'select', options:['survival','creative','adventure','spectator']},
-  {section:'Server', key:'pvp', label:'PvP', type:'select', options:['true','false']},
-  {section:'Server', key:'allow-nether', label:'Nether', type:'select', options:['true','false']},
-  {section:'Server', key:'enable-command-block', label:'Command blocks', type:'select', options:['true','false']},
-  {section:'Server', key:'spawn-monsters', label:'Monstres', type:'select', options:['true','false']},
-  {section:'Server', key:'spawn-animals', label:'Animaux', type:'select', options:['true','false']},
-  {section:'Server', key:'view-distance', label:'Distance de vue', type:'number', help:'2–32'},
-  {section:'Server', key:'simulation-distance', label:'Distance simulation', type:'number'},
-  {section:'Server', key:'motd', label:'MOTD', type:'text'},
+  {section:'Serveur', key:'motd', label:'MOTD', type:'text'},
+  {section:'Serveur', key:'max-players', label:'Joueurs max', type:'number', help:'1–1000'},
+  {section:'Serveur', key:'online-mode', label:'Online mode', type:'select', options:['true','false']},
+  {section:'Serveur', key:'hide-online-players', label:'Masquer la liste des joueurs', type:'select', options:['true','false']},
+  {section:'Serveur', key:'player-idle-timeout', label:'Timeout AFK', type:'number', help:'0 = désactivé'},
+  {section:'Gameplay', key:'gamemode', label:'Mode de jeu', type:'select', options:['survival','creative','adventure','spectator']},
+  {section:'Gameplay', key:'difficulty', label:'Difficulté', type:'select', options:['peaceful','easy','normal','hard']},
+  {section:'Gameplay', key:'hardcore', label:'Hardcore', type:'select', options:['true','false']},
+  {section:'Gameplay', key:'pvp', label:'PvP', type:'select', options:['true','false']},
+  {section:'Gameplay', key:'force-gamemode', label:'Forcer le mode de jeu', type:'select', options:['true','false']},
+  {section:'Gameplay', key:'allow-flight', label:'Autoriser le vol', type:'select', options:['true','false']},
+  {section:'Monde', key:'allow-nether', label:'Nether', type:'select', options:['true','false']},
+  {section:'Monde', key:'enable-command-block', label:'Command blocks', type:'select', options:['true','false']},
+  {section:'Monde', key:'spawn-monsters', label:'Monstres', type:'select', options:['true','false']},
+  {section:'Monde', key:'spawn-animals', label:'Animaux', type:'select', options:['true','false']},
+  {section:'Monde', key:'spawn-protection', label:'Protection du spawn', type:'number', help:'0–64'},
+  {section:'Monde', key:'view-distance', label:'Distance de vue', type:'number', help:'2–32'},
+  {section:'Monde', key:'simulation-distance', label:'Distance simulation', type:'number', help:'2–32'},
+  {section:'Monde', key:'max-world-size', label:'Taille max du monde', type:'number', help:'1–29999984'},
+  {section:'Accès', key:'white-list', label:'Whitelist', type:'select', options:['true','false']},
+  {section:'Accès', key:'enforce-whitelist', label:'Forcer la whitelist', type:'select', options:['true','false']},
+  {section:'Accès', key:'op-permission-level', label:'Niveau OP', type:'select', options:['1','2','3','4']},
+  {section:'Réseau', key:'enable-query', label:'Activer Query', type:'select', options:['true','false']},
+  {section:'Réseau', key:'query.port', label:'Port Query', type:'number', help:'1–65535'},
+  {section:'Réseau', key:'network-compression-threshold', label:'Seuil de compression', type:'number', help:'-1 = désactivé'},
+  {section:'Réseau', key:'max-tick-time', label:'Temps max par tick', type:'number', help:'-1 = désactivé'},
+  {section:'Ressources', key:'resource-pack', label:'URL resource pack', type:'text'},
+  {section:'Ressources', key:'resource-pack-prompt', label:'Message resource pack', type:'text'},
+  {section:'Ressources', key:'require-resource-pack', label:'Resource pack obligatoire', type:'select', options:['true','false']},
+  {section:'Ressources', key:'resource-pack-sha1', label:'SHA1 resource pack', type:'text'},
 ];
 let configData = {};
 
@@ -167,10 +186,20 @@ async function loadMinecraftAdmins() {
       <div class="save-main">
         <span class="save-icon">🛡</span>
         <span class="save-link static">${entry.name}</span>
+        <span class="save-meta">niveau ${entry.level || 4}</span>
       </div>
       <div class="save-actions">
+        <select class="ctrl-select admin-level" data-name="${entry.name}">
+          <option value="1" ${(entry.level || 4) === 1 ? 'selected' : ''}>Niv. 1</option>
+          <option value="2" ${(entry.level || 4) === 2 ? 'selected' : ''}>Niv. 2</option>
+          <option value="3" ${(entry.level || 4) === 3 ? 'selected' : ''}>Niv. 3</option>
+          <option value="4" ${(entry.level || 4) === 4 ? 'selected' : ''}>Niv. 4</option>
+        </select>
         <button class="btn-ghost btn-sm admin-delete">Supprimer</button>
       </div>`;
+    row.querySelector('.admin-level').addEventListener('change', e => {
+      addMinecraftAdmin(entry.name, false, e.target.value);
+    });
     row.querySelector('.admin-delete').addEventListener('click', () => {
       confirmThen(`Retirer ${entry.name} de ops.json ?`, () => removeMinecraftAdmin(entry.name));
     });
@@ -244,19 +273,19 @@ async function loadMinecraftWhitelist() {
   });
 }
 
-async function addMinecraftAdmin(name, fromPlayer = false) {
+async function addMinecraftAdmin(name, fromPlayer = false, level = 4) {
   closeModal();
   const r = await fetch(`${PREFIX}/api/admins`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({name}),
+    body: JSON.stringify({name, level}),
   }).catch(() => null);
   const d = r ? await r.json().catch(() => ({})) : {};
   if (!r?.ok) {
     showToast(d.error || 'Erreur ajout admin Minecraft', 'error');
     return;
   }
-  showToast(d.already_present ? `${name} est déjà dans ops.json` : `${name} ajouté à ops.json`, 'success');
+  showToast(d.already_present ? `${name} niveau OP mis à jour (${d.level || level})` : `${name} ajouté à ops.json`, 'success');
   loadMinecraftAdmins();
   if (fromPlayer) loadPlayers();
 }
@@ -317,6 +346,9 @@ async function addMinecraftWhitelist(name, fromPlayer = false) {
     return;
   }
   showToast(d.already_present ? `${name} est déjà dans whitelist.json` : `${name} ajouté à whitelist.json`, 'success');
+  if (currentState === 20 && !d.reload_ok) {
+    showToast("Whitelist modifiée, mais 'whitelist reload' a échoué. Un redémarrage peut être nécessaire.", 'error');
+  }
   loadMinecraftWhitelist();
   if (fromPlayer) loadPlayers();
 }
@@ -330,6 +362,9 @@ async function removeMinecraftWhitelist(name, fromPlayer = false) {
     return;
   }
   showToast(`${name} retiré de whitelist.json`, 'success');
+  if (currentState === 20 && !d.reload_ok) {
+    showToast("Whitelist modifiée, mais 'whitelist reload' a échoué. Un redémarrage peut être nécessaire.", 'error');
+  }
   loadMinecraftWhitelist();
   if (fromPlayer) loadPlayers();
 }
@@ -438,7 +473,7 @@ function renderConfigFields() {
       el.appendChild(hdr);
       lastSection = f.section;
     }
-    const val = (configData[f.section]||{})[f.key] || '';
+    const val = (configData['Server']||{})[f.key] || '';
     const row = document.createElement('div');
     row.className = 'config-row';
     let input;
@@ -469,7 +504,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('minecraftAdminName');
     const name = input?.value?.trim();
     if (!name) return;
-    addMinecraftAdmin(name, false);
+    addMinecraftAdmin(name, false, 4);
     input.value = '';
   });
   document.getElementById('btnAddMinecraftBan')?.addEventListener('click', () => {

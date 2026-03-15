@@ -107,7 +107,10 @@ def _list_simple(path: Path):
         uuid = _normalize_uuid(entry.get("uuid", ""))
         if not name:
             continue
-        entries.append({"name": name, "uuid": uuid})
+        payload = {"name": name, "uuid": uuid}
+        if "level" in entry:
+            payload["level"] = int(entry.get("level", 4))
+        entries.append(payload)
     entries.sort(key=lambda item: item["name"].lower())
     return {"entries": entries}, None
 
@@ -124,22 +127,30 @@ def list_bans():
     return _list_simple(_bans_path())
 
 
-def add_admin(name: str):
+def add_admin(name: str, level: int = 4):
     entries = _read_json_array(_ops_path())
     identity, err = _resolve_identity(name, entries)
     if err:
         return None, err
+    try:
+        level = int(level)
+    except Exception:
+        return None, "invalid_level"
+    if level < 1 or level > 4:
+        return None, "invalid_level"
     existing = _find_existing_entry(entries, identity["name"])
     if existing:
-        return {"name": identity["name"], "uuid": identity["uuid"], "already_present": True}, None
+        existing["level"] = level
+        _write_json_array(_ops_path(), entries)
+        return {"name": identity["name"], "uuid": identity["uuid"], "level": level, "already_present": True}, None
     entries.append({
         "uuid": identity["uuid"],
         "name": identity["name"],
-        "level": 4,
+        "level": level,
         "bypassesPlayerLimit": False,
     })
     _write_json_array(_ops_path(), entries)
-    return {"name": identity["name"], "uuid": identity["uuid"], "already_present": False}, None
+    return {"name": identity["name"], "uuid": identity["uuid"], "level": level, "already_present": False}, None
 
 
 def remove_admin(name: str):

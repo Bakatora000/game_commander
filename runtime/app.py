@@ -732,7 +732,7 @@ if minecraft_admins_module is not None:
     @auth.require_perm('manage_users')
     def api_minecraft_admins_add():
         payload = request.get_json() or {}
-        data, err = minecraft_admins_module.add_admin(payload.get('name', ''))
+        data, err = minecraft_admins_module.add_admin(payload.get('name', ''), payload.get('level', 4))
         return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
 
     @app.route(f'{PREFIX}/api/admins/<name>', methods=['DELETE'])
@@ -777,14 +777,26 @@ if minecraft_admins_module is not None:
     def api_minecraft_whitelist_add():
         payload = request.get_json() or {}
         data, err = minecraft_admins_module.add_whitelist(payload.get('name', ''))
-        return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+        if err:
+            return jsonify({'error': err}), 400
+        reload_ok = False
+        reload_err = None
+        if server.get_status().get('state') == 20:
+            reload_ok, reload_err = server.send_console_command('whitelist reload')
+        return jsonify({'ok': True, 'reload_ok': reload_ok, 'reload_error': reload_err, **data})
 
     @app.route(f'{PREFIX}/api/whitelist/<name>', methods=['DELETE'])
     @auth.require_auth
     @auth.require_perm('manage_users')
     def api_minecraft_whitelist_delete(name):
         data, err = minecraft_admins_module.remove_whitelist(name)
-        return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+        if err:
+            return jsonify({'error': err}), 400
+        reload_ok = False
+        reload_err = None
+        if server.get_status().get('state') == 20:
+            reload_ok, reload_err = server.send_console_command('whitelist reload')
+        return jsonify({'ok': True, 'reload_ok': reload_ok, 'reload_error': reload_err, **data})
 
 # ─────────────────────────────────────────────────────────────────────────────
 # API — JOUEURS CONNECTÉS (conditionnel)

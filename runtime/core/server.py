@@ -249,5 +249,11 @@ def get_console_entries(n=100, after_cursor=None):
         return [], None
 
 def send_console_command(cmd):
-    """Placeholder — à implémenter par jeu (ex: RCON pour Minecraft)."""
-    return False, 'Console input non supporté pour ce jeu'
+    """Délègue au module jeu si un support console existe."""
+    try:
+        game = _game()
+        module_id = game.get('module_id') or game.get('id', '').replace('-', '_')
+        console_module = importlib.import_module(f'games.{module_id}.console')
+        return console_module.send_console_command(cmd)
+    except Exception:
+        return False, 'Console input non supporté pour ce jeu'
