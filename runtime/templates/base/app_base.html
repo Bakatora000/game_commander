@@ -252,6 +252,7 @@ let currentState = 0;
 let myPerms      = [];
 let chart        = null;
 let chartTimer   = null;
+let transientStatus = null;
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -372,6 +373,7 @@ async function fetchMe() {
 
 // ── STATUS ────────────────────────────────────────────────────────────────────
 async function fetchStatus() {
+  if (transientStatus) return;
   const r = await fetch(`${PREFIX}/api/status`).catch(() => null);
   if (!r) return;
   if (r.status === 401) { location.href = `${PREFIX}/login`; return; }
@@ -381,6 +383,7 @@ async function fetchStatus() {
 const STATE_LABELS = {0:'Arrêté', 5:'Pré-démarrage', 10:'Configuration', 20:'En ligne', 30:'Redémarrage', 40:'Arrêt en cours'};
 
 function renderStatus(s) {
+  if (transientStatus) return;
   currentState = s.state || 0;
   const running = currentState === 20;
   const dot = document.getElementById('statusDot');
@@ -390,6 +393,22 @@ function renderStatus(s) {
   renderGauges(s.metrics || {});
   renderActions();
   if (typeof loadPlayers === 'function') loadPlayers();
+}
+
+function setTransientStatus(label, state=40) {
+  transientStatus = {label, state};
+  currentState = state;
+  const dot = document.getElementById('statusDot');
+  if (dot) dot.className = 'status-dot busy';
+  const labelEl = document.getElementById('statusLabel');
+  if (labelEl) labelEl.textContent = label;
+  const uptimeEl = document.getElementById('statusUptime');
+  if (uptimeEl) uptimeEl.textContent = '';
+  renderActions();
+}
+
+function clearTransientStatus() {
+  transientStatus = null;
 }
 
 // ── GAUGES ────────────────────────────────────────────────────────────────────
@@ -693,7 +712,9 @@ async function analyzeSaveUpload(files) {
 
 async function performSaveUpload(files) {
   closeModal();
+  setTransientStatus('Restauration en cours', 40);
   if (!saveCurrentRoot) {
+    clearTransientStatus();
     showToast('Aucune racine de sauvegarde active', 'error');
     return;
   }
@@ -710,11 +731,14 @@ async function performSaveUpload(files) {
     body: form,
   }).catch(() => null);
   if (!r?.ok) {
+    clearTransientStatus();
     const d = await r?.json().catch(() => ({})) || {};
     showToast(formatSaveUploadError(d.error), 'error');
+    fetchStatus();
     return;
   }
   const d = await r.json();
+  clearTransientStatus();
   const extracted = d.extracted?.length ? `, ${d.extracted.length} élément(s) extrait(s)` : '';
   const stopped = d.server_stopped ? ', serveur arrêté' : '';
   const restarted = d.server_restarted ? ', serveur relancé' : '';
@@ -739,6 +763,9 @@ function formatSaveUploadError(code) {
     restart_failed: 'Restauration faite, mais impossible de relancer le serveur',
     backup_script_missing: 'Script de backup introuvable',
     backup_failed: 'Échec de la sauvegarde automatique avant restauration',
+    invalid_backup: 'Backup invalide',
+    invalid_backup_layout: 'Backup invalide: arborescence incompatible avec ce jeu',
+    missing_backup: 'Backup introuvable',
     unknown_root: 'Racine de sauvegarde inconnue',
     missing_root: 'Racine de sauvegarde absente',
     missing_path: 'Dossier cible introuvable',
@@ -773,8 +800,18 @@ async function loadBackups() {
         <span class="save-meta">${formatBytes(entry.size)}</span>
       </div>
       <div class="save-actions">
+        <button class="btn-ghost btn-sm backup-restore">Restaurer</button>
         <button class="btn-ghost btn-sm backup-download">Télécharger</button>
       </div>`;
+    row.querySelector('.backup-restore').addEventListener('click', () => {
+      const lines = [
+        `Restaurer le backup ${entry.label} ?`,
+        'Le serveur sera arrêté si nécessaire.',
+        'Une sauvegarde automatique sera créée avant restauration.',
+        'Les fichiers de partie existants seront remplacés si besoin.',
+      ];
+      confirmThen(lines.join('\n'), () => restoreBackup(entry.name, entry.label));
+    });
     row.querySelector('.backup-download').addEventListener('click', () => {
       const dl = new URL(`${PREFIX}/api/backups/download`, window.location.origin);
       dl.searchParams.set('name', entry.name);
@@ -796,6 +833,38 @@ async function runManualBackup() {
   const label = d.latest?.label ? ` (${d.latest.label})` : '';
   showToast(`Backup créé${label}`, 'success');
   loadBackups();
+}
+
+async function restoreBackup(name, label) {
+  closeModal();
+  setTransientStatus('Restauration backup en cours', 40);
+  const r = await fetch(`${PREFIX}/api/backups/restore`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      name,
+      confirm_restore: true,
+      stop_if_running: true,
+      backup_before_restore: true,
+    }),
+  }).catch(() => null);
+  if (!r?.ok) {
+    clearTransientStatus();
+    const d = await r?.json().catch(() => ({})) || {};
+    showToast(formatSaveUploadError(d.error), 'error');
+    fetchStatus();
+    return;
+  }
+  const d = await r.json();
+  clearTransientStatus();
+  const stopped = d.server_stopped ? ', serveur arrêté' : '';
+  const restarted = d.server_restarted ? ', serveur relancé' : '';
+  const backup = d.backup_created ? ', backup créé' : '';
+  const collisions = d.collision_count ? `, ${d.collision_count} remplacement(s)` : '';
+  showToast(`Backup restauré${label ? ` (${label})` : ''}${collisions}${stopped}${restarted}${backup}`, 'success');
+  loadSaveEntries();
+  loadBackups();
+  setTimeout(fetchStatus, 1500);
 }
 
 async function loadSaveRoots() {

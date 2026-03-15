@@ -198,21 +198,21 @@ def _systemctl(action, timeout=30, no_block=False):
         return False, str(e)
 
 def start(wait=False, timeout=180):
-    ok, err = _systemctl('start', timeout=30, no_block=wait)
+    ok, err = _systemctl('start', timeout=timeout, no_block=False)
     if not ok or not wait:
         return ok, err
     started = _wait_until_started(timeout)
     return started, '' if started else 'start_timeout'
 
 def stop(wait=False, timeout=180):
-    ok, err = _systemctl('stop', timeout=30, no_block=wait)
+    ok, err = _systemctl('stop', timeout=timeout, no_block=False)
     if not ok or not wait:
         return ok, err
     stopped = _wait_until_stopped(timeout)
     return stopped, '' if stopped else 'stop_timeout'
 
 def restart(wait=False, timeout=180):
-    ok, err = _systemctl('restart', timeout=30, no_block=wait)
+    ok, err = _systemctl('restart', timeout=timeout, no_block=False)
     if not ok or not wait:
         return ok, err
     started = _wait_until_started(timeout)

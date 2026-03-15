@@ -85,6 +85,18 @@ def _backup_label(path: Path) -> str:
     return f"{d[6:8]}/{d[4:6]}/{d[0:4]} {t[0:2]}:{t[2:4]}:{t[4:6]}"
 
 
+def _strip_named_root(members, names):
+    top_levels = {rel.parts[0] for _member, rel in members if rel.parts}
+    if len(top_levels) != 1:
+        return members
+    top = next(iter(top_levels))
+    if top not in names:
+        return members
+    if not all(len(rel.parts) > 1 for _member, rel in members):
+        return members
+    return [(member, Path(*rel.parts[1:])) for member, rel in members]
+
+
 def get_save_roots():
     game_id = _game()["id"]
     server_dir = _server_dir()
@@ -265,6 +277,119 @@ def run_backup():
     return {
         "output": (result.stdout or "").strip(),
         "latest": latest,
+    }, None
+
+
+def _load_backup_members(backup_path: Path):
+    with zipfile.ZipFile(backup_path) as zf:
+        members = list(_safe_zip_members(zf))
+    return _normalize_archive_members(members)
+
+
+def _backup_restore_operations(backup_path: Path):
+    game_id = _game()["id"]
+    members = _load_backup_members(backup_path)
+    if not members:
+        raise ValueError("empty_archive")
+
+    server_dir = _server_dir()
+    data_dir = _data_dir()
+    operations = []
+    collisions = []
+    admin_files = {
+        "server.properties",
+        "ops.json",
+        "whitelist.json",
+        "banned-players.json",
+        "banned-ips.json",
+        "usercache.json",
+    }
+
+    if game_id == "valheim":
+        valid_suffixes = (".db", ".fwl", ".db.old", ".fwl.old")
+        if not any(str(rel).lower().endswith(valid_suffixes) for _member, rel in members):
+            raise ValueError("invalid_backup_layout")
+        root = Path(_find_root("worlds")["path"])
+        for member, rel in members:
+            dest = (root / rel.name).resolve()
+            operations.append((member.filename, dest, rel.name))
+        return operations
+
+    if game_id == "enshrouded":
+        members = _strip_named_root(members, {"savegame", (server_dir / "savegame").name})
+        if not members:
+            raise ValueError("invalid_backup_layout")
+        root = server_dir / "savegame"
+        for member, rel in members:
+            dest = (root / rel).resolve()
+            operations.append((member.filename, dest, str(rel).replace(os.sep, "/")))
+        return operations
+
+    if game_id in {"minecraft", "minecraft-fabric"}:
+        top_levels = {rel.parts[0] for _member, rel in members if rel.parts}
+        if "world" not in top_levels:
+            raise ValueError("invalid_backup_layout")
+        for member, rel in members:
+            if rel.parts[0] == "world":
+                dest = (server_dir / rel).resolve()
+            elif len(rel.parts) == 1 and rel.name in admin_files:
+                dest = (server_dir / rel.name).resolve()
+            else:
+                raise ValueError("invalid_backup_layout")
+            operations.append((member.filename, dest, str(rel).replace(os.sep, "/")))
+        return operations
+
+    if game_id == "terraria":
+        members = _strip_named_root(members, {data_dir.name})
+        suffixes = {rel.suffix.lower() for _member, rel in members if rel.suffix}
+        if not ({".wld", ".twld"} & suffixes):
+            raise ValueError("invalid_backup_layout")
+        for member, rel in members:
+            dest = (data_dir / rel).resolve()
+            operations.append((member.filename, dest, str(rel).replace(os.sep, "/")))
+        return operations
+
+    if game_id == "soulmask":
+        members = _strip_named_root(members, {"Saved"})
+        top_levels = {rel.parts[0] for _member, rel in members if rel.parts}
+        allowed = {"Logs", "Config", "GameplaySettings", "SaveGames", "Saved", "World", "Worlds"}
+        if not top_levels or not (top_levels & allowed):
+            raise ValueError("invalid_backup_layout")
+        root = server_dir / "WS" / "Saved"
+        for member, rel in members:
+            dest = (root / rel).resolve()
+            operations.append((member.filename, dest, str(rel).replace(os.sep, "/")))
+        return operations
+
+    raise ValueError("invalid_backup_layout")
+
+
+def restore_backup(filename: str):
+    backup_path, _download_name, err = get_backup_download_target(filename)
+    if err:
+        return None, err
+
+    operations = _backup_restore_operations(backup_path)
+    written = []
+    extracted = []
+    collision_count = 0
+
+    with zipfile.ZipFile(backup_path) as zf:
+        for member_name, dest, rel_text in operations:
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if dest.exists():
+                collision_count += 1
+            with zf.open(member_name) as src, open(dest, "wb") as dst:
+                shutil.copyfileobj(src, dst)
+            written.append(rel_text)
+            extracted.append(rel_text)
+
+    return {
+        "count": 1,
+        "written": written,
+        "extracted": extracted,
+        "collision_count": collision_count,
+        "restored_backup": filename,
     }, None
 
 

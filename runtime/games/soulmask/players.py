@@ -8,11 +8,13 @@ Patterns suivis :
 """
 import re
 import subprocess
+import time
+
+import psutil
 
 
 _RE_READY = re.compile(r'player ready\..*?Netuid:(\d+), Name:([^\s,]+)')
 _RE_FIRST_LOGIN = re.compile(r'FirstLoginGame: Addr:[^,]+, Netuid:(\d+), Name:([^\s,]+)')
-_RE_AUTH = re.compile(r'AUTH HANDLER: Sending auth result to user (\d+) with flag success\?\s*1')
 _RE_JOIN = re.compile(r'Join succeeded:\s*([^\s,]+)')
 _RE_CLOSE = re.compile(r'CloseBunch.*Name=([^\s,]+)')
 _RE_GENERIC_CLOSE = re.compile(r'Bunch\.bClose == true.*ConditionalCleanUp')
@@ -21,11 +23,13 @@ _RE_LEAVE_WORLD = re.compile(r'player leave world\.\s*(\d+)')
 
 def get_players():
     try:
-        result = subprocess.run(
-            ['journalctl', '-u', _service_name(), '--since', '2 hours ago',
-             '--no-pager', '-o', 'cat'],
-            capture_output=True, text=True, timeout=5
-        )
+        cmd = ['journalctl', '-u', _service_name(), '--no-pager', '-o', 'cat']
+        since_arg = _current_session_since()
+        if since_arg:
+            cmd.extend(['--since', since_arg])
+        else:
+            cmd.extend(['--since', '2 hours ago'])
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
         lines = result.stdout.splitlines()
     except Exception:
         return []
@@ -52,12 +56,6 @@ def get_players():
             remove_player_by_name(name)
 
     for line in lines:
-        auth = _RE_AUTH.search(line)
-        if auth:
-            steamid = auth.group(1).strip()
-            add_player(f"Steam:{steamid}", steamid)
-            continue
-
         first_login = _RE_FIRST_LOGIN.search(line)
         if first_login:
             add_player(first_login.group(2).strip(), first_login.group(1).strip())
@@ -99,3 +97,22 @@ def _service_name():
         return current_app.config['GAME']['server']['service']
     except Exception:
         return 'soulmask-server'
+
+
+def _current_session_since():
+    try:
+        result = subprocess.run(
+            ['systemctl', 'show', _service_name(), '--property=MainPID'],
+            capture_output=True, text=True, timeout=3
+        )
+        pid = 0
+        for line in result.stdout.splitlines():
+            if line.startswith('MainPID='):
+                pid = int(line.split('=', 1)[1].strip() or '0')
+                break
+        if pid <= 0:
+            return None
+        started = psutil.Process(pid).create_time()
+        return f"@{max(int(started) - 5, 0)}"
+    except Exception:
+        return None

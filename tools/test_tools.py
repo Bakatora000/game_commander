@@ -655,6 +655,21 @@ class SaveManagerTests(unittest.TestCase):
         self.assertIsNone(err)
         self.assertEqual(filename, path.name)
 
+    def test_restore_backup_restores_world_and_admin_files(self):
+        self._write_deploy_config()
+        backups = self.root / "backups"
+        backups.mkdir()
+        path = backups / "minecraft-fabric_save_20260314_223346.zip"
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("world/level.dat", b"restored")
+            zf.writestr("server.properties", b"motd=test")
+        with self.app.app_context():
+            data, err = core_saves.restore_backup(path.name)
+        self.assertIsNone(err)
+        self.assertEqual(data["collision_count"], 1)
+        self.assertEqual((self.root / "server" / "world" / "level.dat").read_bytes(), b"restored")
+        self.assertEqual((self.root / "server" / "server.properties").read_bytes(), b"motd=test")
+
 
 class ConfigGenEnshroudedCfgTests(unittest.TestCase):
 
@@ -1061,6 +1076,7 @@ class SoulmaskPlayersTests(unittest.TestCase):
 
     def test_tracks_connected_players_from_logs(self):
         original_run = soulmask_players.subprocess.run
+        original_since = soulmask_players._current_session_since
 
         def fake_run(*args, **kwargs):
             return types.SimpleNamespace(stdout="\n".join([
@@ -1070,15 +1086,18 @@ class SoulmaskPlayersTests(unittest.TestCase):
             ]))
 
         soulmask_players.subprocess.run = fake_run
+        soulmask_players._current_session_since = lambda: None
         try:
             players = soulmask_players.get_players()
         finally:
             soulmask_players.subprocess.run = original_run
+            soulmask_players._current_session_since = original_since
 
         self.assertEqual(players, [])
 
-    def test_uses_auth_handler_as_temporary_presence_when_no_name_is_known(self):
+    def test_ignores_auth_handler_until_real_name_is_known(self):
         original_run = soulmask_players.subprocess.run
+        original_since = soulmask_players._current_session_since
 
         def fake_run(*args, **kwargs):
             return types.SimpleNamespace(stdout="\n".join([
@@ -1086,15 +1105,18 @@ class SoulmaskPlayersTests(unittest.TestCase):
             ]))
 
         soulmask_players.subprocess.run = fake_run
+        soulmask_players._current_session_since = lambda: None
         try:
             players = soulmask_players.get_players()
         finally:
             soulmask_players.subprocess.run = original_run
+            soulmask_players._current_session_since = original_since
 
-        self.assertEqual(players, [{'name': 'Steam:76561197981668140'}])
+        self.assertEqual(players, [])
 
     def test_tracks_multiple_players_and_precise_disconnect(self):
         original_run = soulmask_players.subprocess.run
+        original_since = soulmask_players._current_session_since
 
         def fake_run(*args, **kwargs):
             return types.SimpleNamespace(stdout="\n".join([
@@ -1107,12 +1129,33 @@ class SoulmaskPlayersTests(unittest.TestCase):
             ]))
 
         soulmask_players.subprocess.run = fake_run
+        soulmask_players._current_session_since = lambda: None
         try:
             players = soulmask_players.get_players()
         finally:
             soulmask_players.subprocess.run = original_run
+            soulmask_players._current_session_since = original_since
 
         self.assertEqual(players, [{'name': 'Bob'}])
+
+    def test_uses_current_session_when_available(self):
+        original_run = soulmask_players.subprocess.run
+        original_since = soulmask_players._current_session_since
+        calls = []
+
+        def fake_run(cmd, *args, **kwargs):
+            calls.append(cmd)
+            return types.SimpleNamespace(stdout="")
+
+        soulmask_players.subprocess.run = fake_run
+        soulmask_players._current_session_since = lambda: "@123456"
+        try:
+            soulmask_players.get_players()
+        finally:
+            soulmask_players.subprocess.run = original_run
+            soulmask_players._current_session_since = original_since
+
+        self.assertTrue(any("--since" in call and "@123456" in call for call in calls))
 
 
 class MinecraftFabricModsTests(unittest.TestCase):

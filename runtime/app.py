@@ -235,6 +235,69 @@ def api_backups_run():
     return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 502)
 
 
+@app.route(f'{PREFIX}/api/backups/restore', methods=['POST'])
+@auth.require_auth
+@auth.require_perm('manage_saves')
+def api_backups_restore():
+    data = request.get_json() or {}
+    filename = (data.get('name') or '').strip()
+    confirm_restore = bool(data.get('confirm_restore'))
+    stop_if_running = data.get('stop_if_running', True)
+    backup_before_restore = data.get('backup_before_restore', True)
+    if not filename:
+        return jsonify({'error': 'missing_backup'}), 400
+    if not confirm_restore:
+        return jsonify({'error': 'restore_confirmation_required'}), 400
+
+    server_running = server.get_status().get('state') == 20
+    server_stopped = False
+    server_restarted = False
+    backup_created = None
+    try:
+        if server_running and stop_if_running:
+            ok, err = server.stop(wait=True, timeout=300)
+            if not ok:
+                return jsonify({'error': 'stop_failed', 'detail': err}), 502
+            server_stopped = True
+
+        if backup_before_restore:
+            backup_script = os.path.join(_HERE, f'backup_{GAME_ID}.sh')
+            if not os.path.isfile(backup_script):
+                return jsonify({'error': 'backup_script_missing'}), 500
+            result = subprocess.run(['bash', backup_script], capture_output=True, text=True, timeout=300)
+            if result.returncode != 0:
+                return jsonify({'error': 'backup_failed', 'detail': (result.stderr or result.stdout).strip()}), 502
+            out = (result.stdout or '').strip().splitlines()
+            backup_created = out[-1] if out else None
+
+        result, err = saves.restore_backup(filename)
+        if err:
+            return jsonify({'error': err}), 404
+
+        if server_running and stop_if_running:
+            ok, err = server.start(wait=True, timeout=300)
+            if not ok:
+                return jsonify({
+                    'ok': False,
+                    'error': 'restart_failed',
+                    'detail': err,
+                    'server_stopped': server_stopped,
+                    'backup_created': backup_created,
+                    **result,
+                }), 502
+            server_restarted = True
+
+        return jsonify({
+            'ok': True,
+            'server_stopped': server_stopped,
+            'server_restarted': server_restarted,
+            'backup_created': backup_created,
+            **result,
+        })
+    except ValueError as exc:
+        return jsonify({'error': str(exc) or 'restore_failed'}), 400
+
+
 @app.route(f'{PREFIX}/api/saves/analyze', methods=['POST'])
 @auth.require_auth
 @auth.require_perm('manage_saves')

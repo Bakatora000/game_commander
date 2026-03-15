@@ -932,7 +932,12 @@ TS=$(date +%Y%m%d_%H%M%S)
 ARC="${BACKUP_DIR}/${PREFIX}_save_${TS}.zip"
 [[ ! -d "$WORLD_DIR" ]] && { echo "[$(date)] WARN: $WORLD_DIR introuvable" >&2; exit 1; }
 mkdir -p "$BACKUP_DIR"
-zip -r "$ARC" "$WORLD_DIR" -q \
+ROOT_PARENT="$(dirname "$WORLD_DIR")"
+ROOT_NAME="$(basename "$WORLD_DIR")"
+(
+    cd "$ROOT_PARENT"
+    zip -r "$ARC" "$ROOT_NAME" -q
+) \
     && echo "[$(date)] OK: $(basename "$ARC") ($(du -sh "$ARC"|cut -f1))" \
     || { echo "[$(date)] ERROR" >&2; exit 1; }
 find "$BACKUP_DIR" -name "${PREFIX}_save_*.zip" -mtime +${RETENTION} -delete
