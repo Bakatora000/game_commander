@@ -23,6 +23,25 @@
 
 ## Bugs résolus
 
+### [16] Valheim PlayFab — `SteamID` absent de la liste joueurs malgré un joueur connecté
+- **Statut :** Résolu
+- **Composant :** `runtime/games/valheim/players.py`
+- **Instance(s) affectée(s) :** `valheim2`
+- **Symptôme :**
+  - Le panneau `Joueurs connectés` affiche bien le nom du joueur
+  - mais aucun `SteamID` n'est rattaché au joueur
+  - donc les actions `Ajouter admin`, `Whitelister`, `Bannir` n'apparaissent pas
+- **Cause racine :**
+  - Sur une instance Valheim PlayFab réelle, le `SteamID` n'était pas logué via
+    `Got connection SteamID ...`
+  - Le pattern utile observé était :
+    `PlayFab socket with remote ID ... received local Platform ID Steam_<steamid>`
+- **Solutions essayées :**
+  - ❌ Se baser uniquement sur `Got connection SteamID ...`
+  - ✅ Supporter aussi le pattern PlayFab `local Platform ID Steam_<steamid>`
+  - ✅ Gérer aussi le cas où le nom du personnage et le `SteamID` arrivent dans un ordre inversé
+- **Régression connue :** Pour Valheim PlayFab, ne pas supposer que `SteamID` remonte toujours via `Got connection SteamID ...`.
+
 ### [15] Soulmask — suivi des joueurs encore irrégulier selon les patterns de logs
 - **Statut :** En cours
 - **Composant :** `runtime/games/soulmask/players.py`

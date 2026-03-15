@@ -48,6 +48,21 @@ to `TerrariaServer.bin.x86_64` rather than relying only on `-config serverconfig
 The systemd launch also uses a PTY wrapper (`script -qefc`) to avoid the high CPU behavior
 seen when the Terraria server runs headless without a pseudo-terminal.
 
+Validated deployment note: Valheim support has now reached a stable beta-test state in
+real use. The current validated scope includes:
+- active world selection without automatic restart
+- world modifiers tied to the selected world
+- BetterNetworking configuration when the mod is installed
+- file manager on `worlds_local`
+- manual/scheduled backups and restores
+- Valheim-specific protected deletion flow for current world files
+- player actions from the dashboard (`admin`, `whitelist`, `ban`)
+- manual management of `adminlist.txt`, `bannedlist.txt`, and `permittedlist.txt`
+
+Operational note: on PlayFab-backed Valheim instances, the player `SteamID` may be logged
+via `received local Platform ID Steam_<id>` instead of `Got connection SteamID ...`.
+The player parser must support both patterns.
+
 Implementation note: Soulmask vanilla is now implemented and has been partially validated
 in a real deployment cycle.
 It adds a generic multi-port-group deployment path (`game/query/echo`) and a Soulmask
