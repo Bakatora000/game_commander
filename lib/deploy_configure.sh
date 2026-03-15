@@ -121,7 +121,12 @@ deploy_warn_port_group_conflicts() {
 deploy_select_game() {
     echo ""
     if [[ -z "$GAME_ID" ]]; then
-        echo -e "  ${BOLD}Jeu à déployer :${RESET}"
+        if [[ "$DEPLOY_MODE" == "attach" ]]; then
+            echo -e "  ${BOLD}Jeu du serveur existant :${RESET}"
+        else
+            echo -e "  ${BOLD}Jeu à déployer :${RESET}"
+        fi
+        echo -e "  ${CYAN}[0]${RESET} Quit"
         echo -e "  ${CYAN}[1]${RESET} Valheim"
         echo -e "  ${CYAN}[2]${RESET} Enshrouded"
         echo -e "  ${CYAN}[3]${RESET} Minecraft Java"
@@ -131,6 +136,7 @@ deploy_select_game() {
         echo ""
         prompt "Votre choix" "1"
         case "$REPLY" in
+            0) return 10 ;;
             2) GAME_ID="enshrouded" ;;
             3) GAME_ID="minecraft" ;;
             4) GAME_ID="minecraft-fabric" ;;
@@ -161,10 +167,7 @@ deploy_configure_mode() {
     if $CONFIG_MODE; then
         echo -e "  ${DIM}  (config) Mode : ${BOLD}${DEPLOY_MODE}${RESET}"
     else
-        echo -e "  ${CYAN}[1]${RESET} managed  — installer et gérer le serveur de jeu + Commander"
-        echo -e "  ${CYAN}[2]${RESET} attach   — brancher Commander sur un service de jeu existant"
-        prompt "Votre choix" "$([[ "$DEPLOY_MODE" == "attach" ]] && echo 2 || echo 1)"
-        [[ "$REPLY" == "2" ]] && DEPLOY_MODE="attach" || DEPLOY_MODE="managed"
+        echo -e "  ${DIM}  (menu) Mode : ${BOLD}${DEPLOY_MODE}${RESET}"
     fi
     ok "Mode sélectionné : ${BOLD}${DEPLOY_MODE}${RESET}"
 }
@@ -334,9 +337,11 @@ deploy_configure_server() {
             echo -e "  ${DIM}  (config) Backup intervalle : ${BOLD}${BACKUP_INTERVAL}${RESET}"
         else
             echo -e "  ${BOLD}Mode serveur :${RESET}"
+            echo -e "  ${CYAN}[0]${RESET} Quit"
             echo -e "  ${CYAN}[1]${RESET} PvE"
             echo -e "  ${CYAN}[2]${RESET} PvP"
             prompt "Votre choix" "$([[ "$SERVER_MODE" == "pvp" ]] && echo 2 || echo 1)"
+            [[ "$REPLY" == "0" ]] && return 10
             [[ "$REPLY" == "2" ]] && SERVER_MODE="pvp" || SERVER_MODE="pve"
             confirm "Activer les backups Soulmask ?" "o" && BACKUP_ENABLED=true || BACKUP_ENABLED=false
             confirm "Activer les sauvegardes périodiques ?" "o" && SAVING_ENABLED=true || SAVING_ENABLED=false
@@ -380,11 +385,13 @@ deploy_configure_server() {
         echo -e "  ${DIM}  (config) SSL : ${BOLD}${SSL_MODE}${RESET}"
     else
         echo -e "  ${BOLD}SSL :${RESET}"
+        echo -e "  ${CYAN}[0]${RESET} Quit"
         echo -e "  ${CYAN}[1]${RESET} Certbot (Let's Encrypt)"
         echo -e "  ${CYAN}[2]${RESET} HTTP uniquement"
         echo -e "  ${CYAN}[3]${RESET} SSL déjà configuré"
         prompt "Configuration SSL" "3"
         case "$REPLY" in
+            0) return 10 ;;
             1) SSL_MODE="certbot" ;;
             2) SSL_MODE="none" ;;
             *) SSL_MODE="existing" ;;
@@ -438,13 +445,13 @@ deploy_print_summary() {
 
 deploy_step_configuration() {
     hdr "ÉTAPE 2 : Configuration"
-    deploy_select_game
-    deploy_configure_mode
-    deploy_configure_user
-    deploy_prepare_instance_defaults
-    deploy_configure_paths
-    deploy_configure_server
-    deploy_configure_admin
+    deploy_select_game || return $?
+    deploy_configure_mode || return $?
+    deploy_configure_user || return $?
+    deploy_prepare_instance_defaults || return $?
+    deploy_configure_paths || return $?
+    deploy_configure_server || return $?
+    deploy_configure_admin || return $?
     deploy_print_summary
 
     $AUTO_CONFIRM \

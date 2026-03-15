@@ -35,6 +35,11 @@ cmd_deploy() {
     [[ "$OS_ID" != "ubuntu" ]] && { warn "Optimisé pour Ubuntu."; confirm "Continuer ?" "o" || die "Annulé."; }
 
     deploy_step_configuration
+    if [[ $? -eq 10 ]]; then
+        info "Déploiement annulé."
+        echo ""
+        return 0
+    fi
 
     deploy_step_dependencies
     deploy_step_game_install

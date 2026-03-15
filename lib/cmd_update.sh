@@ -168,6 +168,7 @@ cmd_update() {
     else
         echo ""
         local idx=1 cfg iid gid
+        echo -e "  ${CYAN}[0]${RESET} Quit"
         for cfg in "${UPDATE_CONFIGS[@]}"; do
             iid=$(grep '^INSTANCE_ID=' "$cfg" 2>/dev/null | cut -d= -f2- | tr -d '"')
             gid=$(grep '^GAME_ID=' "$cfg" 2>/dev/null | cut -d= -f2- | tr -d '"')
@@ -177,7 +178,11 @@ cmd_update() {
         echo ""
         ask "Numéro à mettre à jour, ou all :"
         read -r choice
-        if [[ "$choice" == "all" ]]; then
+        if [[ "$choice" == "0" ]]; then
+            info "Mise à jour annulée."
+            echo ""
+            return 0
+        elif [[ "$choice" == "all" ]]; then
             selected=("${UPDATE_CONFIGS[@]}")
         elif [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= ${#UPDATE_CONFIGS[@]} )); then
             selected+=("${UPDATE_CONFIGS[$((choice-1))]}")

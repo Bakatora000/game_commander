@@ -98,22 +98,22 @@ if [[ -z "$COMMAND" ]]; then
         echo ""
         echo -e "  ${BOLD}${CYAN}╔══ GAME COMMANDER ══╗${RESET}"
         echo ""
+        echo -e "  ${CYAN}[0]${RESET} ${BOLD}quit${RESET}       — Quitter"
         echo -e "  ${CYAN}[1]${RESET} ${BOLD}deploy${RESET}     — Installer une nouvelle instance complète"
         echo -e "  ${CYAN}[2]${RESET} ${BOLD}attach${RESET}     — Ajouter Game Commander à un serveur existant"
         echo -e "  ${CYAN}[3]${RESET} ${BOLD}uninstall${RESET}  — Retirer une instance ou nettoyer"
         echo -e "  ${CYAN}[4]${RESET} ${BOLD}status${RESET}     — État de toutes les instances"
         echo -e "  ${CYAN}[5]${RESET} ${BOLD}update${RESET}     — Mettre à jour une instance existante"
-        echo -e "  ${CYAN}[6]${RESET} ${BOLD}quit${RESET}       — Quitter"
         echo ""
         echo -en "  ${YELLOW}?  Votre choix : ${RESET}"
         read -r _choice
         case "$_choice" in
+            0) exit 0 ;;
             1) run_command deploy ;;
             2) run_command attach ;;
             3) run_command uninstall ;;
             4) run_command status ;;
             5) run_command update ;;
-            6) exit 0 ;;
             *) warn "Choix invalide." ;;
         esac
     done
