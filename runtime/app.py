@@ -665,6 +665,50 @@ if GAME_ID == 'valheim':
         def api_valheim_admins_delete(steamid):
             data, err = _va.remove_admin(steamid)
             return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/bans', methods=['GET'])
+        @auth.require_auth
+        @auth.require_perm('manage_users')
+        def api_valheim_bans():
+            data, err = _va.list_bans()
+            return jsonify(data) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/bans', methods=['POST'])
+        @auth.require_auth
+        @auth.require_perm('manage_users')
+        def api_valheim_bans_add():
+            payload = request.get_json() or {}
+            data, err = _va.add_ban(payload.get('steamid', ''))
+            return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/bans/<steamid>', methods=['DELETE'])
+        @auth.require_auth
+        @auth.require_perm('manage_users')
+        def api_valheim_bans_delete(steamid):
+            data, err = _va.remove_ban(steamid)
+            return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/whitelist', methods=['GET'])
+        @auth.require_auth
+        @auth.require_perm('manage_users')
+        def api_valheim_whitelist():
+            data, err = _va.list_whitelist()
+            return jsonify(data) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/whitelist', methods=['POST'])
+        @auth.require_auth
+        @auth.require_perm('manage_users')
+        def api_valheim_whitelist_add():
+            payload = request.get_json() or {}
+            data, err = _va.add_whitelist(payload.get('steamid', ''))
+            return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/whitelist/<steamid>', methods=['DELETE'])
+        @auth.require_auth
+        @auth.require_perm('manage_users')
+        def api_valheim_whitelist_delete(steamid):
+            data, err = _va.remove_whitelist(steamid)
+            return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
     except ImportError as e:
         print(f'[WARN] world_modifiers non chargé: {e}')
 

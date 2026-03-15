@@ -2,6 +2,32 @@
 
 {% block fonts %}family=Cinzel:wght@400;600&family=Rajdhani:wght@400;500;600{% endblock %}
 {% block sidebar_logo %}⚔{% endblock %}
+{% block extra_head %}
+<style>
+  .player-admin-btn.is-off,
+  .player-whitelist-btn.is-off {
+    background: rgba(122, 191, 142, 0.22);
+    border-color: rgba(122, 191, 142, 0.65);
+    color: #d8f3df;
+  }
+  .player-admin-btn.is-on,
+  .player-whitelist-btn.is-on {
+    background: rgba(224, 167, 94, 0.22);
+    border-color: rgba(224, 167, 94, 0.65);
+    color: #ffe4bd;
+  }
+  .player-ban-btn.is-off {
+    background: rgba(206, 82, 82, 0.18);
+    border-color: rgba(206, 82, 82, 0.65);
+    color: #ffc6c6;
+  }
+  .player-ban-btn.is-on {
+    background: rgba(122, 191, 142, 0.22);
+    border-color: rgba(122, 191, 142, 0.65);
+    color: #d8f3df;
+  }
+</style>
+{% endblock %}
 
 {# ── MODS TAB ────────────────────────────────────────────────────────────── #}
 {% block mods_tab %}
@@ -113,14 +139,20 @@
 
 // ── JOUEURS ───────────────────────────────────────────────────────────────────
 async function loadPlayers() {
-  const [playersResp, adminsResp] = await Promise.all([
+  const [playersResp, adminsResp, bansResp, whitelistResp] = await Promise.all([
     fetch(`${PREFIX}/api/players`).catch(() => null),
     fetch(`${PREFIX}/api/admins`).catch(() => null),
+    fetch(`${PREFIX}/api/bans`).catch(() => null),
+    fetch(`${PREFIX}/api/whitelist`).catch(() => null),
   ]);
   if (!playersResp?.ok) return;
   const {players} = await playersResp.json();
   const adminsData = adminsResp?.ok ? await adminsResp.json() : {entries: []};
+  const bansData = bansResp?.ok ? await bansResp.json() : {entries: []};
+  const whitelistData = whitelistResp?.ok ? await whitelistResp.json() : {entries: []};
   const adminIds = new Set((adminsData.entries || []).map(entry => entry.steamid));
+  const bannedIds = new Set((bansData.entries || []).map(entry => entry.steamid));
+  const whitelistIds = new Set((whitelistData.entries || []).map(entry => entry.steamid));
   const panel = document.getElementById('playersPanel');
   const list  = document.getElementById('playersList');
   const count = document.getElementById('playersCount');
@@ -132,7 +164,11 @@ async function loadPlayers() {
       <div class="player-row">
         <span class="player-dot"></span>
         <span class="player-name">${p.name}</span>
-        ${p.steamid ? `<button class="btn-ghost btn-sm player-admin-btn" data-steamid="${p.steamid}" data-admin="${adminIds.has(p.steamid) ? 'true' : 'false'}">${adminIds.has(p.steamid) ? 'Enlever admin' : 'Ajouter admin'}</button>` : ''}
+        ${p.steamid ? `
+          <button class="btn-ghost btn-sm player-admin-btn ${adminIds.has(p.steamid) ? 'is-on' : 'is-off'}" data-steamid="${p.steamid}" data-admin="${adminIds.has(p.steamid) ? 'true' : 'false'}">${adminIds.has(p.steamid) ? 'Enlever admin' : 'Ajouter admin'}</button>
+          <button class="btn-ghost btn-sm player-whitelist-btn ${whitelistIds.has(p.steamid) ? 'is-on' : 'is-off'}" data-steamid="${p.steamid}" data-whitelisted="${whitelistIds.has(p.steamid) ? 'true' : 'false'}">${whitelistIds.has(p.steamid) ? 'Enlever whitelist' : 'Whitelister'}</button>
+          <button class="btn-ghost btn-sm player-ban-btn ${bannedIds.has(p.steamid) ? 'is-on' : 'is-off'}" data-steamid="${p.steamid}" data-banned="${bannedIds.has(p.steamid) ? 'true' : 'false'}">${bannedIds.has(p.steamid) ? 'Unban' : 'Bannir'}</button>
+        ` : ''}
       </div>`).join('')
     : '';
   list.querySelectorAll('.player-admin-btn').forEach(btn => {
@@ -141,6 +177,24 @@ async function loadPlayers() {
         removeValheimAdmin(btn.dataset.steamid, true);
       } else {
         addValheimAdmin(btn.dataset.steamid, true);
+      }
+    });
+  });
+  list.querySelectorAll('.player-whitelist-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.whitelisted === 'true') {
+        removeValheimWhitelist(btn.dataset.steamid, true);
+      } else {
+        addValheimWhitelist(btn.dataset.steamid, true);
+      }
+    });
+  });
+  list.querySelectorAll('.player-ban-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.banned === 'true') {
+        confirmThen(`Retirer ${btn.dataset.steamid} de bannedlist.txt ?`, () => removeValheimBan(btn.dataset.steamid, true));
+      } else {
+        confirmThen(`Bannir ${btn.dataset.steamid} dans bannedlist.txt ?`, () => addValheimBan(btn.dataset.steamid, true));
       }
     });
   });
@@ -403,6 +457,72 @@ async function loadValheimAdmins() {
   });
 }
 
+async function loadValheimBans() {
+  const r = await fetch(`${PREFIX}/api/bans`).catch(() => null);
+  const list = document.getElementById('valheimBansList');
+  if (!list) return;
+  if (!r?.ok) {
+    list.innerHTML = '<p class="empty-msg">Impossible de charger bannedlist.txt</p>';
+    return;
+  }
+  const d = await r.json();
+  const entries = d.entries || [];
+  if (!entries.length) {
+    list.innerHTML = '<p class="empty-msg">Aucun joueur banni</p>';
+    return;
+  }
+  list.innerHTML = '';
+  entries.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'save-row';
+    row.innerHTML = `
+      <div class="save-main">
+        <span class="save-icon">⛔</span>
+        <span class="save-link static">${entry.steamid}</span>
+      </div>
+      <div class="save-actions">
+        <button class="btn-ghost btn-sm ban-delete">Supprimer</button>
+      </div>`;
+    row.querySelector('.ban-delete').addEventListener('click', () => {
+      confirmThen(`Retirer ${entry.steamid} de bannedlist.txt ?`, () => removeValheimBan(entry.steamid));
+    });
+    list.appendChild(row);
+  });
+}
+
+async function loadValheimWhitelist() {
+  const r = await fetch(`${PREFIX}/api/whitelist`).catch(() => null);
+  const list = document.getElementById('valheimWhitelistList');
+  if (!list) return;
+  if (!r?.ok) {
+    list.innerHTML = '<p class="empty-msg">Impossible de charger permittedlist.txt</p>';
+    return;
+  }
+  const d = await r.json();
+  const entries = d.entries || [];
+  if (!entries.length) {
+    list.innerHTML = '<p class="empty-msg">Aucun joueur whitelisté</p>';
+    return;
+  }
+  list.innerHTML = '';
+  entries.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'save-row';
+    row.innerHTML = `
+      <div class="save-main">
+        <span class="save-icon">✅</span>
+        <span class="save-link static">${entry.steamid}</span>
+      </div>
+      <div class="save-actions">
+        <button class="btn-ghost btn-sm whitelist-delete">Supprimer</button>
+      </div>`;
+    row.querySelector('.whitelist-delete').addEventListener('click', () => {
+      confirmThen(`Retirer ${entry.steamid} de permittedlist.txt ?`, () => removeValheimWhitelist(entry.steamid));
+    });
+    list.appendChild(row);
+  });
+}
+
 async function addValheimAdmin(steamid, fromPlayer = false) {
   closeModal();
   const r = await fetch(`${PREFIX}/api/admins`, {
@@ -438,6 +558,80 @@ async function removeValheimAdmin(steamid, fromPlayer = false) {
   showToast(`${steamid} retiré de adminlist.txt`, 'success');
   loadValheimAdmins();
   if (fromPlayer) loadPlayers();
+}
+
+async function addValheimBan(steamid, fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/bans`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({steamid}),
+  }).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur ajout ban Valheim', 'error');
+    return;
+  }
+  showToast(
+    d.already_present
+      ? `${steamid} est déjà dans bannedlist.txt`
+      : `${steamid} ajouté à bannedlist.txt`,
+    'success'
+  );
+  loadValheimBans();
+  if (fromPlayer) loadPlayers();
+}
+
+async function removeValheimBan(steamid, fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/bans/${encodeURIComponent(steamid)}`, {
+    method: 'DELETE',
+  }).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur suppression ban Valheim', 'error');
+    return;
+  }
+  showToast(`${steamid} retiré de bannedlist.txt`, 'success');
+  loadValheimBans();
+  loadPlayers();
+}
+
+async function addValheimWhitelist(steamid, fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/whitelist`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({steamid}),
+  }).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur ajout whitelist Valheim', 'error');
+    return;
+  }
+  showToast(
+    d.already_present
+      ? `${steamid} est déjà dans permittedlist.txt`
+      : `${steamid} ajouté à permittedlist.txt`,
+    'success'
+  );
+  loadValheimWhitelist();
+  if (fromPlayer) loadPlayers();
+}
+
+async function removeValheimWhitelist(steamid, fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/whitelist/${encodeURIComponent(steamid)}`, {
+    method: 'DELETE',
+  }).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur suppression whitelist Valheim', 'error');
+    return;
+  }
+  showToast(`${steamid} retiré de permittedlist.txt`, 'success');
+  loadValheimWhitelist();
+  loadPlayers();
 }
 
 async function pollUpdate() {
@@ -570,6 +764,20 @@ document.addEventListener('DOMContentLoaded', () => {
     addValheimAdmin(steamid, false);
     input.value = '';
   });
+  document.getElementById('btnAddValheimBan')?.addEventListener('click', () => {
+    const input = document.getElementById('valheimBanSteamId');
+    const steamid = input?.value?.trim();
+    if (!steamid) return;
+    addValheimBan(steamid, false);
+    input.value = '';
+  });
+  document.getElementById('btnAddValheimWhitelist')?.addEventListener('click', () => {
+    const input = document.getElementById('valheimWhitelistSteamId');
+    const steamid = input?.value?.trim();
+    if (!steamid) return;
+    addValheimWhitelist(steamid, false);
+    input.value = '';
+  });
   document.getElementById('worldSelect')?.addEventListener('change', saveWorldSelection);
   document.getElementById('btnSaveWM')?.addEventListener('click', saveWorldModifiers);
   document.querySelectorAll('.nav-btn[data-tab="config"]').forEach(b => {
@@ -581,7 +789,11 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
   document.querySelectorAll('.nav-btn[data-tab="users"]').forEach(b => {
-    b.addEventListener('click', loadValheimAdmins);
+    b.addEventListener('click', () => {
+      loadValheimAdmins();
+      loadValheimBans();
+      loadValheimWhitelist();
+    });
   });
 });
 </script>
@@ -602,6 +814,32 @@ document.addEventListener('DOMContentLoaded', () => {
     </div>
   </div>
   <div id="valheimAdminsList"></div>
+</div>
+
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Joueurs bannis</span>
+  </div>
+  <div style="padding:.75rem 1rem">
+    <div class="search-row">
+      <input type="text" class="search-input" id="valheimBanSteamId" placeholder="SteamID64">
+      <button class="btn-primary btn-sm" id="btnAddValheimBan" data-requires-perm="manage_users">Ajouter</button>
+    </div>
+  </div>
+  <div id="valheimBansList"></div>
+</div>
+
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Whitelist</span>
+  </div>
+  <div style="padding:.75rem 1rem">
+    <div class="search-row">
+      <input type="text" class="search-input" id="valheimWhitelistSteamId" placeholder="SteamID64">
+      <button class="btn-primary btn-sm" id="btnAddValheimWhitelist" data-requires-perm="manage_users">Ajouter</button>
+    </div>
+  </div>
+  <div id="valheimWhitelistList"></div>
 </div>
 {% endblock %}
 

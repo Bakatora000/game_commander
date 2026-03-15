@@ -4,6 +4,7 @@ games/valheim/players.py — Suivi des joueurs connectés via parsing journalctl
 Patterns Valheim (PlayFab/BepInEx) :
   Connexion (nom dispo) : "Got character ZDOID from NAME : ZDOID"
   Connexion (SteamID) : "Got connection SteamID 7656..."
+  Connexion (PlayFab) : "local Platform ID Steam_7656..."
   Déconnexion (avec BetterNetworking) : "Compression: NAME[Steam_ID] disconnected"
   Déconnexion (avec BetterNetworking, sans nom) : "Compression: [Steam_ID] disconnected"
   Déconnexion (compteur fallback) : "Player connection lost ... now 0 player(s)"
@@ -33,6 +34,7 @@ def _journal_since_start(service):
 # Patterns
 _RE_ZDOID    = re.compile(r'Got character ZDOID from (.+?) :')
 _RE_STEAMID  = re.compile(r'Got connection SteamID (\d+)')
+_RE_PLATFORM = re.compile(r'local Platform ID Steam_(\d+)')
 _RE_BN_DISC  = re.compile(r'\[Message:Better Networking\].*?Compression: (.+?)\[(?:Steam_)?\d')
 _RE_BN_ID    = re.compile(r'\[Message:Better Networking\].*?Compression: \[(\d+)\] disconnected')
 _RE_COUNT    = re.compile(r'now (\d+) player\(s\)')
@@ -61,6 +63,13 @@ def get_players():
                 return
         connected.append({'name': name, 'steamid': steamid})
 
+    def attach_latest_steamid(steamid):
+        for entry in reversed(connected):
+            if not entry.get('steamid'):
+                entry['steamid'] = steamid
+                return True
+        return False
+
     def remove_by_name(name):
         for i, entry in enumerate(connected):
             if entry['name'] == name:
@@ -80,7 +89,16 @@ def get_players():
 
         m = _RE_STEAMID.search(line)
         if m:
-            pending_ids.append(m.group(1).strip())
+            steamid = m.group(1).strip()
+            if not attach_latest_steamid(steamid):
+                pending_ids.append(steamid)
+            continue
+
+        m = _RE_PLATFORM.search(line)
+        if m:
+            steamid = m.group(1).strip()
+            if not attach_latest_steamid(steamid):
+                pending_ids.append(steamid)
             continue
 
         # Connexion : nom du personnage connu

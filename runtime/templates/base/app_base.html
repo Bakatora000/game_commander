@@ -629,6 +629,11 @@ let saveRoots = [];
 let saveCurrentRoot = '';
 let saveCurrentPath = '';
 
+function currentSaveRootLabel() {
+  const root = saveRoots.find(r => r.id === saveCurrentRoot);
+  return root?.label || '';
+}
+
 function initSaveManager() {
   saveCurrentPath = '';
   document.getElementById('saveRootSelect')?.addEventListener('change', e => {
@@ -932,6 +937,7 @@ async function loadSaveRoots() {
   saveRoots = d.roots || [];
   const select = document.getElementById('saveRootSelect');
   if (!select) return;
+  select.style.display = saveRoots.length > 1 ? '' : 'none';
   select.innerHTML = saveRoots.map(root =>
     `<option value="${root.id}" ${!root.exists ? 'disabled' : ''}>${root.label}${root.exists ? '' : ' (absent)'}</option>`
   ).join('');
@@ -956,8 +962,11 @@ async function loadSaveEntries() {
       saveCurrentPath = '';
       return loadSaveEntries();
     }
-    if (upBtn) upBtn.disabled = true;
-    if (pathLabel) pathLabel.textContent = '/';
+    if (upBtn) {
+      upBtn.disabled = true;
+      upBtn.style.display = saveRoots.length > 1 ? '' : 'none';
+    }
+    if (pathLabel) pathLabel.textContent = currentSaveRootLabel() || '/';
     if (list) list.innerHTML = '<p class="empty-msg">Aucune sauvegarde accessible</p>';
     return;
   }
@@ -965,8 +974,14 @@ async function loadSaveEntries() {
   saveRoots = d.roots || saveRoots;
   saveCurrentPath = d.current_path || '';
   if (rootLabel) rootLabel.textContent = d.root?.label || '';
-  if (pathLabel) pathLabel.textContent = '/' + (saveCurrentPath || '');
-  if (upBtn) upBtn.disabled = !saveCurrentPath;
+  if (pathLabel) {
+    const base = d.root?.label || currentSaveRootLabel();
+    pathLabel.textContent = saveCurrentPath ? `${base}/${saveCurrentPath}` : (base || '/');
+  }
+  if (upBtn) {
+    upBtn.disabled = !saveCurrentPath;
+    upBtn.style.display = saveCurrentPath || saveRoots.length > 1 ? '' : 'none';
+  }
   if (!list) return;
   if (!d.entries?.length) {
     list.innerHTML = '<p class="empty-msg">Dossier vide</p>';

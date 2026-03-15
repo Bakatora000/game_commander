@@ -1092,6 +1092,46 @@ class ValheimPlayersTests(unittest.TestCase):
             valheim_players.subprocess.run = original_run
         self.assertEqual(players, [])
 
+    def test_tracks_connected_players_when_name_precedes_steamid(self):
+        original_run = valheim_players.subprocess.run
+
+        def fake_run(*args, **kwargs):
+            lines = "\n".join([
+                "03/15/2026 12:36:51: Got character ZDOID from toto : 123:456",
+                "03/15/2026 12:36:52: Got connection SteamID 76561198298757896",
+            ])
+            return types.SimpleNamespace(stdout=lines)
+
+        valheim_players.subprocess.run = fake_run
+        app = Flask(__name__)
+        app.config["GAME"] = {"server": {"service": "valheim-server-test"}}
+        try:
+            with app.app_context():
+                players = valheim_players.get_players()
+        finally:
+            valheim_players.subprocess.run = original_run
+        self.assertEqual(players, [{"name": "toto", "steamid": "76561198298757896"}])
+
+    def test_tracks_connected_players_from_playfab_platform_id(self):
+        original_run = valheim_players.subprocess.run
+
+        def fake_run(*args, **kwargs):
+            lines = "\n".join([
+                "03/15/2026 17:46:53: PlayFab socket with remote ID playfab/333D6B4687BBBA00 received local Platform ID Steam_76561198355296827",
+                "03/15/2026 17:47:20: Got character ZDOID from Pantsu Kudasai : 1436054514:2",
+            ])
+            return types.SimpleNamespace(stdout=lines)
+
+        valheim_players.subprocess.run = fake_run
+        app = Flask(__name__)
+        app.config["GAME"] = {"server": {"service": "valheim-server-test"}}
+        try:
+            with app.app_context():
+                players = valheim_players.get_players()
+        finally:
+            valheim_players.subprocess.run = original_run
+        self.assertEqual(players, [{"name": "Pantsu Kudasai", "steamid": "76561198355296827"}])
+
 
 class ConfigGenEnshroudedCfgTests(unittest.TestCase):
 

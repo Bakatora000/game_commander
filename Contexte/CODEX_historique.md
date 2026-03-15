@@ -556,6 +556,16 @@ Point UX laissé volontairement pour plus tard :
 - objectif visé : supprimer ce menu déroulant dans ce cas et afficher à la place le chemin
   relatif utile du dossier de sauvegarde, par exemple `.../worlds_local`
 
+### Valheim PlayFab — pattern SteamID réel
+
+- Sur l'instance Valheim PlayFab réelle `valheim2`, le `SteamID` d'un joueur connecté
+  n'est pas remonté via `Got connection SteamID ...`.
+- Pattern réel observé dans `journalctl` :
+  - `PlayFab socket with remote ID ... received local Platform ID Steam_<steamid>`
+- Le parser Valheim doit donc supporter ce pattern pour rattacher le `SteamID` au nom
+  du joueur et réafficher les actions `admin` / `whitelist` / `ban` dans
+  `Joueurs connectés`.
+
 ### Save manager — état actuel
 
 Le `save manager` est maintenant implémenté dans l'UI :

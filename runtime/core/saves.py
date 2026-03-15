@@ -177,7 +177,7 @@ def get_save_roots():
         worlds_local = data_dir / "worlds_local"
         worlds = data_dir / "worlds"
         root_path = worlds_local if worlds_local.exists() else worlds
-        roots.append({"id": "worlds", "label": "Mondes", "path": root_path})
+        roots.append({"id": "worlds", "label": root_path.name, "path": root_path})
     elif game_id == "enshrouded":
         roots.append({"id": "savegame", "label": "Savegame", "path": server_dir / "savegame"})
     elif game_id == "minecraft":
