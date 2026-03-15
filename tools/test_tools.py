@@ -556,6 +556,14 @@ class SaveManagerTests(unittest.TestCase):
         self.assertIn("level.dat", names)
         self.assertIn("playerdata", names)
 
+    def test_delete_save_entry_removes_file(self):
+        target = self.root / "server" / "world" / "playerdata" / "abc.dat"
+        with self.app.app_context():
+            data, err = core_saves.delete_save_entry("playerdata", "abc.dat")
+        self.assertIsNone(err)
+        self.assertEqual(data["type"], "file")
+        self.assertFalse(target.exists())
+
     def test_list_entries_blocks_path_traversal(self):
         with self.app.app_context():
             with self.assertRaises(ValueError):
@@ -572,8 +580,7 @@ class SaveManagerTests(unittest.TestCase):
     def test_upload_plain_file_into_current_directory(self):
         upload = FileStorage(stream=io.BytesIO(b"newdata"), filename="new.dat")
         with self.app.app_context():
-            analysis, err = core_saves.analyze_uploads("world", "playerdata", [upload])
-            data = core_saves.save_uploads(analysis)
+            data, err = core_saves.upload_save_files("world", "playerdata", [upload])
         self.assertIsNone(err)
         self.assertEqual(data["count"], 1)
         self.assertTrue((self.root / "server" / "world" / "playerdata" / "new.dat").exists())
@@ -654,6 +661,28 @@ class SaveManagerTests(unittest.TestCase):
             target, filename, err = core_saves.get_backup_download_target(path.name)
         self.assertIsNone(err)
         self.assertEqual(filename, path.name)
+
+    def test_delete_backup_removes_zip(self):
+        self._write_deploy_config()
+        backups = self.root / "backups"
+        backups.mkdir()
+        path = backups / "minecraft-fabric_save_20260314_223346.zip"
+        path.write_text("x")
+        with self.app.app_context():
+            data, err = core_saves.delete_backup(path.name)
+        self.assertIsNone(err)
+        self.assertEqual(data["deleted"], path.name)
+        self.assertFalse(path.exists())
+
+    def test_upload_backups_copies_zip_into_backup_dir(self):
+        self._write_deploy_config()
+        upload = FileStorage(stream=io.BytesIO(b"zipdata"), filename="import.zip")
+        with self.app.app_context():
+            data, err = core_saves.upload_backups([upload])
+        self.assertIsNone(err)
+        self.assertEqual(data["count"], 1)
+        backups = list((self.root / "backups").glob("minecraft-fabric_save_*_import.zip"))
+        self.assertEqual(len(backups), 1)
 
     def test_restore_backup_restores_world_and_admin_files(self):
         self._write_deploy_config()

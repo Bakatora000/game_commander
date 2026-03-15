@@ -205,6 +205,20 @@ def api_saves_download():
     return send_file(target, as_attachment=True, download_name=filename)
 
 
+@app.route(f'{PREFIX}/api/saves/delete', methods=['POST'])
+@auth.require_auth
+@auth.require_perm('manage_saves')
+def api_saves_delete():
+    data = request.get_json() or {}
+    root_id = (data.get('root') or '').strip()
+    rel_path = data.get('path') or ''
+    try:
+        payload, err = saves.delete_save_entry(root_id, rel_path)
+    except ValueError:
+        return jsonify({'error': 'invalid_path'}), 400
+    return jsonify({'ok': True, **payload}) if not err else (jsonify({'error': err}), 404)
+
+
 @app.route(f'{PREFIX}/api/backups')
 @auth.require_auth
 @auth.require_perm('manage_saves')
@@ -227,12 +241,42 @@ def api_backups_download():
     return send_file(target, as_attachment=True, download_name=download_name)
 
 
+@app.route(f'{PREFIX}/api/backups/delete', methods=['POST'])
+@auth.require_auth
+@auth.require_perm('manage_saves')
+def api_backups_delete():
+    data = request.get_json() or {}
+    filename = (data.get('name') or '').strip()
+    try:
+        payload, err = saves.delete_backup(filename)
+    except ValueError:
+        return jsonify({'error': 'invalid_backup'}), 400
+    return jsonify({'ok': True, **payload}) if not err else (jsonify({'error': err}), 404)
+
+
 @app.route(f'{PREFIX}/api/backups/run', methods=['POST'])
 @auth.require_auth
 @auth.require_perm('manage_saves')
 def api_backups_run():
     data, err = saves.run_backup()
     return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 502)
+
+
+@app.route(f'{PREFIX}/api/backups/upload', methods=['POST'])
+@auth.require_auth
+@auth.require_perm('manage_saves')
+def api_backups_upload():
+    overwrite = request.form.get('overwrite', 'false').lower() == 'true'
+    files = request.files.getlist('files')
+    if not files:
+        return jsonify({'error': 'no_files'}), 400
+    try:
+        data, err = saves.upload_backups(files, overwrite=overwrite)
+    except ValueError as exc:
+        return jsonify({'error': str(exc) or 'invalid_backup'}), 400
+    if not overwrite and data.get('collision_count'):
+        return jsonify({'error': 'backup_conflicts', **data}), 409
+    return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
 
 
 @app.route(f'{PREFIX}/api/backups/restore', methods=['POST'])
@@ -333,71 +377,17 @@ def api_saves_analyze():
 def api_saves_upload():
     root_id = request.form.get('root', '').strip()
     rel_path = request.form.get('path', '')
-    extract_archives = request.form.get('extract_archives', 'true').lower() != 'false'
-    confirm_restore = request.form.get('confirm_restore', 'false').lower() == 'true'
-    stop_if_running = request.form.get('stop_if_running', 'true').lower() != 'false'
-    backup_before_restore = request.form.get('backup_before_restore', 'true').lower() != 'false'
+    overwrite = request.form.get('overwrite', 'false').lower() == 'true'
     files = request.files.getlist('files')
     if not files:
         return jsonify({'error': 'no_files'}), 400
     try:
-        analysis, err = saves.analyze_uploads(root_id, rel_path, files, extract_archives=extract_archives)
+        data, err = saves.upload_save_files(root_id, rel_path, files, overwrite=overwrite)
     except ValueError as exc:
         return jsonify({'error': str(exc) or 'invalid_upload'}), 400
-    if err:
-        return jsonify({'error': err}), 404
-    if not confirm_restore:
-        saves.cleanup_upload_analysis(analysis)
-        return jsonify({'error': 'restore_confirmation_required'}), 400
-
-    server_running = server.get_status().get('state') == 20
-    server_stopped = False
-    server_restarted = False
-    backup_created = None
-    try:
-        if server_running and stop_if_running:
-            ok, err = server.stop(wait=True, timeout=300)
-            if not ok:
-                saves.cleanup_upload_analysis(analysis)
-                return jsonify({'error': 'stop_failed', 'detail': err}), 502
-            server_stopped = True
-
-        if backup_before_restore:
-            backup_script = os.path.join(_HERE, f'backup_{GAME_ID}.sh')
-            if not os.path.isfile(backup_script):
-                saves.cleanup_upload_analysis(analysis)
-                return jsonify({'error': 'backup_script_missing'}), 500
-            result = subprocess.run(['bash', backup_script], capture_output=True, text=True, timeout=300)
-            if result.returncode != 0:
-                saves.cleanup_upload_analysis(analysis)
-                return jsonify({'error': 'backup_failed', 'detail': (result.stderr or result.stdout).strip()}), 502
-            out = (result.stdout or '').strip().splitlines()
-            backup_created = out[-1] if out else None
-
-        result = saves.save_uploads(analysis)
-        if server_running and stop_if_running:
-            ok, err = server.start(wait=True, timeout=300)
-            if not ok:
-                return jsonify({
-                    'ok': False,
-                    'error': 'restart_failed',
-                    'detail': err,
-                    'server_stopped': server_stopped,
-                    'backup_created': backup_created,
-                    **result,
-                }), 502
-            server_restarted = True
-
-        return jsonify({
-            'ok': True,
-            'server_stopped': server_stopped,
-            'server_restarted': server_restarted,
-            'backup_created': backup_created,
-            **result,
-        })
-    except ValueError as exc:
-        saves.cleanup_upload_analysis(analysis)
-        return jsonify({'error': str(exc) or 'restore_failed'}), 400
+    if not overwrite and data.get('collision_count'):
+        return jsonify({'error': 'upload_conflicts', **data}), 409
+    return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 404)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # API — UTILISATEURS

@@ -173,16 +173,20 @@
           </div>
           <div class="save-upload-dropzone" id="saveUploadDropzone">
             <input type="file" id="saveUploadInput" multiple hidden>
-            <span class="save-upload-title">Glisse-dépose tes sauvegardes ici</span>
-            <span class="save-upload-subtitle">Les fichiers sont copiés tels quels. Les archives .zip sont extraites automatiquement dans le dossier courant.</span>
+            <span class="save-upload-title">Glisse-dépose tes fichiers ici</span>
+            <span class="save-upload-subtitle">Les fichiers sont copiés tels quels dans le dossier courant. Pour restaurer un backup zip, utilise la zone Backups.</span>
           </div>
           <div id="saveEntries" class="saves-list"></div>
         </div>
         <div class="panel backups-panel">
           <div class="panel-header">
             <span class="panel-title">Backups</span>
-            <button class="btn-primary btn-sm" id="btnRunBackup">Sauvegarder maintenant</button>
+            <div class="panel-actions">
+              <button class="btn-ghost btn-sm" id="btnBackupUpload">Uploader un backup</button>
+              <button class="btn-primary btn-sm" id="btnRunBackup">Sauvegarder maintenant</button>
+            </div>
           </div>
+          <input type="file" id="backupUploadInput" accept=".zip" multiple hidden>
           <div class="backups-meta" id="backupsMeta"></div>
           <div id="backupEntries" class="saves-list"></div>
         </div>
@@ -253,6 +257,7 @@ let myPerms      = [];
 let chart        = null;
 let chartTimer   = null;
 let transientStatus = null;
+let backupEntriesCache = [];
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -644,6 +649,15 @@ function initSaveManager() {
     offerSaveUpload(files);
     e.target.value = '';
   });
+  document.getElementById('btnBackupUpload')?.addEventListener('click', () => {
+    document.getElementById('backupUploadInput')?.click();
+  });
+  document.getElementById('backupUploadInput')?.addEventListener('change', e => {
+    const files = [...(e.target.files || [])];
+    if (!files.length) return;
+    offerBackupUpload(files);
+    e.target.value = '';
+  });
   document.getElementById('btnRunBackup')?.addEventListener('click', () => {
     confirmThen('Créer une sauvegarde maintenant ?', runManualBackup);
   });
@@ -671,82 +685,43 @@ function initSaveDropzone() {
 }
 
 function offerSaveUpload(files) {
-  analyzeSaveUpload(files);
+  const names = files.map(f => f.name);
+  const lines = [`${files.length} fichier(s) vont être copiés dans ce dossier.`];
+  if (names.length) lines.push(`Exemples: ${names.slice(0,3).join(', ')}`);
+  lines.push('Confirmer l’upload ?');
+  confirmThen(lines.join('\n'), () => performSaveUpload(files, false));
 }
 
-async function analyzeSaveUpload(files) {
-  if (!saveCurrentRoot) {
-    showToast('Aucune racine de sauvegarde active', 'error');
-    return;
-  }
-  const form = new FormData();
-  form.set('root', saveCurrentRoot);
-  form.set('path', saveCurrentPath || '');
-  form.set('extract_archives', 'true');
-  files.forEach(file => form.append('files', file));
-  const r = await fetch(`${PREFIX}/api/saves/analyze`, {
-    method: 'POST',
-    body: form,
-  }).catch(() => null);
-  if (!r?.ok) {
-    const d = await r?.json().catch(() => ({})) || {};
-    showToast(formatSaveUploadError(d.error), 'error');
-    return;
-  }
-  const d = await r.json();
-  const lines = [];
-  lines.push(`${d.write_count || 0} élément(s) vont être restaurés.`);
-  if (d.collision_count) {
-    lines.push(`${d.collision_count} fichier(s) existant(s) seront remplacés.`);
-    if (d.collisions?.length) lines.push(`Exemples: ${d.collisions.slice(0,3).join(', ')}`);
-  } else {
-    lines.push('Aucun fichier existant ne sera écrasé.');
-  }
-  if (d.server_running) {
-    lines.push('Le serveur sera arrêté avant restauration.');
-  }
-  lines.push('Une sauvegarde automatique sera créée avant écrasement.');
-  lines.push('Confirmer la restauration ?');
-  confirmThen(lines.join('\n'), () => performSaveUpload(files));
-}
-
-async function performSaveUpload(files) {
+async function performSaveUpload(files, overwrite) {
   closeModal();
-  setTransientStatus('Restauration en cours', 40);
   if (!saveCurrentRoot) {
-    clearTransientStatus();
     showToast('Aucune racine de sauvegarde active', 'error');
     return;
   }
   const form = new FormData();
   form.set('root', saveCurrentRoot);
   form.set('path', saveCurrentPath || '');
-  form.set('extract_archives', 'true');
-  form.set('confirm_restore', 'true');
-  form.set('stop_if_running', 'true');
-  form.set('backup_before_restore', 'true');
+  form.set('overwrite', overwrite ? 'true' : 'false');
   files.forEach(file => form.append('files', file));
   const r = await fetch(`${PREFIX}/api/saves/upload`, {
     method: 'POST',
     body: form,
   }).catch(() => null);
   if (!r?.ok) {
-    clearTransientStatus();
     const d = await r?.json().catch(() => ({})) || {};
+    if (d.collision_count && !overwrite) {
+      const lines = [`${d.collision_count} fichier(s) existent déjà et seront remplacés.`];
+      if (d.collisions?.length) lines.push(`Exemples: ${d.collisions.slice(0,3).join(', ')}`);
+      lines.push('Confirmer l’écrasement ?');
+      confirmThen(lines.join('\n'), () => performSaveUpload(files, true));
+      return;
+    }
     showToast(formatSaveUploadError(d.error), 'error');
-    fetchStatus();
     return;
   }
   const d = await r.json();
-  clearTransientStatus();
-  const extracted = d.extracted?.length ? `, ${d.extracted.length} élément(s) extrait(s)` : '';
-  const stopped = d.server_stopped ? ', serveur arrêté' : '';
-  const restarted = d.server_restarted ? ', serveur relancé' : '';
-  const backup = d.backup_created ? ', backup créé' : '';
-  showToast(`${d.count || files.length} fichier(s) restauré(s)${extracted}${stopped}${restarted}${backup}`, 'success');
+  showToast(`${d.count || files.length} fichier(s) uploadé(s)`, 'success');
   loadSaveEntries();
-  loadBackups();
-  setTimeout(fetchStatus, 1500);
 }
 
 function formatSaveUploadError(code) {
@@ -766,6 +741,12 @@ function formatSaveUploadError(code) {
     invalid_backup: 'Backup invalide',
     invalid_backup_layout: 'Backup invalide: arborescence incompatible avec ce jeu',
     missing_backup: 'Backup introuvable',
+    backup_conflicts: 'Un backup du même nom existe déjà',
+    upload_conflicts: 'Des fichiers du même nom existent déjà',
+    invalid_backup_file: 'Seuls les fichiers .zip sont acceptés pour les backups',
+    backup_write_failed: 'Impossible d’écrire ce backup. Vérifie les permissions du fichier cible.',
+    save_write_failed: 'Impossible d’écrire dans ce dossier. Vérifie les permissions.',
+    cannot_delete_root: 'La racine de sauvegarde ne peut pas être supprimée',
     unknown_root: 'Racine de sauvegarde inconnue',
     missing_root: 'Racine de sauvegarde absente',
     missing_path: 'Dossier cible introuvable',
@@ -774,18 +755,68 @@ function formatSaveUploadError(code) {
   return map[code] || code || 'Erreur upload sauvegarde';
 }
 
+function offerBackupUpload(files) {
+  const nonZip = files.find(f => !f.name.toLowerCase().endsWith('.zip'));
+  if (nonZip) {
+    showToast('Seuls les fichiers .zip sont acceptés dans Backups', 'error');
+    return;
+  }
+  const lines = [`${files.length} backup(s) zip vont être ajoutés.`];
+  const existing = new Set((backupEntriesCache || []).map(entry => entry.name));
+  const conflicts = files.map(f => f.name).filter(name => existing.has(name));
+  if (conflicts.length) {
+    lines.push(`${conflicts.length} backup(s) existent déjà et seront remplacés.`);
+    lines.push(`Exemples: ${conflicts.slice(0,3).join(', ')}`);
+    lines.push('Confirmer l’écrasement ?');
+    confirmThen(lines.join('\n'), () => performBackupUpload(files, true));
+    return;
+  }
+  lines.push('Ils seront ensuite restaurables depuis cette liste.');
+  lines.push('Confirmer l’upload ?');
+  confirmThen(lines.join('\n'), () => performBackupUpload(files, false));
+}
+
+async function performBackupUpload(files, overwrite) {
+  closeModal();
+  const form = new FormData();
+  form.set('overwrite', overwrite ? 'true' : 'false');
+  files.forEach(file => form.append('files', file));
+  const r = await fetch(`${PREFIX}/api/backups/upload`, {
+    method: 'POST',
+    body: form,
+  }).catch(() => null);
+  if (!r?.ok) {
+    const d = await r?.json().catch(() => ({})) || {};
+    if (d.collision_count && !overwrite) {
+      const lines = [`${d.collision_count} backup(s) existent déjà et seront remplacés.`];
+      if (d.collisions?.length) lines.push(`Exemples: ${d.collisions.slice(0,3).join(', ')}`);
+      lines.push('Confirmer l’écrasement ?');
+      confirmThen(lines.join('\n'), () => performBackupUpload(files, true));
+      return;
+    }
+    showToast(formatSaveUploadError(d.error), 'error');
+    return;
+  }
+  const d = await r.json();
+  showToast(`${d.count || files.length} backup(s) uploadé(s)`, 'success');
+  loadBackups();
+}
+
 async function loadBackups() {
   const r = await fetch(`${PREFIX}/api/backups`).catch(() => null);
   const list = document.getElementById('backupEntries');
   const meta = document.getElementById('backupsMeta');
   if (!list || !meta) return;
   if (!r?.ok) {
+    backupEntriesCache = [];
     list.innerHTML = '<p class="empty-msg">Impossible de charger les backups</p>';
     return;
   }
   const d = await r.json();
+  backupEntriesCache = d.entries || [];
   meta.textContent = d.backup_dir || '';
   if (!d.entries?.length) {
+    backupEntriesCache = [];
     list.innerHTML = '<p class="empty-msg">Aucun backup disponible</p>';
     return;
   }
@@ -801,6 +832,7 @@ async function loadBackups() {
       </div>
       <div class="save-actions">
         <button class="btn-ghost btn-sm backup-restore">Restaurer</button>
+        <button class="btn-ghost btn-sm backup-delete">Supprimer</button>
         <button class="btn-ghost btn-sm backup-download">Télécharger</button>
       </div>`;
     row.querySelector('.backup-restore').addEventListener('click', () => {
@@ -816,6 +848,9 @@ async function loadBackups() {
       const dl = new URL(`${PREFIX}/api/backups/download`, window.location.origin);
       dl.searchParams.set('name', entry.name);
       window.location.href = dl.toString();
+    });
+    row.querySelector('.backup-delete').addEventListener('click', () => {
+      confirmThen(`Supprimer définitivement le backup ${entry.label} ?`, () => deleteBackup(entry.name, entry.label));
     });
     list.appendChild(row);
   });
@@ -865,6 +900,22 @@ async function restoreBackup(name, label) {
   loadSaveEntries();
   loadBackups();
   setTimeout(fetchStatus, 1500);
+}
+
+async function deleteBackup(name, label) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/backups/delete`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name}),
+  }).catch(() => null);
+  if (!r?.ok) {
+    const d = await r?.json().catch(() => ({})) || {};
+    showToast(formatSaveUploadError(d.error), 'error');
+    return;
+  }
+  showToast(`Backup supprimé${label ? ` (${label})` : ''}`, 'success');
+  loadBackups();
 }
 
 async function loadSaveRoots() {
@@ -927,6 +978,7 @@ async function loadSaveEntries() {
         <span class="save-meta">${meta}</span>
       </div>
       <div class="save-actions">
+        <button class="btn-ghost btn-sm save-delete">Supprimer</button>
         <button class="btn-ghost btn-sm save-download">Télécharger</button>
       </div>`;
     row.querySelector('.save-link').addEventListener('click', () => {
@@ -941,8 +993,28 @@ async function loadSaveEntries() {
       dl.searchParams.set('path', entry.path);
       window.location.href = dl.toString();
     });
+    row.querySelector('.save-delete').addEventListener('click', () => {
+      const kind = entry.type === 'dir' ? 'le dossier' : 'le fichier';
+      confirmThen(`Supprimer définitivement ${kind} ${entry.name} ?`, () => deleteSaveEntry(entry.path, entry.name));
+    });
     list.appendChild(row);
   });
+}
+
+async function deleteSaveEntry(path, name) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/saves/delete`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({root: saveCurrentRoot, path}),
+  }).catch(() => null);
+  if (!r?.ok) {
+    const d = await r?.json().catch(() => ({})) || {};
+    showToast(formatSaveUploadError(d.error), 'error');
+    return;
+  }
+  showToast(`Élément supprimé (${name})`, 'success');
+  loadSaveEntries();
 }
 
 function formatBytes(n) {

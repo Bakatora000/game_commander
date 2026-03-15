@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import tempfile
+import time
 import zipfile
 import re
 from pathlib import Path
@@ -230,6 +231,34 @@ def get_download_target(root_id: str, rel_path: str):
     return tmp_path, f"{target.name}.zip", None
 
 
+def delete_save_entry(root_id: str, rel_path: str):
+    root = _find_root(root_id)
+    if not root:
+        return None, "unknown_root"
+
+    root_path = Path(root["path"])
+    if not root_path.exists():
+        return None, "missing_root"
+    if not rel_path:
+        return None, "cannot_delete_root"
+
+    target = _safe_target(root_path, rel_path)
+    if not target.exists():
+        return None, "missing_path"
+
+    if target.is_dir():
+        shutil.rmtree(target)
+        entry_type = "dir"
+    else:
+        target.unlink()
+        entry_type = "file"
+
+    return {
+        "deleted": str(Path(rel_path)).replace(os.sep, "/"),
+        "type": entry_type,
+    }, None
+
+
 def list_backups():
     backup_dir = _backup_dir()
     if not backup_dir.exists():
@@ -265,6 +294,14 @@ def get_backup_download_target(filename: str):
     return path, path.name, None
 
 
+def delete_backup(filename: str):
+    path, _download_name, err = get_backup_download_target(filename)
+    if err:
+        return None, err
+    path.unlink()
+    return {"deleted": path.name}, None
+
+
 def run_backup():
     script = _backup_script_path()
     if not script.is_file():
@@ -277,6 +314,94 @@ def run_backup():
     return {
         "output": (result.stdout or "").strip(),
         "latest": latest,
+    }, None
+
+
+def upload_backups(files, overwrite=False):
+    backup_dir = _backup_dir()
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    written = []
+    collisions = []
+    game_id = _game()["id"]
+
+    for storage in files:
+        filename = Path((storage.filename or "").strip()).name
+        if not filename:
+            continue
+        if not filename.lower().endswith(".zip"):
+            raise ValueError("invalid_backup_file")
+
+        safe_name = re.sub(r'[^A-Za-z0-9._-]+', '-', filename).strip('-') or "backup.zip"
+        if not re.match(rf'^{re.escape(game_id)}_save_\d{{8}}_\d{{6}}', safe_name):
+            ts = time.strftime("%Y%m%d_%H%M%S")
+            safe_name = f"{game_id}_save_{ts}_{safe_name}"
+
+        dest = (backup_dir / safe_name).resolve()
+        root = backup_dir.resolve()
+        if dest != root and root not in dest.parents:
+            raise ValueError("invalid_backup")
+        if dest.exists():
+            collisions.append(dest.name)
+            if not overwrite:
+                continue
+        try:
+            storage.save(dest)
+        except PermissionError as exc:
+            raise ValueError("backup_write_failed") from exc
+        except OSError as exc:
+            raise ValueError("backup_write_failed") from exc
+        written.append(dest.name)
+
+    return {
+        "count": len(written),
+        "written": written,
+        "collision_count": len(collisions),
+        "collisions": collisions,
+    }, None
+
+
+def upload_save_files(root_id: str, rel_path: str, files, overwrite=False):
+    root = _find_root(root_id)
+    if not root:
+        return None, "unknown_root"
+
+    root_path = Path(root["path"])
+    if not root_path.exists():
+        return None, "missing_root"
+
+    target = _safe_target(root_path, rel_path)
+    if not target.exists():
+        return None, "missing_path"
+    if not target.is_dir():
+        return None, "not_a_directory"
+
+    written = []
+    collisions = []
+    for storage in files:
+        filename = Path((storage.filename or "").strip()).name
+        if not filename:
+            continue
+        dest = (target / filename).resolve()
+        root_resolved = target.resolve()
+        if dest != root_resolved and root_resolved not in dest.parents:
+            raise ValueError("invalid_upload_path")
+        if dest.exists():
+            collisions.append(filename)
+            if not overwrite:
+                continue
+        try:
+            storage.save(dest)
+        except PermissionError as exc:
+            raise ValueError("save_write_failed") from exc
+        except OSError as exc:
+            raise ValueError("save_write_failed") from exc
+        written.append(filename)
+
+    return {
+        "count": len(written),
+        "written": written,
+        "collision_count": len(collisions),
+        "collisions": collisions,
     }, None
 
 
