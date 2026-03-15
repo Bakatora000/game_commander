@@ -528,6 +528,26 @@ Contraintes retenues pour `attach` :
 - ne pas auto-décaler les ports du serveur de jeu existant
 - seul le port Flask de la nouvelle UI peut être ajusté
 
+### Commander Hub
+
+Nouvelle direction produit validée :
+- ne plus considérer les URLs d'instances (`/valheim2`, `/testsoul`, etc.) comme seule
+  porte d'entrée
+- exposer un hub unique `/commander`
+- y lister les instances disponibles avec accès direct à leur UI
+
+Implémentation retenue :
+- pas de nouveau service Flask dédié
+- génération d'une page HTML statique via `tools/nginx_manager.py`
+- publication via Nginx sur `/commander`
+- chargement dynamique du `statut` et du nombre de `joueurs` depuis les APIs des
+  instances existantes
+
+Conséquence doc/produit :
+- le flux nominal utilisateur devient `hub -> instance`
+- la doc publique doit refléter ce point d'entrée unique plutôt que l'ancien angle
+  “copier des JSON runtime à la main”
+
 ### Save manager — état actuel
 
 Le `save manager` est maintenant implémenté dans l'UI :

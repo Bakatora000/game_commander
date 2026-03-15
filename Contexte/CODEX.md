@@ -4,7 +4,13 @@ This file provides guidance to Codex when working with code in this repository.
 
 ## Overview
 
-**Game Commander** is a generic Flask web interface for managing game servers (Valheim, Enshrouded, Minecraft Java, Minecraft Fabric, Terraria, Soulmask) without AMP. It uses `psutil` + `systemd` + `bcrypt`. One instance of the app manages one game server, selected by `game.json`.
+**Game Commander** is now both:
+- a deployment/operations shell tool (`game_commander.sh`)
+- a per-instance Flask web UI
+- and a shared Nginx hub entrypoint at `/commander`
+
+One Flask instance still manages one game server, selected by `game.json`, but the normal
+user-facing entrypoint is now the shared hub URL rather than direct instance URLs.
 
 Current server state noted in project memory: no active Game Commander instance is deployed
 at the moment; AMP instances still coexist on the same machine and must not be impacted by
@@ -77,13 +83,16 @@ export GAME_COMMANDER_SECRET=$(python3 -c "import secrets; print(secrets.token_h
 python3 runtime/app.py
 ```
 
-The app is deployed behind Nginx (for example `gaming.example.com.conf`). Flask listens on `127.0.0.1:<flask_port>` from `runtime/game.json`.
+The app is deployed behind Nginx (for example `gaming.example.com.conf`). Flask listens on
+`127.0.0.1:<flask_port>` from `runtime/game.json`. The shared Nginx entrypoint `/commander`
+lists available instances and links to each instance UI.
 
 ## Deployment Script
 
 ```bash
 sudo bash game_commander.sh              # interactive menu
 sudo bash game_commander.sh deploy       # guided deploy
+sudo bash game_commander.sh attach       # attach Commander to an existing service
 sudo bash game_commander.sh status       # show all instances
 sudo bash game_commander.sh update --instance testfabric
 sudo bash game_commander.sh uninstall --dry-run
@@ -97,7 +106,7 @@ sudo bash game_commander.sh uninstall --dry-run
 
 Nginx management is also split out into `tools/nginx_manager.py`, which maintains a
 manifest and a generated locations file rather than repeatedly editing inline blocks for
-each instance.
+each instance. It also generates the shared static hub page served at `/commander`.
 
 Operational note: deployed instances are copies of the runtime app. Repository fixes do
 not update existing instances automatically. The `update` command is now the supported way

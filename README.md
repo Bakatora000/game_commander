@@ -1,26 +1,62 @@
 # Game Commander
 
-Interface web générique pour la gestion de serveurs de jeu.
-Sans dépendance AMP — psutil + systemd + bcrypt.
+Suite de déploiement et d’administration de serveurs de jeu.
+Sans AMP, basée sur `systemd`, `psutil`, `Flask`, `bcrypt` et Nginx.
 
-## Déploiement
+## Point d'entrée recommandé
+
+L’entrée utilisateur normale est maintenant :
+
+- `https://gaming.expevay.net/commander`
+
+Cette page hub liste les instances disponibles et ouvre ensuite leur interface dédiée :
+
+- `/valheim2`
+- `/testsoul`
+- etc.
+
+Les URLs d’instance existent toujours, mais `/commander` est désormais la porte d’entrée
+principale.
+
+## Utilisation courante
 
 ```bash
-# 1. Copier un template runtime en game.json
-cp runtime/game_valheim.json runtime/game.json
+# Menu interactif
+sudo bash game_commander.sh
 
-# 2. Créer users.json avec un compte admin
-python3 -c "
-import bcrypt, json
-pw = input('Mot de passe admin : ').encode()
-h  = bcrypt.hashpw(pw, bcrypt.gensalt()).decode()
-print(json.dumps({'admin': {'password_hash': h, 'permissions': []}}, indent=2))
-" > runtime/users.json
+# Déployer une nouvelle instance complète
+sudo bash game_commander.sh deploy
 
-# 3. Lancer
-export GAME_COMMANDER_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-python3 runtime/app.py
+# Attacher Commander à un serveur existant
+sudo bash game_commander.sh attach
+
+# Mettre à jour le runtime d'une instance déjà installée
+sudo bash game_commander.sh update --instance valheim2
+
+# Voir l'état des instances
+sudo bash game_commander.sh status
+
+# Désinstaller
+sudo bash game_commander.sh uninstall
 ```
+
+## Modes de déploiement
+
+- `managed`
+  - Game Commander installe et gère aussi le serveur de jeu
+  - création du service jeu + du service web Commander
+
+- `attach`
+  - Game Commander se branche sur un serveur/service jeu existant
+  - ne réinstalle pas le jeu
+  - ne recrée pas le service jeu
+  - déploie seulement le runtime Commander, son service Flask et l’intégration Nginx
+
+Le mode `attach` est utile pour :
+
+- rattacher Commander à une instance déjà présente
+- dissocier l’hébergement du jeu de l’interface Commander
+- préparer le support d’installations externes, par exemple hors déploiement Game Commander
 
 ## Structure
 
@@ -46,7 +82,7 @@ tools/
 
 runtime/
   app.py                   ← Flask factory (lit game.json)
-  game.json                ← Config du jeu actif (copier depuis game_*.json)
+  game.json                ← Config active d'une instance déployée
   users.json               ← Utilisateurs (bcrypt)
   metrics.log              ← Métriques append-only
   core/
@@ -72,7 +108,29 @@ runtime/
     themes/enshrouded/     ← Thème brume/sarcelle
 ```
 
-## game.json — Variables clés
+## Développement runtime
+
+Le mode standalone `runtime/game.json` existe toujours pour le développement local du
+runtime Flask, mais ce n’est plus le flux nominal du produit.
+
+```bash
+# 1. Copier un template runtime en game.json
+cp runtime/game_valheim.json runtime/game.json
+
+# 2. Créer users.json avec un compte admin
+python3 -c "
+import bcrypt, json
+pw = input('Mot de passe admin : ').encode()
+h  = bcrypt.hashpw(pw, bcrypt.gensalt()).decode()
+print(json.dumps({'admin': {'password_hash': h, 'permissions': []}}, indent=2))
+" > runtime/users.json
+
+# 3. Lancer
+export GAME_COMMANDER_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
+python3 runtime/app.py
+```
+
+## `game.json` — Variables clés
 
 | Champ | Rôle |
 |---|---|
@@ -89,22 +147,22 @@ runtime/
 1. Créer `runtime/games/{id}/config.py` et/ou `runtime/games/{id}/mods.py`
 2. Créer `runtime/templates/games/{id}/app.html` et `login.html`
 3. Créer `runtime/static/themes/{id}/theme.css` et `login.css`
-4. Créer `runtime/game_{id}.json` et le copier en `runtime/game.json`
+4. Créer `runtime/game_{id}.json`
 
 ## Script de déploiement
 
 ```bash
-# Interactif (demande tout)
+# Menu interactif
 sudo bash game_commander.sh
 
-# Déploiement interactif
+# Déploiement interactif d'une nouvelle instance
 sudo bash game_commander.sh deploy
 
-# Avec fichier de config (CI/redéploiement)
+# Déploiement avec fichier de config
 sudo bash game_commander.sh deploy --config env/deploy_config.env
 
 # Attacher seulement Commander à un service jeu existant
-sudo bash game_commander.sh deploy --attach
+sudo bash game_commander.sh attach
 
 # Variante attach avec fichier de config
 sudo bash game_commander.sh deploy --config env/deploy_attach.env
@@ -136,25 +194,6 @@ sudo bash game_commander.sh update --instance testfabric
 | 11 | Règles sudoers (systemctl + BepInEx pour Valheim) |
 | 12 | Sauvegarde deploy_config.env |
 
-### Modes de déploiement
-
-Le script supporte maintenant deux modes :
-
-- `managed`
-  - Game Commander installe et gère aussi le serveur de jeu
-  - création du service jeu + service Flask
-
-- `attach`
-  - Game Commander se branche sur un service jeu déjà existant
-  - aucun nouveau service jeu n'est créé
-  - le serveur de jeu n'est pas réinstallé
-  - seul le runtime Commander, son service Flask, Nginx et la config associée sont déployés
-
-Le mode `attach` est utile pour :
-- rattacher Commander à un serveur déjà présent sur la machine
-- séparer clairement “hébergement du jeu” et “interface Commander”
-- préparer à terme un rattachement à des installations non créées par `game_commander.sh`
-
 Comportement important du mode `attach` :
 - `GAME_SERVICE` est conservé tel que fourni
 - `SERVER_DIR` et `DATA_DIR` sont conservés tels que fournis
@@ -168,9 +207,11 @@ partagé. Il utilise :
 
 - `/etc/nginx/game-commander-manifest.json` comme source de vérité des instances
 - `/etc/nginx/game-commander-locations.conf` comme fichier auto-généré
+- `/etc/nginx/game-commander-hub.html` comme page hub auto-générée
 - `tools/nginx_manager.py` pour initialiser, migrer, régénérer et nettoyer
 
-Le vhost du domaine inclut ensuite ce fichier généré dans son bloc SSL.
+Le vhost du domaine inclut ensuite ce fichier généré dans son bloc SSL et expose aussi
+`/commander` comme hub de navigation entre instances.
 
 ## GitHub
 
