@@ -595,3 +595,16 @@ pstree -p $(sudo systemctl show enshrouded-server-enshrouded2 --property=MainPID
 # Ne JAMAIS utiliser :
 # pkill -f "enshrouded"   ← tue aussi l'instance AMP Test01
 ```
+
+## Milestone v2.2
+
+Jalon retenu pour l'état actuel du projet :
+- mode `attach` validé en réel
+- `save manager` ajouté à l'UI
+- liste des backups avec téléchargement, restauration et suppression
+- sauvegarde manuelle depuis l'UI
+- upload simple des fichiers de save
+- upload dédié des backups
+- backup automatique avant restauration
+- suppression de fichiers/dossiers de save
+- Soulmask validé pour UI, backups/restauration et suivi joueurs de base
