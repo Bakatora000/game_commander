@@ -10,6 +10,11 @@ cmd_uninstall() {
 
     DEPLOY_CONFIGS=()
     uninstall_gc_section
+    if [[ $? -eq 10 ]]; then
+        info "Désinstallation annulée."
+        echo ""
+        return
+    fi
     uninstall_flask_section
     uninstall_orphans_section
 

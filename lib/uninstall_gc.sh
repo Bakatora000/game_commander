@@ -239,7 +239,7 @@ uninstall_gc_section() {
     gc_read gc_sel
 
     if [[ "$gc_sel" == "skip" || -z "$gc_sel" ]]; then
-        return
+        return 10
     fi
 
     if [[ "$gc_sel" == "all" ]]; then

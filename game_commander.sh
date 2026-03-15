@@ -41,6 +41,7 @@ show_help() {
 
   COMMANDES :
     deploy                   Déploiement interactif
+    deploy --attach          Attacher Game Commander à un serveur existant
     deploy --config FILE     Déploiement silencieux depuis un fichier de config
     deploy --generate-config Générer un modèle de fichier de config
     uninstall                Désinstallation guidée
@@ -53,12 +54,26 @@ show_help() {
   EXEMPLES :
     sudo bash game_commander.sh
     sudo bash game_commander.sh deploy
+    sudo bash game_commander.sh deploy --attach
     sudo bash game_commander.sh deploy --config env/deploy_config.env
     sudo bash game_commander.sh uninstall
     sudo bash game_commander.sh status
     sudo bash game_commander.sh update --instance testfabric
 
 EOF
+}
+
+run_command() {
+    local cmd="$1"
+    shift || true
+    case "$cmd" in
+        deploy)    cmd_deploy    "$@" ;;
+        attach)    cmd_deploy    --attach "$@" ;;
+        uninstall) cmd_uninstall ;;
+        status)    cmd_status    ;;
+        update)    cmd_update    "$@" ;;
+        *)         show_help; return 1 ;;
+    esac
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -69,7 +84,7 @@ REMAINING_ARGS=()
 
 for arg in "$@"; do
     case "$arg" in
-        deploy|uninstall|status|update) COMMAND="$arg" ;;
+        deploy|attach|uninstall|status|update) COMMAND="$arg" ;;
         --dry-run) DRY_RUN=true ;;
         --help|-h) show_help; exit 0 ;;
         *) REMAINING_ARGS+=("$arg") ;;
@@ -79,29 +94,29 @@ done
 # Menu interactif si aucune commande
 if [[ -z "$COMMAND" ]]; then
     [[ $EUID -ne 0 ]] && die "Lancez en root : sudo bash $0"
-    echo ""
-    echo -e "  ${BOLD}${CYAN}╔══ GAME COMMANDER ══╗${RESET}"
-    echo ""
-    echo -e "  ${CYAN}[1]${RESET} ${BOLD}deploy${RESET}     — Installer une nouvelle instance"
-    echo -e "  ${CYAN}[2]${RESET} ${BOLD}uninstall${RESET}  — Désinstaller une instance"
-    echo -e "  ${CYAN}[3]${RESET} ${BOLD}status${RESET}     — État de toutes les instances"
-    echo -e "  ${CYAN}[4]${RESET} ${BOLD}update${RESET}     — Mettre à jour une instance existante"
-    echo ""
-    echo -en "  ${YELLOW}?  Votre choix : ${RESET}"
-    read -r _choice
-    case "$_choice" in
-        1) COMMAND="deploy" ;;
-        2) COMMAND="uninstall" ;;
-        3) COMMAND="status" ;;
-        4) COMMAND="update" ;;
-        *) die "Choix invalide." ;;
-    esac
+    while true; do
+        echo ""
+        echo -e "  ${BOLD}${CYAN}╔══ GAME COMMANDER ══╗${RESET}"
+        echo ""
+        echo -e "  ${CYAN}[1]${RESET} ${BOLD}deploy${RESET}     — Installer une nouvelle instance complète"
+        echo -e "  ${CYAN}[2]${RESET} ${BOLD}attach${RESET}     — Ajouter Game Commander à un serveur existant"
+        echo -e "  ${CYAN}[3]${RESET} ${BOLD}uninstall${RESET}  — Retirer une instance ou nettoyer"
+        echo -e "  ${CYAN}[4]${RESET} ${BOLD}status${RESET}     — État de toutes les instances"
+        echo -e "  ${CYAN}[5]${RESET} ${BOLD}update${RESET}     — Mettre à jour une instance existante"
+        echo -e "  ${CYAN}[6]${RESET} ${BOLD}quit${RESET}       — Quitter"
+        echo ""
+        echo -en "  ${YELLOW}?  Votre choix : ${RESET}"
+        read -r _choice
+        case "$_choice" in
+            1) run_command deploy ;;
+            2) run_command attach ;;
+            3) run_command uninstall ;;
+            4) run_command status ;;
+            5) run_command update ;;
+            6) exit 0 ;;
+            *) warn "Choix invalide." ;;
+        esac
+    done
 fi
 
-case "$COMMAND" in
-    deploy)    cmd_deploy    "${REMAINING_ARGS[@]:-}" ;;
-    uninstall) cmd_uninstall ;;
-    status)    cmd_status    ;;
-    update)    cmd_update    "${REMAINING_ARGS[@]:-}" ;;
-    *)         show_help; exit 1 ;;
-esac
+run_command "$COMMAND" "${REMAINING_ARGS[@]:-}"
