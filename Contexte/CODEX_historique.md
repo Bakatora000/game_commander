@@ -648,10 +648,13 @@ pstree -p $(sudo systemctl show enshrouded-server-enshrouded2 --property=MainPID
 # pkill -f "enshrouded"   ← tue aussi l'instance AMP Test01
 ```
 
-## Milestone v2.2
+## Milestone v2.3
 
-Jalon retenu pour l'état actuel du projet :
+Jalon de stabilisation retenu avant le gros chantier de refonte UI / thèmes.
+
+État validé à ce stade :
 - mode `attach` validé en réel
+- hub `/commander` en place comme point d'entrée principal
 - `save manager` ajouté à l'UI
 - liste des backups avec téléchargement, restauration et suppression
 - sauvegarde manuelle depuis l'UI
@@ -660,3 +663,15 @@ Jalon retenu pour l'état actuel du projet :
 - backup automatique avant restauration
 - suppression de fichiers/dossiers de save
 - Soulmask validé pour UI, backups/restauration et suivi joueurs de base
+- Valheim amené à un niveau produit de référence pour les autres jeux :
+  - `Configuration` fusionnée avec l'ancien onglet monde
+  - sélection de monde actif
+  - `World Modifiers`
+  - BetterNetworking si installé
+  - gestionnaire de fichiers sur `worlds_local`
+  - actions joueurs `admin / whitelist / ban`
+  - panneaux `adminlist.txt / bannedlist.txt / permittedlist.txt`
+  - prise en compte du pattern PlayFab réel pour le `SteamID`
+
+Point explicitement repoussé après ce jalon :
+- refonte transversale UI/CSS/thèmes/accessibilité

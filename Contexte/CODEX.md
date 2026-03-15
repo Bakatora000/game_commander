@@ -203,7 +203,7 @@ Jinja2 context always has: `game` (full config dict), `prefix`, `game_id`, `modu
 
 At each milestone, create a git commit and push to `origin/main`. Bump the version in the `game_commander.sh` header (line 3, `v2.x`) accordingly.
 
-Current validated milestone: `v2.2`
+Current validated milestone: `v2.3`
 
 ## Adding a New Game
 
