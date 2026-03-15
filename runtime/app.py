@@ -125,6 +125,16 @@ def api_me():
 def api_status():
     return jsonify(server.get_status())
 
+@app.route(f'{PREFIX}/api/hub-status')
+def api_hub_status():
+    status = server.get_status()
+    return jsonify({
+        'state': status.get('state', 0),
+        'metrics': {
+            'players': (status.get('metrics') or {}).get('players', {'value': 0, 'max': 0}),
+        },
+    })
+
 @app.route(f'{PREFIX}/api/updates')
 @auth.require_auth
 def api_updates():

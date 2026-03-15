@@ -258,7 +258,7 @@ def build_hub_html(vhost: str, instances: list[dict]) -> str:
       const statusEl = card.querySelector('[data-field="status"]');
       const playersEl = card.querySelector('[data-field="players"]');
       try {{
-        const r = await fetch(`${{prefix}}/api/status`, {{ credentials: 'same-origin' }});
+        const r = await fetch(`${{prefix}}/api/hub-status`, {{ credentials: 'same-origin' }});
         if (!r.ok) throw new Error(`status_${{r.status}}`);
         const data = await r.json();
         const state = Number(data?.state || 0);
