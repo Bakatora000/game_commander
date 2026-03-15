@@ -132,11 +132,12 @@ All routes are prefixed with `PREFIX` from `game.json`. Common routes:
 - `GET/POST {PREFIX}/api/config` (loaded only if `features.config`)
 - `GET/POST {PREFIX}/api/mods/*` (loaded only if `features.mods`)
 - `GET/POST {PREFIX}/api/world_modifiers` (Valheim only)
-- `GET {PREFIX}/api/players` (Valheim / Enshrouded / Minecraft Java / Minecraft Fabric)
+- `GET {PREFIX}/api/players` (Valheim / Enshrouded / Minecraft Java / Minecraft Fabric / Soulmask)
 - `POST {PREFIX}/api/update` → SteamCMD update in background thread
-
-Planned next feature: a `save manager` view/API to expose the real world/save directories
-per game and the generated backup archives through the web UI.
+- `GET {PREFIX}/api/saves`, `POST {PREFIX}/api/saves/upload|delete`
+- `GET {PREFIX}/api/saves/download`
+- `GET {PREFIX}/api/backups`, `POST {PREFIX}/api/backups/create|upload|restore|delete`
+- `GET {PREFIX}/api/backups/download`
 
 ### Auth (`runtime/core/auth.py`)
 
@@ -166,6 +167,14 @@ Current backup policy by game:
 - Minecraft Java / Fabric: `world/` + main admin files
 - Terraria: server world/data directory
 - Soulmask: `WS/Saved`
+
+Current save manager scope:
+- browse real save directories per game
+- upload files into allowed save folders
+- delete files/subfolders inside allowed save roots
+- list backup archives
+- create/download/upload/restore/delete backup archives
+- restore flow stops the server if needed, creates a backup first, then restarts
 
 ### Templates and themes
 

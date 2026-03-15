@@ -43,7 +43,7 @@
       <button class="nav-btn" data-tab="config" id="navBtnConfig"><span class="nav-icon">◈</span><span>Configuration</span></button>
       {% endif %}
       {% if game.features.saves %}
-      <button class="nav-btn" data-tab="saves" id="navBtnSaves"><span class="nav-icon">⬓</span><span>Sauvegardes</span></button>
+      <button class="nav-btn" data-tab="saves" id="navBtnSaves"><span class="nav-icon">⬓</span><span>{% block saves_nav_label %}Fichiers{% endblock %}</span></button>
       {% endif %}
       <button class="nav-btn admin-only" data-tab="users" style="display:none"><span class="nav-icon">◉</span><span>Utilisateurs</span></button>
       {% block extra_nav %}{% endblock %}
@@ -162,7 +162,7 @@
       <div class="content-wrap">
         <div class="panel saves-panel">
           <div class="panel-header">
-            <span class="panel-title">Save Manager</span>
+            <span class="panel-title">Gestionnaire de fichiers</span>
             <span class="panel-count" id="saveRootLabel"></span>
           </div>
           <div class="saves-toolbar">
@@ -174,13 +174,14 @@
           <div class="save-upload-dropzone" id="saveUploadDropzone">
             <input type="file" id="saveUploadInput" multiple hidden>
             <span class="save-upload-title">Glisse-dépose tes fichiers ici</span>
-            <span class="save-upload-subtitle">Les fichiers sont copiés tels quels dans le dossier courant. Pour restaurer un backup zip, utilise la zone Backups.</span>
+            <span class="save-upload-subtitle">Les fichiers sont copies tels quels dans le dossier courant. Pour restaurer un backup zip, utilise le panneau Sauvegardes.</span>
           </div>
           <div id="saveEntries" class="saves-list"></div>
         </div>
+        {% block saves_backups_panel %}
         <div class="panel backups-panel">
           <div class="panel-header">
-            <span class="panel-title">Backups</span>
+            <span class="panel-title">Sauvegardes</span>
             <div class="panel-actions">
               <button class="btn-ghost btn-sm" id="btnBackupUpload">Uploader un backup</button>
               <button class="btn-primary btn-sm" id="btnRunBackup">Sauvegarder maintenant</button>
@@ -190,6 +191,7 @@
           <div class="backups-meta" id="backupsMeta"></div>
           <div id="backupEntries" class="saves-list"></div>
         </div>
+        {% endblock %}
       </div>
     </section>
     {% endif %}
@@ -221,6 +223,7 @@
             </div>
           </div>
         </div>
+        {% block users_tab_extra %}{% endblock %}
       </div>
     </section>
 
@@ -746,6 +749,10 @@ function formatSaveUploadError(code) {
     invalid_backup_file: 'Seuls les fichiers .zip sont acceptés pour les backups',
     backup_write_failed: 'Impossible d’écrire ce backup. Vérifie les permissions du fichier cible.',
     save_write_failed: 'Impossible d’écrire dans ce dossier. Vérifie les permissions.',
+    predelete_backup_failed: 'Impossible de créer la copie de sécurité avant suppression.',
+    stop_required: 'Le serveur doit être arrêté avant cette suppression.',
+    stop_permission_required: 'Permission stop_server requise pour supprimer ce fichier du monde actif.',
+    protected_world_file: 'Ce fichier du monde actif nécessite une confirmation spéciale.',
     cannot_delete_root: 'La racine de sauvegarde ne peut pas être supprimée',
     unknown_root: 'Racine de sauvegarde inconnue',
     missing_root: 'Racine de sauvegarde absente',
@@ -970,7 +977,10 @@ async function loadSaveEntries() {
     const row = document.createElement('div');
     row.className = 'save-row';
     const typeIcon = entry.type === 'dir' ? '📁' : '📄';
-    const meta = entry.type === 'file' && entry.size != null ? formatBytes(entry.size) : 'Dossier';
+    const dateText = entry.mtime ? formatDateTime(entry.mtime) : 'Date inconnue';
+    const meta = entry.type === 'file' && entry.size != null
+      ? `${formatBytes(entry.size)} • ${dateText}`
+      : `Dossier • ${dateText}`;
     row.innerHTML = `
       <div class="save-main">
         <span class="save-icon">${typeIcon}</span>
@@ -994,6 +1004,11 @@ async function loadSaveEntries() {
       window.location.href = dl.toString();
     });
     row.querySelector('.save-delete').addEventListener('click', () => {
+      const isValheimWorldFile = GAME_ID === 'valheim' && entry.type === 'file' && (entry.name.endsWith('.db') || entry.name.endsWith('.fwl'));
+      if (isValheimWorldFile) {
+        deleteSaveEntry(entry.path, entry.name);
+        return;
+      }
       const kind = entry.type === 'dir' ? 'le dossier' : 'le fichier';
       confirmThen(`Supprimer définitivement ${kind} ${entry.name} ?`, () => deleteSaveEntry(entry.path, entry.name));
     });
@@ -1001,20 +1016,33 @@ async function loadSaveEntries() {
   });
 }
 
-async function deleteSaveEntry(path, name) {
+async function deleteSaveEntry(path, name, opts = {}) {
   closeModal();
   const r = await fetch(`${PREFIX}/api/saves/delete`, {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({root: saveCurrentRoot, path}),
+    body: JSON.stringify({root: saveCurrentRoot, path, ...opts}),
   }).catch(() => null);
+  const d = await r?.json().catch(() => ({})) || {};
+  if (r?.status === 409 && d.error === 'protected_world_file') {
+    const lines = [
+      `Le fichier ${name} appartient au monde Valheim en cours.`,
+      'Le serveur doit être arrêté avant suppression.',
+      'Une copie de sécurité des fichiers du monde courant sera créée dans les backups avant suppression.',
+      'Confirmer la suppression ?',
+    ];
+    confirmThen(lines.join('\n'), () => deleteSaveEntry(path, name, {confirm_special: true, stop_if_running: true}));
+    return;
+  }
   if (!r?.ok) {
-    const d = await r?.json().catch(() => ({})) || {};
     showToast(formatSaveUploadError(d.error), 'error');
     return;
   }
-  showToast(`Élément supprimé (${name})`, 'success');
+  const stopped = d.server_stopped ? ', serveur arrêté' : '';
+  const backup = d.backup_created?.name ? `, copie ${d.backup_created.name} créée` : '';
+  showToast(`Élément supprimé (${name})${stopped}${backup}`, 'success');
   loadSaveEntries();
+  loadBackups();
 }
 
 function formatBytes(n) {
@@ -1023,6 +1051,18 @@ function formatBytes(n) {
   let i = 0, v = n;
   while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
   return `${v >= 10 || i === 0 ? v.toFixed(0) : v.toFixed(1)} ${units[i]}`;
+}
+
+function formatDateTime(ts) {
+  const d = new Date(ts * 1000);
+  if (Number.isNaN(d.getTime())) return 'Date inconnue';
+  return d.toLocaleString('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 // ── USERS ─────────────────────────────────────────────────────────────────────

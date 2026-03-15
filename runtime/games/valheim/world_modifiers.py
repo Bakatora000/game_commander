@@ -4,6 +4,7 @@ Lecture/écriture des World Modifiers Valheim.
 Stockés dans world_modifiers.json, appliqués dans le script de lancement.
 """
 import json, os, re
+from pathlib import Path
 from flask import current_app
 
 # ── Définition des modificateurs ─────────────────────────────────────────────
@@ -39,8 +40,94 @@ PRESETS = {
 }
 
 def _json_path():
+    world_name = (current_app.config['GAME']['server'].get('world_name') or '').strip()
+    return _named_json_path(world_name)
+
+def _named_json_path(world_name: str):
+    install_dir = current_app.config['GAME']['server']['install_dir']
+    if world_name:
+        safe = re.sub(r'[^A-Za-z0-9._-]+', '-', world_name).strip('-') or 'world'
+        return os.path.join(install_dir, f'world_modifiers.{safe}.json')
+    return os.path.join(install_dir, 'world_modifiers.json')
+
+def _legacy_json_path():
     install_dir = current_app.config['GAME']['server']['install_dir']
     return os.path.join(install_dir, 'world_modifiers.json')
+
+def _world_file_path():
+    data_dir = current_app.config['GAME']['server'].get('data_dir') or current_app.config['GAME']['server']['install_dir']
+    world_name = (current_app.config['GAME']['server'].get('world_name') or '').strip()
+    if not world_name:
+        return None
+    root = Path(data_dir) / 'worlds_local'
+    if not root.exists():
+        root = Path(data_dir) / 'worlds'
+    return root / f'{world_name}.fwl'
+
+def _has_world_specific_files():
+    install_dir = Path(current_app.config['GAME']['server']['install_dir'])
+    return any(install_dir.glob('world_modifiers.*.json'))
+
+def _defaults():
+    defaults = {m['key']: m['default'] for m in MODIFIERS}
+    defaults['setkeys'] = []
+    return defaults
+
+def _modifiers_from_fwl():
+    path = _world_file_path()
+    if not path or not path.exists():
+        return None
+    try:
+        data = path.read_bytes()
+        text = data.decode('utf-8', errors='ignore')
+    except Exception:
+        return None
+
+    result = _defaults()
+
+    preset_match = re.search(r'\bpreset\s+([A-Za-z0-9_-]+)\b', text)
+    if preset_match:
+        preset = preset_match.group(1).strip().lower()
+        if preset in PRESETS:
+            result.update(PRESETS[preset])
+            result['setkeys'] = list(PRESETS[preset].get('setkeys', []))
+
+    toggles = {
+        'nomap': 'nomap',
+        'playerevents': 'playerevents',
+        'nobuildcost': 'nobuildcost',
+        'nofire': 'nofireplacedmg',
+        'passivemobs': 'passivemobs',
+    }
+    for token, setkey in toggles.items():
+        if re.search(rf'\b{re.escape(token)}\b', text) and setkey not in result['setkeys']:
+            result['setkeys'].append(setkey)
+
+    portal_map = [
+        ('nobossportals', 'nobossportals'),
+        ('noportals', 'noportals'),
+    ]
+    for token, value in portal_map:
+        if re.search(rf'\b{re.escape(token)}\b', text):
+            result['portals'] = value
+            break
+
+    # Numeric fallbacks useful for uploaded worlds with embedded settings.
+    if re.search(r'\benemydamage\s+200\b', text):
+        result['combat'] = 'veryhard'
+    elif re.search(r'\benemydamage\s+150\b', text):
+        result['combat'] = 'hard'
+    elif re.search(r'\benemydamage\s+50\b', text):
+        result['combat'] = 'easy'
+    elif re.search(r'\benemydamage\s+25\b', text):
+        result['combat'] = 'veryeasy'
+
+    if re.search(r'\bdeathdeleteitems\b', text) and re.search(r'\bdeathskillsreset\b', text):
+        result['deathpenalty'] = 'hardcore'
+    elif re.search(r'\bdeathskillsreset\b', text):
+        result['deathpenalty'] = 'hard'
+
+    return result
 
 def _start_script():
     install_dir = current_app.config['GAME']['server']['install_dir']
@@ -52,8 +139,14 @@ def _start_script():
 
 def read_modifiers():
     path = _json_path()
-    defaults = {m['key']: m['default'] for m in MODIFIERS}
-    defaults['setkeys'] = []
+    defaults = _defaults()
+    if not os.path.exists(path):
+        legacy = _legacy_json_path()
+        if path != legacy and os.path.exists(legacy) and not _has_world_specific_files():
+            path = legacy
+        else:
+            from_fwl = _modifiers_from_fwl()
+            return (from_fwl or defaults), None
     if not os.path.exists(path):
         return defaults, None
     try:

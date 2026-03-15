@@ -44,6 +44,46 @@ def _safe_extract(zf, dest):
             raise ValueError(f'Zip Slip bloqué : {member}')
         zf.extract(member, dest)
 
+def _normalize_mod_token(value):
+    return re.sub(r'[^a-z0-9]+', '', value.lower())
+
+def _selected_bepinex_members(names, namespace, name):
+    """Sélectionne uniquement les fichiers du mod ciblé dans une archive BepInEx."""
+    normalized_targets = {
+        _normalize_mod_token(namespace),
+        _normalize_mod_token(name),
+        _normalize_mod_token(f'{namespace}-{name}'),
+        _normalize_mod_token(f'{namespace}_{name}'),
+        _normalize_mod_token(f'{namespace}.{name}'),
+    }
+    normalized_targets.discard('')
+
+    def rel_under(prefix, member):
+        return member[len(prefix):] if member.startswith(prefix) else None
+
+    exact_prefixes = [
+        f'BepInEx/plugins/{namespace}-{name}/',
+        f'BepInEx/plugins/{namespace}_{name}/',
+        f'BepInEx/plugins/{namespace}.{name}/',
+    ]
+    selected = []
+    for prefix in exact_prefixes:
+        matches = [n for n in names if n.startswith(prefix)]
+        if matches:
+            return matches
+
+    for member in names:
+        rel_plugin = rel_under('BepInEx/plugins/', member)
+        rel_config = rel_under('BepInEx/config/', member)
+        rel = rel_plugin or rel_config
+        if rel is None or not rel or rel.endswith('/'):
+            continue
+        token = _normalize_mod_token(os.path.basename(rel))
+        parent = _normalize_mod_token(rel.split('/', 1)[0])
+        if any(target and (target in token or target in parent) for target in normalized_targets):
+            selected.append(member)
+    return selected
+
 # ── Recherche ──────────────────────────────────────────────────────────────────
 def _get_all_packages():
     now = datetime.now(timezone.utc)
@@ -93,6 +133,9 @@ def get_installed_mods():
     for entry in os.scandir(plugins):
         if entry.is_dir():
             mods.append({'name': entry.name, 'folder': entry.path})
+            continue
+        if entry.is_file() and entry.name.lower().endswith('.dll'):
+            mods.append({'name': entry.name[:-4], 'file': entry.path})
     return sorted(mods, key=lambda x: x['name'].lower())
 
 # ── Installation ───────────────────────────────────────────────────────────────
@@ -131,34 +174,18 @@ def install_mod(namespace, name, version):
             with zipfile.ZipFile(zip_path) as zf:
                 names = zf.namelist()
                 if any(n.startswith('BepInEx/') for n in names):
-                    # Structure BepInEx — extraire UNIQUEMENT le dossier du mod demandé
-                    # (ignorer les dépendances bundlées dans le zip)
-                    mod_prefix = f'BepInEx/plugins/{namespace}-{name}/'
-                    mod_files  = [n for n in names if n.startswith(mod_prefix)]
-
-                    if mod_files:
-                        # Extraire uniquement ce dossier vers plugins/
-                        dest_base = os.path.dirname(plugins)
-                        for member in mod_files:
-                            target = os.path.realpath(os.path.join(dest_base, member))
-                            if not target.startswith(os.path.realpath(dest_base)):
-                                raise ValueError(f'Zip Slip bloqué : {member}')
-                            os.makedirs(os.path.dirname(target), exist_ok=True)
-                            if not member.endswith('/'):
-                                with zf.open(member) as src, open(target, 'wb') as dst:
-                                    dst.write(src.read())
-                    else:
-                        # Fallback : extraire tout BepInEx/plugins/ si pas de dossier exact
-                        plugin_files = [n for n in names if n.startswith('BepInEx/plugins/')]
-                        dest_base = os.path.dirname(plugins)
-                        for member in plugin_files:
-                            target = os.path.realpath(os.path.join(dest_base, member))
-                            if not target.startswith(os.path.realpath(dest_base)):
-                                raise ValueError(f'Zip Slip bloqué : {member}')
-                            os.makedirs(os.path.dirname(target), exist_ok=True)
-                            if not member.endswith('/'):
-                                with zf.open(member) as src, open(target, 'wb') as dst:
-                                    dst.write(src.read())
+                    selected_members = _selected_bepinex_members(names, namespace, name)
+                    if not selected_members:
+                        return False, 'Archive mod BepInEx invalide : fichiers du mod introuvables'
+                    dest_base = os.path.dirname(plugins)
+                    dest_root = os.path.realpath(dest_base)
+                    for member in selected_members:
+                        target = os.path.realpath(os.path.join(dest_base, member))
+                        if not target.startswith(dest_root + os.sep) and target != dest_root:
+                            raise ValueError(f'Zip Slip bloqué : {member}')
+                        os.makedirs(os.path.dirname(target), exist_ok=True)
+                        with zf.open(member) as src, open(target, 'wb') as dst:
+                            dst.write(src.read())
                 else:
                     # Flat structure → dossier plugins/{Namespace}-{Name}
                     mod_folder = _safe_path(plugins, f'{namespace}-{name}')
@@ -179,10 +206,15 @@ def remove_mod(mod_name):
     except ValueError as e:
         return False, str(e)
 
-    if not os.path.isdir(target):
-        return False, 'Mod introuvable'
     try:
-        shutil.rmtree(target)
+        if os.path.isdir(target):
+            shutil.rmtree(target)
+        elif os.path.isfile(target):
+            os.remove(target)
+        elif os.path.isfile(f'{target}.dll'):
+            os.remove(f'{target}.dll')
+        else:
+            return False, 'Mod introuvable'
         return True, f'{mod_name} supprimé'
     except Exception as e:
         return False, str(e)

@@ -45,6 +45,8 @@
 </div>
 {% endblock %}
 
+{% block saves_backups_panel %}{% endblock %}
+
 {# ── SCRIPTS VALHEIM ─────────────────────────────────────────────────────── #}
 {% block game_scripts %}
 <script>
@@ -53,20 +55,29 @@
 let _configNavChecked = false;
 async function checkConfigNav() {
   if (_configNavChecked) return;
-  const r = await fetch(`${PREFIX}/api/mods/installed`).catch(() => null);
-  if (!r?.ok) return;                    // réessaiera au prochain poll
+  const [modsResp, configResp] = await Promise.all([
+    fetch(`${PREFIX}/api/mods/installed`).catch(() => null),
+    fetch(`${PREFIX}/api/config`).catch(() => null),
+  ]);
+  if (!modsResp?.ok && !configResp?.ok) return;   // réessaiera au prochain poll
   _configNavChecked = true;
-  const {mods} = await r.json();
-  const hasBN = (mods || []).some(m => m.name.toLowerCase().includes('betternetworking'));
-  if (!hasBN) document.getElementById('navBtnConfig')?.remove();
+  const modsData = modsResp?.ok ? await modsResp.json() : {mods: []};
+  const hasBN = (modsData.mods || []).some(m => m.name.toLowerCase().includes('betternetworking'));
+  const hasBNConfig = !!configResp?.ok;
+  if (!hasBN && !hasBNConfig) document.getElementById('navBtnConfig')?.remove();
 }
 
 // ── JOUEURS ───────────────────────────────────────────────────────────────────
 async function loadPlayers() {
   checkConfigNav();   // check une fois auth confirmée
-  const r = await fetch(`${PREFIX}/api/players`).catch(() => null);
-  if (!r?.ok) return;
-  const {players} = await r.json();
+  const [playersResp, adminsResp] = await Promise.all([
+    fetch(`${PREFIX}/api/players`).catch(() => null),
+    fetch(`${PREFIX}/api/admins`).catch(() => null),
+  ]);
+  if (!playersResp?.ok) return;
+  const {players} = await playersResp.json();
+  const adminsData = adminsResp?.ok ? await adminsResp.json() : {entries: []};
+  const adminIds = new Set((adminsData.entries || []).map(entry => entry.steamid));
   const panel = document.getElementById('playersPanel');
   const list  = document.getElementById('playersList');
   const count = document.getElementById('playersCount');
@@ -74,8 +85,22 @@ async function loadPlayers() {
   panel.style.display = players.length > 0 ? '' : 'none';
   count.textContent = `${players.length} en ligne`;
   list.innerHTML = players.length
-    ? players.map(p => `<div class="player-row"><span class="player-dot"></span><span class="player-name">${p.name}</span></div>`).join('')
+    ? players.map(p => `
+      <div class="player-row">
+        <span class="player-dot"></span>
+        <span class="player-name">${p.name}</span>
+        ${p.steamid ? `<button class="btn-ghost btn-sm player-admin-btn" data-steamid="${p.steamid}" data-admin="${adminIds.has(p.steamid) ? 'true' : 'false'}">${adminIds.has(p.steamid) ? 'Enlever admin' : 'Ajouter admin'}</button>` : ''}
+      </div>`).join('')
     : '';
+  list.querySelectorAll('.player-admin-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.admin === 'true') {
+        removeValheimAdmin(btn.dataset.steamid, true);
+      } else {
+        addValheimAdmin(btn.dataset.steamid, true);
+      }
+    });
+  });
 }
 
 // Rafraîchir la liste joueurs toutes les 15s si serveur en ligne
@@ -247,6 +272,7 @@ document.getElementById('btnSaveConfig')?.addEventListener('click', async () => 
 
 // ── MISE À JOUR SERVEUR ───────────────────────────────────────────────────────
 let _updatePolling = null;
+let _valheimWorldsLoaded = false;
 
 async function startUpdate() {
   if (!confirm('Mettre à jour le serveur Valheim ?\nLe serveur sera arrêté le temps de la mise à jour.')) return;
@@ -255,6 +281,120 @@ async function startUpdate() {
   showToast('Mise à jour démarrée...', 'info');
   document.getElementById('updateLog').style.display = 'block';
   _updatePolling = setInterval(pollUpdate, 2000);
+}
+
+async function loadValheimWorlds() {
+  const r = await fetch(`${PREFIX}/api/worlds`).catch(() => null);
+  if (!r?.ok) return;
+  const d = await r.json();
+  const select = document.getElementById('worldSelect');
+  const note = document.getElementById('worldSelectNote');
+  if (!select) return;
+  const current = d.current_world || '';
+  select.innerHTML = (d.worlds || []).map(w =>
+    `<option value="${w.name}" ${w.selected ? 'selected' : ''}>${w.label || w.name}</option>`
+  ).join('');
+  select.value = current;
+  if (note) {
+    note.textContent = d.server_running
+      ? 'Le changement sera effectif au prochain redémarrage du serveur.'
+      : 'Le prochain démarrage utilisera ce monde.';
+  }
+  _valheimWorldsLoaded = true;
+}
+
+async function saveWorldSelection() {
+  const select = document.getElementById('worldSelect');
+  if (!select?.value) return;
+  const r = await fetch(`${PREFIX}/api/worlds/select`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({world_name: select.value}),
+  }).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur sélection monde', 'error');
+    return;
+  }
+  showToast(
+    d.server_running
+      ? `Monde actif défini sur ${d.world_name}. Redémarre le serveur pour l’appliquer.`
+      : `Monde actif défini sur ${d.world_name}.`,
+    'success'
+  );
+  loadValheimWorlds();
+  loadSaveRoots();
+  loadWorldModifiers();
+}
+
+async function loadValheimAdmins() {
+  const r = await fetch(`${PREFIX}/api/admins`).catch(() => null);
+  const list = document.getElementById('valheimAdminsList');
+  if (!list) return;
+  if (!r?.ok) {
+    list.innerHTML = '<p class="empty-msg">Impossible de charger adminlist.txt</p>';
+    return;
+  }
+  const d = await r.json();
+  const entries = d.entries || [];
+  if (!entries.length) {
+    list.innerHTML = '<p class="empty-msg">Aucun admin Valheim configuré</p>';
+    return;
+  }
+  list.innerHTML = '';
+  entries.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'save-row';
+    row.innerHTML = `
+      <div class="save-main">
+        <span class="save-icon">🛡</span>
+        <span class="save-link static">${entry.steamid}</span>
+      </div>
+      <div class="save-actions">
+        <button class="btn-ghost btn-sm admin-delete">Supprimer</button>
+      </div>`;
+    row.querySelector('.admin-delete').addEventListener('click', () => {
+      confirmThen(`Retirer ${entry.steamid} de adminlist.txt ?`, () => removeValheimAdmin(entry.steamid));
+    });
+    list.appendChild(row);
+  });
+}
+
+async function addValheimAdmin(steamid, fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/admins`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({steamid}),
+  }).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur ajout admin Valheim', 'error');
+    return;
+  }
+  showToast(
+    d.already_present
+      ? `${steamid} est déjà dans adminlist.txt`
+      : `${steamid} ajouté à adminlist.txt`,
+    'success'
+  );
+  loadValheimAdmins();
+  if (fromPlayer) loadPlayers();
+}
+
+async function removeValheimAdmin(steamid, fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/admins/${encodeURIComponent(steamid)}`, {
+    method: 'DELETE',
+  }).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur suppression admin Valheim', 'error');
+    return;
+  }
+  showToast(`${steamid} retiré de adminlist.txt`, 'success');
+  loadValheimAdmins();
+  if (fromPlayer) loadPlayers();
 }
 
 async function pollUpdate() {
@@ -380,9 +520,24 @@ async function saveWorldModifiers() {
 // Init
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btnUpdate')?.addEventListener('click', startUpdate);
+  document.getElementById('btnAddValheimAdmin')?.addEventListener('click', () => {
+    const input = document.getElementById('valheimAdminSteamId');
+    const steamid = input?.value?.trim();
+    if (!steamid) return;
+    addValheimAdmin(steamid, false);
+    input.value = '';
+  });
+  document.getElementById('btnSaveWorldSelect')?.addEventListener('click', saveWorldSelection);
   document.getElementById('btnSaveWM')?.addEventListener('click', saveWorldModifiers);
   document.querySelectorAll('.nav-btn[data-tab="worldmod"]').forEach(b => {
-    b.addEventListener('click', loadWorldModifiers);
+    b.addEventListener('click', () => {
+      if (!_valheimWorldsLoaded) loadValheimWorlds();
+      else loadValheimWorlds();
+      loadWorldModifiers();
+    });
+  });
+  document.querySelectorAll('.nav-btn[data-tab="users"]').forEach(b => {
+    b.addEventListener('click', loadValheimAdmins);
   });
   // Config mods nav check — déclenché après auth (voir checkConfigNav ci-dessous)
 });
@@ -392,6 +547,21 @@ document.addEventListener('DOMContentLoaded', () => {
 {# ── NAV SUPPLÉMENTAIRE ──────────────────────────────────────────────────── #}
 {% block extra_nav %}
 <button class="nav-btn" data-tab="worldmod"><span class="nav-icon">🌍</span><span>Monde</span></button>
+{% endblock %}
+
+{% block users_tab_extra %}
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Admins Valheim</span>
+  </div>
+  <div style="padding:.75rem 1rem">
+    <div class="search-row">
+      <input type="text" class="search-input" id="valheimAdminSteamId" placeholder="SteamID64">
+      <button class="btn-primary btn-sm" id="btnAddValheimAdmin" data-requires-perm="manage_users">Ajouter</button>
+    </div>
+  </div>
+  <div id="valheimAdminsList"></div>
+</div>
 {% endblock %}
 
 {# ── PANEL SUPPLÉMENTAIRE ────────────────────────────────────────────────── #}
@@ -411,6 +581,32 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <pre class="update-log-text" id="updateLogText"></pre>
       </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">Monde actif</span>
+        <button class="btn-primary btn-sm" id="btnSaveWorldSelect" data-requires-perm="manage_config">Sélectionner</button>
+      </div>
+      <div style="padding:.75rem 1rem">
+        <div class="search-row">
+          <select class="search-input" id="worldSelect"></select>
+        </div>
+        <div class="backups-meta" id="worldSelectNote" style="margin-top:.6rem"></div>
+      </div>
+    </div>
+
+    <div class="panel backups-panel">
+      <div class="panel-header">
+        <span class="panel-title">Sauvegardes</span>
+        <div class="panel-actions">
+          <button class="btn-ghost btn-sm" id="btnBackupUpload">Uploader un backup</button>
+          <button class="btn-primary btn-sm" id="btnRunBackup">Sauvegarder maintenant</button>
+        </div>
+      </div>
+      <input type="file" id="backupUploadInput" accept=".zip" multiple hidden>
+      <div class="backups-meta" id="backupsMeta"></div>
+      <div id="backupEntries" class="saves-list"></div>
     </div>
 
     <!-- World Modifiers -->

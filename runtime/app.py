@@ -212,6 +212,61 @@ def api_saves_delete():
     data = request.get_json() or {}
     root_id = (data.get('root') or '').strip()
     rel_path = data.get('path') or ''
+    confirm_special = bool(data.get('confirm_special'))
+    stop_if_running = bool(data.get('stop_if_running'))
+    try:
+        requirements, err = saves.get_delete_requirements(root_id, rel_path)
+    except ValueError:
+        return jsonify({'error': 'invalid_path'}), 400
+    if err:
+        return jsonify({'error': err}), 404
+
+    server_running = server.get_status().get('state') == 20
+    if requirements.get('protected'):
+        if server_running and not auth.has_perm('stop_server'):
+            return jsonify({
+                'error': 'stop_permission_required',
+                'server_running': True,
+                **requirements,
+            }), 403
+        if not confirm_special:
+            return jsonify({
+                'error': 'protected_world_file',
+                'server_running': server_running,
+                **requirements,
+            }), 409
+        if server_running and not stop_if_running:
+            return jsonify({
+                'error': 'stop_required',
+                'server_running': True,
+                **requirements,
+            }), 409
+
+        server_stopped = False
+        backup_created = None
+        if server_running:
+            ok, err = server.stop(wait=True, timeout=300)
+            if not ok:
+                return jsonify({'error': 'stop_failed', 'detail': err}), 502
+            server_stopped = True
+
+        backup_created, err = saves.snapshot_valheim_current_world_files()
+        if err:
+            return jsonify({'error': 'predelete_backup_failed', 'detail': err}), 502
+
+        try:
+            payload, err = saves.delete_save_entry(root_id, rel_path)
+        except ValueError:
+            return jsonify({'error': 'invalid_path'}), 400
+        if err:
+            return jsonify({'error': err}), 404
+        return jsonify({
+            'ok': True,
+            'server_stopped': server_stopped,
+            'backup_created': backup_created,
+            **payload,
+        })
+
     try:
         payload, err = saves.delete_save_entry(root_id, rel_path)
     except ValueError:
@@ -305,14 +360,9 @@ def api_backups_restore():
             server_stopped = True
 
         if backup_before_restore:
-            backup_script = os.path.join(_HERE, f'backup_{GAME_ID}.sh')
-            if not os.path.isfile(backup_script):
-                return jsonify({'error': 'backup_script_missing'}), 500
-            result = subprocess.run(['bash', backup_script], capture_output=True, text=True, timeout=300)
-            if result.returncode != 0:
-                return jsonify({'error': 'backup_failed', 'detail': (result.stderr or result.stdout).strip()}), 502
-            out = (result.stdout or '').strip().splitlines()
-            backup_created = out[-1] if out else None
+            backup_created, err = saves.run_safety_backup("before_restore")
+            if err:
+                return jsonify({'error': err}), 502
 
         result, err = saves.restore_backup(filename)
         if err:
@@ -555,7 +605,9 @@ def api_update_status():
 # ─────────────────────────────────────────────────────────────────────────────
 if GAME_ID == 'valheim':
     try:
+        import games.valheim.admins as _va
         import games.valheim.world_modifiers as _wm
+        import games.valheim.worlds as _vw
         @app.route(f'{PREFIX}/api/world_modifiers', methods=['GET'])
         @auth.require_auth
         def api_wm_get():
@@ -570,6 +622,49 @@ if GAME_ID == 'valheim':
             ok, err = _wm.write_modifiers(request.get_json() or {})
             return jsonify({'ok': True, 'warning': err}) if ok \
                 else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/worlds', methods=['GET'])
+        @auth.require_auth
+        def api_valheim_worlds():
+            data, err = _vw.list_worlds()
+            if err:
+                return jsonify({'error': err}), 400
+            data['server_running'] = server.get_status().get('state') == 20
+            return jsonify(data)
+
+        @app.route(f'{PREFIX}/api/worlds/select', methods=['POST'])
+        @auth.require_auth
+        @auth.require_perm('manage_config')
+        def api_valheim_worlds_select():
+            payload = request.get_json() or {}
+            world_name = (payload.get('world_name') or '').strip()
+            data, err = _vw.select_world(world_name)
+            if err:
+                return jsonify({'error': err}), 400
+            data['server_running'] = server.get_status().get('state') == 20
+            return jsonify({'ok': True, **data})
+
+        @app.route(f'{PREFIX}/api/admins', methods=['GET'])
+        @auth.require_auth
+        @auth.require_perm('manage_users')
+        def api_valheim_admins():
+            data, err = _va.list_admins()
+            return jsonify(data) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/admins', methods=['POST'])
+        @auth.require_auth
+        @auth.require_perm('manage_users')
+        def api_valheim_admins_add():
+            payload = request.get_json() or {}
+            data, err = _va.add_admin(payload.get('steamid', ''))
+            return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/admins/<steamid>', methods=['DELETE'])
+        @auth.require_auth
+        @auth.require_perm('manage_users')
+        def api_valheim_admins_delete(steamid):
+            data, err = _va.remove_admin(steamid)
+            return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
     except ImportError as e:
         print(f'[WARN] world_modifiers non chargé: {e}')
 

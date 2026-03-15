@@ -30,10 +30,15 @@ import config_gen
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import players as minecraft_players
 from runtime.games.minecraft_fabric import mods as minecraft_fabric_mods
+from runtime.games.valheim import mods as valheim_mods
 from runtime.core import saves as core_saves
+from runtime.games.valheim import worlds as valheim_worlds
+from runtime.games.valheim import admins as valheim_admins
+from runtime.games.valheim import players as valheim_players
 from runtime.games.soulmask import players as soulmask_players
 from runtime.games.soulmask import config as soulmask_config
 from runtime.games.terraria import config as terraria_config
+from runtime.games.valheim import world_modifiers as valheim_world_modifiers
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -118,6 +123,7 @@ class NginxInjectTests(unittest.TestCase):
             content = Path(conf).read_text()
             self.assertIn("location /valheim8 {", content)
             self.assertIn("proxy_pass         http://127.0.0.1:5002;", content)
+            self.assertIn("client_max_body_size 2G;", content)
             self.assertIn("location /valheim8/static {", content)
             # Doit être dans le bloc SSL, pas dans le bloc HTTP redirect
             ssl_block_end = content.index("return 404")
@@ -651,6 +657,154 @@ class SaveManagerTests(unittest.TestCase):
         self.assertEqual(len(data["entries"]), 1)
         self.assertEqual(data["entries"][0]["label"], "14/03/2026 22:33:46")
 
+    def test_list_backups_hides_safety_backups(self):
+        self._write_deploy_config()
+        backups = self.root / "backups"
+        backups.mkdir()
+        (backups / "minecraft-fabric_save_20260314_223346.zip").write_text("x")
+        (backups / "gc_safety_before_restore_minecraft-fabric_20260314_223500.zip").write_text("y")
+        with self.app.app_context():
+            data, err = core_saves.list_backups()
+        self.assertIsNone(err)
+        self.assertEqual(len(data["entries"]), 1)
+        self.assertEqual(data["entries"][0]["name"], "minecraft-fabric_save_20260314_223346.zip")
+
+    def test_list_backups_valheim_uses_world_name_from_fwl(self):
+        self._write_deploy_config()
+        self.app.config["GAME"] = {
+            "id": "valheim",
+            "server": {
+                "install_dir": str(self.root / "server"),
+                "data_dir": str(self.root / "data"),
+                "world_name": "Monde1",
+            }
+        }
+        backups = self.root / "backups"
+        backups.mkdir()
+        path = backups / "Monde1_20260314_223346.zip"
+        fwl = bytes([0x2B, 0, 0, 0, 0x25, 0, 0, 0, 6]) + b"Monde1" + b"\nGKbnRNIuU7"
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("Monde1.fwl", fwl)
+            zf.writestr("Monde1.db", b"db")
+        with self.app.app_context():
+            data, err = core_saves.list_backups()
+        self.assertIsNone(err)
+        self.assertEqual(len(data["entries"]), 1)
+        self.assertEqual(data["entries"][0]["world_name"], "Monde1")
+        self.assertEqual(data["entries"][0]["label"], "Monde1 — 14/03/2026 22:33:46")
+
+    def test_get_delete_requirements_marks_valheim_world_files_as_protected(self):
+        self.app.config["GAME"] = {
+            "id": "valheim",
+            "server": {
+                "install_dir": str(self.root / "server"),
+                "data_dir": str(self.root / "data"),
+                "world_name": "Monde1",
+            }
+        }
+        worlds = self.root / "data" / "worlds_local"
+        worlds.mkdir(parents=True, exist_ok=True)
+        (worlds / "Monde1.db").write_text("db")
+        with self.app.app_context():
+            data, err = core_saves.get_delete_requirements("worlds", "Monde1.db")
+        self.assertIsNone(err)
+        self.assertTrue(data["protected"])
+        self.assertEqual(data["world_name"], "Monde1")
+
+    def test_snapshot_valheim_current_world_files_creates_targeted_backup(self):
+        self._write_deploy_config()
+        self.app.config["GAME"] = {
+            "id": "valheim",
+            "server": {
+                "install_dir": str(self.root / "server"),
+                "data_dir": str(self.root / "data"),
+                "world_name": "Monde1",
+            }
+        }
+        worlds = self.root / "data" / "worlds_local"
+        worlds.mkdir(parents=True, exist_ok=True)
+        (worlds / "Monde1.db").write_text("db")
+        (worlds / "Monde1.fwl").write_bytes(bytes([0x2B, 0, 0, 0, 0x25, 0, 0, 0, 6]) + b"Monde1" + b"\nseed")
+        (worlds / "Monde1.db.old").write_text("old")
+        with self.app.app_context():
+            data, err = core_saves.snapshot_valheim_current_world_files()
+        self.assertIsNone(err)
+        self.assertTrue(data["name"].startswith("gc_safety_predelete_valheim_Monde1_"))
+        with zipfile.ZipFile(self.root / "backups" / data["name"]) as zf:
+            self.assertIn("Monde1.db", zf.namelist())
+            self.assertIn("Monde1.fwl", zf.namelist())
+            self.assertIn("Monde1.db.old", zf.namelist())
+
+    def test_snapshot_valheim_current_world_files_avoids_same_second_overwrite(self):
+        self._write_deploy_config()
+        self.app.config["GAME"] = {
+            "id": "valheim",
+            "server": {
+                "install_dir": str(self.root / "server"),
+                "data_dir": str(self.root / "data"),
+                "world_name": "Monde1",
+            }
+        }
+        worlds = self.root / "data" / "worlds_local"
+        worlds.mkdir(parents=True, exist_ok=True)
+        (worlds / "Monde1.db").write_text("db")
+        (worlds / "Monde1.fwl").write_bytes(bytes([0x2B, 0, 0, 0, 0x25, 0, 0, 0, 6]) + b"Monde1" + b"\nseed")
+        original_strftime = core_saves.time.strftime
+        core_saves.time.strftime = lambda _fmt: "20260315_112233"
+        try:
+            with self.app.app_context():
+                data1, err1 = core_saves.snapshot_valheim_current_world_files()
+                data2, err2 = core_saves.snapshot_valheim_current_world_files()
+        finally:
+            core_saves.time.strftime = original_strftime
+        self.assertIsNone(err1)
+        self.assertIsNone(err2)
+        self.assertNotEqual(data1["name"], data2["name"])
+        self.assertTrue(data2["name"].endswith("_2.zip"))
+
+    def test_run_safety_backup_renames_latest_backup_out_of_regular_list(self):
+        self._write_deploy_config()
+        original_run = core_saves.subprocess.run
+        app_script = Path(self.app.root_path) / "backup_minecraft-fabric.sh"
+        app_script.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+
+        def fake_run(*args, **kwargs):
+            backups = self.root / "backups"
+            backups.mkdir(exist_ok=True)
+            (backups / "minecraft-fabric_save_20260314_223346.zip").write_text("x")
+            return types.SimpleNamespace(returncode=0, stdout="ok", stderr="")
+
+        core_saves.subprocess.run = fake_run
+        original_strftime = core_saves.time.strftime
+        core_saves.time.strftime = lambda _fmt: "20260314_223500"
+        try:
+            with self.app.app_context():
+                data, err = core_saves.run_safety_backup("before_restore")
+                listed, _ = core_saves.list_backups()
+        finally:
+            core_saves.subprocess.run = original_run
+            core_saves.time.strftime = original_strftime
+        self.assertIsNone(err)
+        self.assertTrue(data["name"].startswith("gc_safety_before_restore_minecraft-fabric_20260314_223500"))
+        self.assertEqual(listed["entries"], [])
+
+    def test_run_safety_backup_skips_valheim_when_world_files_missing(self):
+        self._write_deploy_config()
+        self.app.config["GAME"] = {
+            "id": "valheim",
+            "server": {
+                "install_dir": str(self.root / "server"),
+                "data_dir": str(self.root / "data"),
+                "world_name": "Monde1",
+            }
+        }
+        worlds = self.root / "data" / "worlds_local"
+        worlds.mkdir(parents=True, exist_ok=True)
+        with self.app.app_context():
+            data, err = core_saves.run_safety_backup("before_restore")
+        self.assertIsNone(err)
+        self.assertTrue(data["skipped"])
+
     def test_get_backup_download_target_uses_backup_dir(self):
         self._write_deploy_config()
         backups = self.root / "backups"
@@ -698,6 +852,235 @@ class SaveManagerTests(unittest.TestCase):
         self.assertEqual(data["collision_count"], 1)
         self.assertEqual((self.root / "server" / "world" / "level.dat").read_bytes(), b"restored")
         self.assertEqual((self.root / "server" / "server.properties").read_bytes(), b"motd=test")
+
+    def test_restore_backup_valheim_targets_current_world_and_promotes_old_files(self):
+        self._write_deploy_config()
+        self.app.config["GAME"] = {
+            "id": "valheim",
+            "server": {
+                "install_dir": str(self.root / "server"),
+                "data_dir": str(self.root / "data"),
+                "world_name": "Monde",
+            }
+        }
+        worlds = self.root / "data" / "worlds_local"
+        worlds.mkdir(parents=True, exist_ok=True)
+        (worlds / "Monde.fwl").write_text("current", encoding="utf-8")
+        backups = self.root / "backups"
+        backups.mkdir()
+        path = backups / "Monde1_20260315_113402.zip"
+        with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            zf.writestr("Monde1.db", b"db")
+            zf.writestr("Monde1.fwl.old", b"old-meta")
+        with self.app.app_context():
+            data, err = core_saves.restore_backup(path.name)
+        self.assertIsNone(err)
+        self.assertEqual((worlds / "Monde.db").read_bytes(), b"db")
+        self.assertEqual((worlds / "Monde.fwl.old").read_bytes(), b"old-meta")
+        self.assertEqual((worlds / "Monde.fwl").read_bytes(), b"old-meta")
+        self.assertFalse((worlds / "Monde1.db").exists())
+        self.assertFalse((worlds / "Monde1.fwl.old").exists())
+        self.assertIn("Monde.db", data["written"])
+        self.assertIn("Monde.fwl", data["written"])
+
+
+class ValheimWorldSelectionTests(unittest.TestCase):
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.app = Flask(__name__)
+        self.app.root_path = str(self.root / "app")
+        Path(self.app.root_path).mkdir(parents=True, exist_ok=True)
+        (self.root / "server").mkdir()
+        (self.root / "data" / "worlds_local").mkdir(parents=True)
+        self.app.config["GAME"] = {
+            "id": "valheim",
+            "server": {
+                "install_dir": str(self.root / "server"),
+                "data_dir": str(self.root / "data"),
+                "world_name": "Monde",
+                "max_players": 10,
+            }
+        }
+        (Path(self.app.root_path) / "game.json").write_text(json.dumps({
+            "server": {"world_name": "Monde"}
+        }), encoding="utf-8")
+        (Path(self.app.root_path) / "deploy_config.env").write_text(
+            'WORLD_NAME="Monde"\nBACKUP_DIR="' + str(self.root / "backups") + '"\n',
+            encoding="utf-8",
+        )
+        (Path(self.app.root_path) / "backup_valheim.sh").write_text(
+            '#!/usr/bin/env bash\nWORLD_NAME="Monde"\n',
+            encoding="utf-8",
+        )
+        (self.root / "server" / "start_server.sh").write_text(
+            'exec ./valheim_server.x86_64 -world "Monde" -savedir "/data"\n',
+            encoding="utf-8",
+        )
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_list_worlds_returns_detected_worlds(self):
+        worlds = self.root / "data" / "worlds_local"
+        (worlds / "Monde.db").write_text("db")
+        (worlds / "Monde2.fwl").write_text("fwl")
+        with self.app.app_context():
+            data, err = valheim_worlds.list_worlds()
+        self.assertIsNone(err)
+        self.assertEqual([w["name"] for w in data["worlds"]], ["Monde", "Monde2"])
+        self.assertEqual(data["current_world"], "Monde")
+        self.assertEqual(data["worlds"][0]["label"], "Monde")
+
+    def test_select_world_updates_runtime_and_scripts(self):
+        worlds = self.root / "data" / "worlds_local"
+        (worlds / "Monde.db").write_text("db")
+        (worlds / "Monde2.fwl").write_text("fwl")
+        with self.app.app_context():
+            data, err = valheim_worlds.select_world("Monde2")
+        self.assertIsNone(err)
+        self.assertEqual(data["world_name"], "Monde2")
+        self.assertEqual(self.app.config["GAME"]["server"]["world_name"], "Monde2")
+        self.assertIn('"world_name": "Monde2"', (Path(self.app.root_path) / "game.json").read_text())
+        self.assertIn('WORLD_NAME="Monde2"', (Path(self.app.root_path) / "deploy_config.env").read_text())
+        self.assertIn('WORLD_NAME="Monde2"', (Path(self.app.root_path) / "backup_valheim.sh").read_text())
+        self.assertIn('-world "Monde2"', (self.root / "server" / "start_server.sh").read_text())
+
+    def test_list_worlds_keeps_missing_current_world_marked_absent(self):
+        worlds = self.root / "data" / "worlds_local"
+        (worlds / "Cauchemar2.fwl").write_text("fwl")
+        with self.app.app_context():
+            data, err = valheim_worlds.list_worlds()
+        self.assertIsNone(err)
+        self.assertEqual([w["name"] for w in data["worlds"]], ["Cauchemar2", "Monde"])
+        missing = next(w for w in data["worlds"] if w["name"] == "Monde")
+        self.assertFalse(missing["exists"])
+        self.assertEqual(missing["label"], "Monde (absent)")
+
+    def test_select_world_migrates_legacy_world_modifiers_to_previous_world(self):
+        worlds = self.root / "data" / "worlds_local"
+        (worlds / "Monde.db").write_text("db")
+        (worlds / "Cauchemar2.fwl").write_text("fwl")
+        legacy = self.root / "server" / "world_modifiers.json"
+        legacy.write_text(json.dumps({"combat": "hardcore", "setkeys": ["nomap"]}), encoding="utf-8")
+        with self.app.app_context():
+            data, err = valheim_worlds.select_world("Cauchemar2")
+        self.assertIsNone(err)
+        migrated = self.root / "server" / "world_modifiers.Monde.json"
+        self.assertTrue(migrated.exists())
+        self.assertEqual(json.loads(migrated.read_text(encoding="utf-8"))["combat"], "hardcore")
+
+
+class ValheimWorldModifiersTests(unittest.TestCase):
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.app = Flask(__name__)
+        self.app.config["GAME"] = {
+            "id": "valheim",
+            "server": {
+                "install_dir": str(self.root / "server"),
+                "data_dir": str(self.root / "data"),
+                "world_name": "Cauchemar2",
+            }
+        }
+        (self.root / "server").mkdir(parents=True, exist_ok=True)
+        (self.root / "data" / "worlds_local").mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_read_modifiers_from_fwl_when_no_json_exists(self):
+        fwl = (
+            bytes([0x2B, 0, 0, 0, 0x25, 0, 0, 0, 10]) + b"Cauchemar2" +
+            b"\npreset hardcore\nnobossportals\nnomap\nenemydamage 200\n"
+        )
+        (self.root / "data" / "worlds_local" / "Cauchemar2.fwl").write_bytes(fwl)
+        with self.app.app_context():
+            data, err = valheim_world_modifiers.read_modifiers()
+        self.assertIsNone(err)
+        self.assertEqual(data["combat"], "veryhard")
+        self.assertEqual(data["deathpenalty"], "hardcore")
+        self.assertEqual(data["portals"], "nobossportals")
+        self.assertIn("nomap", data["setkeys"])
+
+
+class ValheimAdminsTests(unittest.TestCase):
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self.tmp.name)
+        self.app = Flask(__name__)
+        self.app.config["GAME"] = {
+            "id": "valheim",
+            "server": {
+                "install_dir": str(self.root / "server"),
+                "data_dir": str(self.root / "data"),
+                "world_name": "Monde1",
+            }
+        }
+        (self.root / "data").mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def test_add_and_remove_admin(self):
+        with self.app.app_context():
+            data, err = valheim_admins.add_admin("76561198298757896")
+            listed, err2 = valheim_admins.list_admins()
+            removed, err3 = valheim_admins.remove_admin("76561198298757896")
+        self.assertIsNone(err)
+        self.assertIsNone(err2)
+        self.assertIsNone(err3)
+        self.assertFalse(data["already_present"])
+        self.assertEqual(listed["entries"][0]["steamid"], "76561198298757896")
+        self.assertTrue(removed["removed"])
+
+
+class ValheimPlayersTests(unittest.TestCase):
+
+    def test_tracks_connected_players_with_steamid(self):
+        original_run = valheim_players.subprocess.run
+
+        def fake_run(*args, **kwargs):
+            lines = "\n".join([
+                "03/15/2026 12:36:51: Got connection SteamID 76561198298757896",
+                "03/15/2026 12:36:52: Got character ZDOID from toto : 123:456",
+            ])
+            return types.SimpleNamespace(stdout=lines)
+
+        valheim_players.subprocess.run = fake_run
+        app = Flask(__name__)
+        app.config["GAME"] = {"server": {"service": "valheim-server-test"}}
+        try:
+            with app.app_context():
+                players = valheim_players.get_players()
+        finally:
+            valheim_players.subprocess.run = original_run
+        self.assertEqual(players, [{"name": "toto", "steamid": "76561198298757896"}])
+
+    def test_disconnect_by_steamid_removes_player(self):
+        original_run = valheim_players.subprocess.run
+
+        def fake_run(*args, **kwargs):
+            lines = "\n".join([
+                "03/15/2026 12:36:51: Got connection SteamID 76561198298757896",
+                "03/15/2026 12:36:52: Got character ZDOID from toto : 123:456",
+                "[Message:Better Networking] Compression: [76561198298757896] disconnected",
+            ])
+            return types.SimpleNamespace(stdout=lines)
+
+        valheim_players.subprocess.run = fake_run
+        app = Flask(__name__)
+        app.config["GAME"] = {"server": {"service": "valheim-server-test"}}
+        try:
+            with app.app_context():
+                players = valheim_players.get_players()
+        finally:
+            valheim_players.subprocess.run = original_run
+        self.assertEqual(players, [])
 
 
 class ConfigGenEnshroudedCfgTests(unittest.TestCase):
@@ -1280,6 +1663,75 @@ class MinecraftFabricModsTests(unittest.TestCase):
                 self.assertTrue(Path(tmpdir, "mods", "fabric-api.jar").is_file())
             finally:
                 minecraft_fabric_mods.http.get = original_get
+
+
+class ValheimModsTests(unittest.TestCase):
+
+    def _app(self, bepinex_path):
+        app = Flask(__name__)
+        app.config["GAME"] = {
+            "mods": {
+                "bepinex_path": bepinex_path,
+            }
+        }
+        return app
+
+    def test_get_installed_mods_includes_plugin_directories_and_dlls(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plugins = Path(tmpdir, "plugins")
+            plugins.mkdir(parents=True)
+            Path(plugins, "BetterNetworking").mkdir()
+            Path(plugins, "CW_Jesse.BetterNetworking.dll").write_bytes(b"dll")
+            Path(plugins, "README.txt").write_text("ignore")
+
+            app = self._app(tmpdir)
+            with app.app_context():
+                mods = valheim_mods.get_installed_mods()
+
+            self.assertEqual(
+                [m["name"] for m in mods],
+                ["BetterNetworking", "CW_Jesse.BetterNetworking"],
+            )
+
+    def test_install_mod_ignores_unrelated_bepinex_plugin_files(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir)
+            original_get = valheim_mods.http.get
+
+            class FakeResp:
+                def raise_for_status(self):
+                    return None
+                def iter_content(self, _size):
+                    buf = io.BytesIO()
+                    with zipfile.ZipFile(buf, "w") as zf:
+                        zf.writestr("BepInEx/plugins/CW_Jesse-BetterNetworking_Valheim/CW_Jesse.BetterNetworking.dll", b"bn")
+                        zf.writestr("BepInEx/plugins/Valheim.DisplayBepInExInfo.dll", b"bad")
+                    yield buf.getvalue()
+
+            valheim_mods.http.get = lambda *args, **kwargs: FakeResp()
+            try:
+                with app.app_context():
+                    ok, msg = valheim_mods.install_mod("CW_Jesse", "BetterNetworking_Valheim", "1.0.0")
+                self.assertTrue(ok, msg)
+            finally:
+                valheim_mods.http.get = original_get
+
+            self.assertTrue(Path(tmpdir, "plugins", "CW_Jesse-BetterNetworking_Valheim", "CW_Jesse.BetterNetworking.dll").is_file())
+            self.assertFalse(Path(tmpdir, "plugins", "Valheim.DisplayBepInExInfo.dll").exists())
+
+    def test_remove_mod_accepts_single_dll_install(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plugins = Path(tmpdir, "plugins")
+            plugins.mkdir(parents=True)
+            target = plugins / "Valheim.DisplayBepInExInfo.dll"
+            target.write_bytes(b"dll")
+
+            app = self._app(tmpdir)
+            with app.app_context():
+                ok, msg = valheim_mods.remove_mod("Valheim.DisplayBepInExInfo")
+
+            self.assertTrue(ok, msg)
+            self.assertFalse(target.exists())
 
 
 # ══════════════════════════════════════════════════════════════════════════════

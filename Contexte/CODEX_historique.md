@@ -528,12 +528,17 @@ Contraintes retenues pour `attach` :
 - ne pas auto-décaler les ports du serveur de jeu existant
 - seul le port Flask de la nouvelle UI peut être ajusté
 
-### Save manager — sujet à reprendre
+### Save manager — état actuel
 
-Besoin produit noté pour plus tard :
-- ajouter un menu `save manager` dans l'UI
-- exposer les dossiers de sauvegarde réels par jeu
-- permettre le téléchargement via interface graphique
+Le `save manager` est maintenant implémenté dans l'UI :
+- navigation dans les dossiers de sauvegarde réels par jeu
+- téléchargement de fichiers et de dossiers
+- upload simple de fichiers dans les dossiers de save autorisés
+- suppression de fichiers/sous-dossiers
+- vue séparée `Backups`
+- création manuelle d'un backup
+- upload/download/suppression/restauration d'archives de backup
+- restauration protégée par confirmation, backup préalable et restart du service si nécessaire
 
 Séparation conceptuelle retenue :
 - `backup manager`
@@ -554,6 +559,15 @@ Politique de sauvegarde actuelle à prendre en compte :
   - pas les personnages client
 - Soulmask
   - `WS/Saved`
+
+### Soulmask — points encore à reprendre
+
+- valider le cas multi-joueurs réel de façon plus complète
+  - plusieurs connexions simultanées
+  - départ d'un seul joueur
+  - cohérence durable de la liste joueurs
+- mieux documenter le profil CPU/RAM en charge réelle
+- homogénéiser à terme la structure relative des nouveaux zips de backup
 
 ### Refresh rates frontend
 - Statut + compteurs : `setInterval(fetchStatus, 5000)` — 5 secondes

@@ -84,6 +84,7 @@ def build_location_block(instance_id: str, prefix: str, port: int, game: str) ->
         f"        proxy_set_header   X-Real-IP         $remote_addr;\n"
         f"        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;\n"
         f"        proxy_set_header   X-Forwarded-Proto $scheme;\n"
+        f"        client_max_body_size 2G;\n"
         f"        proxy_read_timeout 120s;\n"
         f"        proxy_send_timeout 120s;\n"
         f"    }}\n"

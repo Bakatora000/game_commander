@@ -73,9 +73,13 @@ def _backup_script_path() -> Path:
 def _backup_pattern() -> str:
     game_id = _game()["id"]
     if game_id == "valheim":
-        world_name = _world_name()
-        return f"{world_name}_*.zip" if world_name else "*.zip"
+        return "*.zip"
     return f"{game_id}_save_*.zip"
+
+
+def _is_safety_backup(path: Path) -> bool:
+    name = path.name.lower()
+    return name.startswith("gc_safety_") or name.startswith("valheim_worldfiles_")
 
 
 def _backup_label(path: Path) -> str:
@@ -84,6 +88,70 @@ def _backup_label(path: Path) -> str:
         return path.name
     d, t = m.groups()
     return f"{d[6:8]}/{d[4:6]}/{d[0:4]} {t[0:2]}:{t[2:4]}:{t[4:6]}"
+
+
+def _valheim_world_name_from_fwl_bytes(data: bytes) -> str:
+    if len(data) < 9:
+        return ""
+    name_len = data[8]
+    if name_len <= 0 or len(data) < 9 + name_len:
+        return ""
+    try:
+        return data[9:9 + name_len].decode("utf-8", errors="ignore").strip()
+    except Exception:
+        return ""
+
+
+def _valheim_world_name_from_backup(path: Path) -> str:
+    if path.suffix.lower() != ".zip":
+        return ""
+    try:
+        with zipfile.ZipFile(path) as zf:
+            for name in zf.namelist():
+                base = Path(name).name
+                lower = base.lower()
+                if not lower.endswith(".fwl"):
+                    continue
+                if lower.endswith(".fwl.old"):
+                    continue
+                if re.search(r"\.fwl\.[^.]+$", lower):
+                    continue
+                with zf.open(name) as handle:
+                    return _valheim_world_name_from_fwl_bytes(handle.read(256))
+    except Exception:
+        return ""
+    return ""
+
+
+def _valheim_current_world_paths():
+    world_name = _world_name()
+    if _game()["id"] != "valheim" or not world_name:
+        return []
+    root = Path(_find_root("worlds")["path"])
+    names = [
+        f"{world_name}.db",
+        f"{world_name}.fwl",
+        f"{world_name}.db.old",
+        f"{world_name}.fwl.old",
+    ]
+    return [root / name for name in names]
+
+
+def _valheim_member_suffix(name: str) -> str:
+    lower = name.lower()
+    for suffix in (".db.old", ".fwl.old", ".db", ".fwl"):
+        if lower.endswith(suffix):
+            return suffix
+    return ""
+
+
+def _is_valheim_protected_world_file(target: Path) -> bool:
+    if _game()["id"] != "valheim":
+        return False
+    world_name = _world_name()
+    if not world_name:
+        return False
+    return target.name in {f"{world_name}.db", f"{world_name}.fwl"}
 
 
 def _strip_named_root(members, names):
@@ -110,8 +178,6 @@ def get_save_roots():
         worlds = data_dir / "worlds"
         root_path = worlds_local if worlds_local.exists() else worlds
         roots.append({"id": "worlds", "label": "Mondes", "path": root_path})
-        if world_name:
-            roots.append({"id": "current_world", "label": f"Monde courant ({world_name})", "path": root_path})
     elif game_id == "enshrouded":
         roots.append({"id": "savegame", "label": "Savegame", "path": server_dir / "savegame"})
     elif game_id == "minecraft":
@@ -259,6 +325,111 @@ def delete_save_entry(root_id: str, rel_path: str):
     }, None
 
 
+def get_delete_requirements(root_id: str, rel_path: str):
+    root = _find_root(root_id)
+    if not root:
+        return None, "unknown_root"
+
+    root_path = Path(root["path"])
+    if not root_path.exists():
+        return None, "missing_root"
+    if not rel_path:
+        return None, "cannot_delete_root"
+
+    target = _safe_target(root_path, rel_path)
+    if not target.exists():
+        return None, "missing_path"
+
+    protected = _is_valheim_protected_world_file(target)
+    return {
+        "protected": protected,
+        "game_id": _game()["id"],
+        "root_id": root_id,
+        "path": str(Path(rel_path)).replace(os.sep, "/"),
+        "name": target.name,
+        "type": "dir" if target.is_dir() else "file",
+        "world_name": _world_name() if protected else "",
+        "requires_stop": protected,
+    }, None
+
+
+def snapshot_valheim_current_world_files():
+    if _game()["id"] != "valheim":
+        return None, "unsupported_game"
+    files = [p for p in _valheim_current_world_paths() if p.exists() and p.is_file()]
+    if not files:
+        return None, "missing_world_files"
+
+    backup_dir = _backup_dir()
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    world_name = re.sub(r'[^A-Za-z0-9._-]+', '-', _world_name()).strip('-') or "world"
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    backup_name = f"gc_safety_predelete_valheim_{world_name}_{stamp}.zip"
+    backup_path = backup_dir / backup_name
+    suffix = 2
+    while backup_path.exists():
+        backup_name = f"gc_safety_predelete_valheim_{world_name}_{stamp}_{suffix}.zip"
+        backup_path = backup_dir / backup_name
+        suffix += 1
+
+    with zipfile.ZipFile(backup_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for path in files:
+            zf.write(path, arcname=path.name)
+
+    return {
+        "name": backup_name,
+        "path": str(backup_path),
+        "world_name": _world_name(),
+    }, None
+
+
+def run_safety_backup(reason: str):
+    if _game()["id"] == "valheim":
+        files = [p for p in _valheim_current_world_paths() if p.exists() and p.is_file()]
+        if not files:
+            return {
+                "name": "",
+                "path": "",
+                "reason": reason,
+                "skipped": True,
+            }, None
+
+    script = _backup_script_path()
+    if not script.is_file():
+        return None, "backup_script_missing"
+
+    backup_dir = _backup_dir()
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    before = {p.name for p in backup_dir.glob(_backup_pattern()) if p.is_file()}
+    result = subprocess.run(["bash", str(script)], capture_output=True, text=True, timeout=300)
+    if result.returncode != 0:
+        return None, (result.stderr or result.stdout).strip() or "backup_failed"
+
+    candidates = [
+        p for p in backup_dir.glob(_backup_pattern())
+        if p.is_file() and p.name not in before and not _is_safety_backup(p)
+    ]
+    if not candidates:
+        candidates = [p for p in backup_dir.glob(_backup_pattern()) if p.is_file() and not _is_safety_backup(p)]
+    if not candidates:
+        return None, "backup_failed"
+
+    source = sorted(candidates, key=lambda p: p.stat().st_mtime, reverse=True)[0]
+    stamp = time.strftime("%Y%m%d_%H%M%S")
+    safe_reason = re.sub(r'[^A-Za-z0-9._-]+', '-', reason).strip('-') or "safety"
+    target = backup_dir / f"gc_safety_{safe_reason}_{_game()['id']}_{stamp}.zip"
+    suffix = 2
+    while target.exists():
+        target = backup_dir / f"gc_safety_{safe_reason}_{_game()['id']}_{stamp}_{suffix}.zip"
+        suffix += 1
+    source.rename(target)
+    return {
+        "name": target.name,
+        "path": str(target),
+        "reason": reason,
+    }, None
+
+
 def list_backups():
     backup_dir = _backup_dir()
     if not backup_dir.exists():
@@ -269,12 +440,21 @@ def list_backups():
 
     entries = []
     for path in sorted(backup_dir.glob(_backup_pattern()), key=lambda p: p.stat().st_mtime, reverse=True):
+        if _is_safety_backup(path):
+            continue
         stat = path.stat()
+        label = _backup_label(path)
+        world_name = ""
+        if _game()["id"] == "valheim":
+            world_name = _valheim_world_name_from_backup(path)
+            if world_name:
+                label = f"{world_name} — {label}"
         entries.append({
             "name": path.name,
-            "label": _backup_label(path),
+            "label": label,
             "size": stat.st_size,
             "mtime": int(stat.st_mtime),
+            "world_name": world_name,
         })
     return {
         "backup_dir": str(backup_dir),
@@ -431,13 +611,48 @@ def _backup_restore_operations(backup_path: Path):
     }
 
     if game_id == "valheim":
-        valid_suffixes = (".db", ".fwl", ".db.old", ".fwl.old")
-        if not any(str(rel).lower().endswith(valid_suffixes) for _member, rel in members):
-            raise ValueError("invalid_backup_layout")
         root = Path(_find_root("worlds")["path"])
+        target_world = _world_name().strip()
+        valid_members = []
         for member, rel in members:
-            dest = (root / rel.name).resolve()
-            operations.append((member.filename, dest, rel.name))
+            suffix = _valheim_member_suffix(rel.name)
+            if suffix:
+                valid_members.append((member, rel, suffix))
+        if not valid_members:
+            raise ValueError("invalid_backup_layout")
+
+        if not target_world:
+            for member, rel, _suffix in valid_members:
+                dest = (root / rel.name).resolve()
+                operations.append((member.filename, dest, rel.name))
+            return operations
+
+        present_suffixes = {suffix for _member, _rel, suffix in valid_members}
+        seen_targets = set()
+
+        def add_operation(member_name: str, suffix: str):
+            dest_name = f"{target_world}{suffix}"
+            if dest_name in seen_targets:
+                return
+            dest = (root / dest_name).resolve()
+            operations.append((member_name, dest, dest_name))
+            seen_targets.add(dest_name)
+
+        for member, _rel, suffix in valid_members:
+            add_operation(member.filename, suffix)
+
+        fallback_pairs = {
+            ".db.old": ".db",
+            ".fwl.old": ".fwl",
+        }
+        for suffix, primary in fallback_pairs.items():
+            if suffix in present_suffixes and primary not in present_suffixes:
+                source_member = next(
+                    member.filename
+                    for member, _rel, member_suffix in valid_members
+                    if member_suffix == suffix
+                )
+                add_operation(source_member, primary)
         return operations
 
     if game_id == "enshrouded":
@@ -569,7 +784,7 @@ def _validate_archive_layout(root_id: str, rel_path: str, members):
     top_levels = {rel.parts[0] for rel in rel_paths if rel.parts}
 
     if game_id == "valheim":
-        if root_id not in {"worlds", "current_world"} or not ({".db", ".fwl"} & suffixes):
+        if root_id != "worlds" or not ({".db", ".fwl"} & suffixes):
             raise ValueError("invalid_archive_layout")
         return
 

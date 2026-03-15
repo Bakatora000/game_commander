@@ -257,7 +257,16 @@
 
 ## Bugs connus / non résolus
 
-_(aucun pour l'instant)_
+### [16] Soulmask — suivi multi-joueurs à revalider en conditions réelles
+- **Statut :** Ouvert
+- **Composant :** `runtime/games/soulmask/players.py`
+- **Symptôme :**
+  - le cas simple 1 joueur est validé
+  - la remontée des noms dépend encore de logs parfois tardifs ou irréguliers
+  - le cas de plusieurs joueurs simultanés reste à revalider en réel
+- **État actuel :**
+  - la liste joueurs est exploitable pour un usage simple
+  - le vrai test restant est la cohérence sur connexions/déconnexions partielles en multi
 
 ---
 
