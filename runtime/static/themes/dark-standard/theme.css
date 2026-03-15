@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  color-scheme: dark;
+  --color-bg:        #171a1f;
+  --color-surface:   #20242b;
+  --color-surface2:  #2a3038;
+  --color-border:    #3b4450;
+  --color-text:      #eef2f7;
+  --color-muted:     #aab4c0;
+  --color-primary:   #69b3ff;
+  --color-secondary: #4f95dd;
+  --color-success:   #56c288;
+  --color-danger:    #e06b75;
+  --color-warning:   #e0ad5f;
+  --color-accent:    #9e8cff;
+  --font-main: 'Inter', 'Segoe UI', sans-serif;
+  --font-ui:   'Inter', 'Segoe UI', sans-serif;
+  --glow-primary:   rgba(105, 179, 255, 0.16);
+  --glow-secondary: rgba(79, 149, 221, 0.12);
+  --color-chart-cpu: #69b3ff;
+  --color-chart-ram: #9e8cff;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 120% 55% at 50% 100%, rgba(105,179,255,0.07) 0%, transparent 60%),
+    linear-gradient(180deg, #171a1f 0%, #14171c 100%);
+}
+
+.sidebar { background: #1d2127; border-right-color: #36404c; }
+.topbar { background: #1d2127; border-bottom-color: #36404c; }
+.panel, .gauge-card, .graph-wrap { box-shadow: 0 10px 24px rgba(0,0,0,0.18); }
+.nav-btn.active { background: rgba(105,179,255,0.10); border-left: 2px solid var(--color-primary); }
+.nav-btn:hover { background: rgba(255,255,255,0.05); }
+.btn-primary { background: rgba(105,179,255,0.08); }
+.btn-ghost { background: rgba(255,255,255,0.03); }
+.btn-success { background: rgba(86,194,136,0.08); }
+.btn-danger { background: rgba(224,107,117,0.08); }

@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap');
+
+:root {
+  color-scheme: dark;
+  --color-bg:        #101214;
+  --color-surface:   #171a1d;
+  --color-surface2:  #1f2428;
+  --color-border:    #7f8b99;
+  --color-text:      #ffffff;
+  --color-muted:     #d3dbe3;
+  --color-primary:   #6fc2ff;
+  --color-secondary: #4aa7eb;
+  --color-success:   #78dba2;
+  --color-danger:    #ff8a96;
+  --color-warning:   #ffd166;
+  --color-accent:    #c7a6ff;
+  --font-main: 'Atkinson Hyperlegible', 'Segoe UI', sans-serif;
+  --font-ui:   'Atkinson Hyperlegible', 'Segoe UI', sans-serif;
+  --glow-primary:   rgba(111, 194, 255, 0.2);
+  --glow-secondary: rgba(74, 167, 235, 0.14);
+  --color-chart-cpu: #6fc2ff;
+  --color-chart-ram: #c7a6ff;
+}
+
+body { background: #101214; }
+.sidebar, .topbar, .panel, .gauge-card, .graph-wrap { box-shadow: none; }
+.nav-btn.active { background: rgba(111,194,255,0.14); border-left: 3px solid var(--color-primary); }
+.btn-primary, .btn-danger, .btn-ghost, .btn-success, .btn-warn { font-weight: 700; }
+.btn-primary { background: rgba(111,194,255,0.12); }
+.btn-ghost { background: rgba(255,255,255,0.04); color: var(--color-text); }
+.btn-success { background: rgba(120,219,162,0.12); }
+.btn-danger { background: rgba(255,138,150,0.12); }

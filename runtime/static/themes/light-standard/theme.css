@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  color-scheme: light;
+  --color-bg:        #f4f6f8;
+  --color-surface:   #ffffff;
+  --color-surface2:  #eef2f6;
+  --color-border:    #cfd8e3;
+  --color-text:      #18212b;
+  --color-muted:     #5a6775;
+  --color-primary:   #256fdb;
+  --color-secondary: #3d88f0;
+  --color-success:   #258d5a;
+  --color-danger:    #c44756;
+  --color-warning:   #b67b1f;
+  --color-accent:    #6a58d6;
+  --font-main: 'Inter', 'Segoe UI', sans-serif;
+  --font-ui:   'Inter', 'Segoe UI', sans-serif;
+  --glow-primary:   rgba(37, 111, 219, 0.14);
+  --glow-secondary: rgba(61, 136, 240, 0.10);
+  --color-chart-cpu: #256fdb;
+  --color-chart-ram: #6a58d6;
+}
+
+body {
+  background:
+    radial-gradient(ellipse 100% 45% at 50% 100%, rgba(37,111,219,0.06) 0%, transparent 60%),
+    linear-gradient(180deg, #f6f8fb 0%, #eff3f7 100%);
+}
+
+.sidebar { background: #f8fafc; border-right-color: #d7e0ea; }
+.topbar { background: #f8fafc; border-bottom-color: #d7e0ea; }
+.nav-btn:hover { background: rgba(37,111,219,0.05); }
+.nav-btn.active { background: rgba(37,111,219,0.08); border-left: 2px solid var(--color-primary); }
+.panel, .gauge-card, .graph-wrap { box-shadow: 0 8px 20px rgba(23,31,38,0.06); }
+.btn-primary { background: rgba(37,111,219,0.05); }
+.btn-ghost { background: rgba(24,33,43,0.02); }
+.btn-success { background: rgba(37,141,90,0.06); }
+.btn-danger { background: rgba(196,71,86,0.06); }

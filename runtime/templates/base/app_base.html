@@ -52,10 +52,10 @@
     <div class="sidebar-footer">
       <span class="sidebar-user" id="sidebarUser"></span>
       <div class="theme-switcher" id="themeSwitcher">
-        <button class="theme-btn active" data-theme="{{ theme_name }}" title="Thème principal">🔥</button>
-        <button class="theme-btn" data-theme="{{ game_id }}-ice" title="Valheim Ice">❄</button>
-        <button class="theme-btn" data-theme="dark-steel" title="Dark Steel">⚙</button>
-        <button class="theme-btn" data-theme="parchment" title="Parchemin">📜</button>
+        <button class="theme-btn active" data-theme="{{ theme_name }}" title="Thème du jeu">🎮</button>
+        <button class="theme-btn" data-theme="dark-standard" title="Dark Standard">◐</button>
+        <button class="theme-btn" data-theme="light-standard" title="Light Standard">◑</button>
+        <button class="theme-btn" data-theme="high-contrast" title="High Contrast">◉</button>
       </div>
       <a href="{{ prefix }}/logout" class="btn-logout">Déconnexion</a>
     </div>
@@ -1186,7 +1186,7 @@ function showToast(msg, type='info') {
   const gameId   = '{{ game_id }}';
   const prefix   = '{{ prefix }}';
   const storageKey = `gc_theme_${gameId}`;
-  const saved    = localStorage.getItem(storageKey) || gameId;
+  const saved    = localStorage.getItem(storageKey) || '{{ theme_name }}';
 
   function applyTheme(name) {
     document.getElementById('themeLink').href = `${prefix}/static/themes/${name}/theme.css`;
