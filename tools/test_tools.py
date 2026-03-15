@@ -1534,6 +1534,23 @@ class MinecraftPlayersTests(unittest.TestCase):
 
         self.assertEqual(players, [{'name': 'alex'}])
 
+    def test_removes_player_on_lost_connection_without_left_line(self):
+        original_run = minecraft_players.subprocess.run
+
+        def fake_run(*args, **kwargs):
+            return types.SimpleNamespace(stdout="\n".join([
+                "[15:13:54] [Server thread/INFO]: xuanphu joined the game",
+                "[15:17:12] [Server thread/INFO]: xuanphu lost connection: Timed out",
+            ]))
+
+        minecraft_players.subprocess.run = fake_run
+        try:
+            players = minecraft_players.get_players()
+        finally:
+            minecraft_players.subprocess.run = original_run
+
+        self.assertEqual(players, [])
+
 
 class MinecraftAdminsTests(unittest.TestCase):
 

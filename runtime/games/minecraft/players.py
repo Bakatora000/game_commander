@@ -3,7 +3,7 @@ games/minecraft/players.py — Joueurs connectés via parsing journalctl.
 
 Patterns suivis :
   Connexion  : "<name> joined the game"
-  Déconnexion: "<name> left the game"
+  Déconnexion: "<name> left the game" ou "<name> lost connection: ..."
 
 On reconstruit l'état courant depuis les logs récents du service.
 """
@@ -11,8 +11,9 @@ import re
 import subprocess
 
 
-_RE_JOIN = re.compile(r'] \[Server thread/INFO\]: ([^[]+?) joined the game$')
-_RE_LEFT = re.compile(r'] \[Server thread/INFO\]: ([^[]+?) left the game$')
+_RE_JOIN = re.compile(r': ([^:[]+?) joined the game$')
+_RE_LOST = re.compile(r': ([^:[]+?) lost connection: .+$')
+_RE_LEFT = re.compile(r': ([^:[]+?) left the game$')
 
 
 def get_players():
@@ -34,6 +35,13 @@ def get_players():
             name = joined.group(1).strip()
             if name and name not in connected:
                 connected.append(name)
+            continue
+
+        lost = _RE_LOST.search(line)
+        if lost:
+            name = lost.group(1).strip()
+            if name in connected:
+                connected.remove(name)
             continue
 
         left = _RE_LEFT.search(line)
