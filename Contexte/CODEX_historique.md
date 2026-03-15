@@ -548,6 +548,14 @@ Conséquence doc/produit :
 - la doc publique doit refléter ce point d'entrée unique plutôt que l'ancien angle
   “copier des JSON runtime à la main”
 
+### TODO Valheim UI
+
+Point UX laissé volontairement pour plus tard :
+- dans `Fichiers > Gestionnaire de fichiers`, le sélecteur de racine affiche encore
+  seulement `Mondes` quand une seule racine existe
+- objectif visé : supprimer ce menu déroulant dans ce cas et afficher à la place le chemin
+  relatif utile du dossier de sauvegarde, par exemple `.../worlds_local`
+
 ### Save manager — état actuel
 
 Le `save manager` est maintenant implémenté dans l'UI :

@@ -36,6 +36,66 @@
 
 {# ── CONFIG TAB ──────────────────────────────────────────────────────────── #}
 {% block config_tab %}
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Mise à jour serveur</span>
+    <button class="btn-primary btn-sm" id="btnUpdate" data-requires-perm="restart_server">⬆ Mettre à jour via Steam</button>
+  </div>
+  <div id="updateLog" style="display:none; padding:.75rem 1rem;">
+    <div class="update-status-line">
+      Statut : <strong id="updateStatus">—</strong>
+    </div>
+    <pre class="update-log-text" id="updateLogText"></pre>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Monde actif</span>
+  </div>
+  <div style="padding:.75rem 1rem">
+    <div class="search-row">
+      <select class="search-input" id="worldSelect" data-requires-perm="manage_config"></select>
+    </div>
+    <div class="backups-meta" id="worldSelectNote" style="margin-top:.6rem"></div>
+  </div>
+</div>
+
+<div class="panel backups-panel">
+  <div class="panel-header">
+    <span class="panel-title">Sauvegardes</span>
+    <div class="panel-actions">
+      <button class="btn-ghost btn-sm" id="btnBackupUpload">Uploader un backup</button>
+      <button class="btn-primary btn-sm" id="btnRunBackup">Sauvegarder maintenant</button>
+    </div>
+  </div>
+  <input type="file" id="backupUploadInput" accept=".zip" multiple hidden>
+  <div class="backups-meta" id="backupsMeta"></div>
+  <div id="backupEntries" class="saves-list"></div>
+</div>
+
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">World Modifiers</span>
+    <button class="btn-primary btn-sm" id="btnSaveWM" data-requires-perm="manage_config">Sauvegarder</button>
+  </div>
+
+  <div style="padding:.5rem 1rem .25rem">
+    <div class="config-section-header" style="margin-top:0">Presets</div>
+    <div id="wmPresets" class="wm-presets-row"></div>
+  </div>
+
+  <div style="padding:.25rem 1rem">
+    <div class="config-section-header">Modificateurs</div>
+    <div id="wmModifiers"></div>
+  </div>
+
+  <div style="padding:.25rem 1rem .75rem">
+    <div class="config-section-header">Options</div>
+    <div id="wmSetkeys" class="wm-setkeys-row"></div>
+  </div>
+</div>
+
 <div class="panel config-panel" id="configPanel">
   <div class="panel-header">
     <span class="panel-title">BetterNetworking</span>
@@ -50,26 +110,9 @@
 {# ── SCRIPTS VALHEIM ─────────────────────────────────────────────────────── #}
 {% block game_scripts %}
 <script>
-// ── CONFIG MODS NAV ──────────────────────────────────────────────────────────
-// Appelé une fois après auth confirmée (via renderStatus → loadPlayers)
-let _configNavChecked = false;
-async function checkConfigNav() {
-  if (_configNavChecked) return;
-  const [modsResp, configResp] = await Promise.all([
-    fetch(`${PREFIX}/api/mods/installed`).catch(() => null),
-    fetch(`${PREFIX}/api/config`).catch(() => null),
-  ]);
-  if (!modsResp?.ok && !configResp?.ok) return;   // réessaiera au prochain poll
-  _configNavChecked = true;
-  const modsData = modsResp?.ok ? await modsResp.json() : {mods: []};
-  const hasBN = (modsData.mods || []).some(m => m.name.toLowerCase().includes('betternetworking'));
-  const hasBNConfig = !!configResp?.ok;
-  if (!hasBN && !hasBNConfig) document.getElementById('navBtnConfig')?.remove();
-}
 
 // ── JOUEURS ───────────────────────────────────────────────────────────────────
 async function loadPlayers() {
-  checkConfigNav();   // check une fois auth confirmée
   const [playersResp, adminsResp] = await Promise.all([
     fetch(`${PREFIX}/api/players`).catch(() => null),
     fetch(`${PREFIX}/api/admins`).catch(() => null),
@@ -217,10 +260,10 @@ async function loadConfig() {
   const d = r ? await r.json() : {};
   configData = r?.ok ? d : {};
   const el = document.getElementById('configFields');
+  const panel = document.getElementById('configPanel');
+  if (panel) panel.style.display = r?.ok ? '' : 'none';
   if (!r?.ok) {
-    const msg = d?.error || 'Fichier de configuration introuvable';
-    el.innerHTML = `<p class="config-notice">⚠ ${msg}<br>
-      <small>Le fichier est généré automatiquement au premier lancement du serveur avec BepInEx.</small></p>`;
+    el.innerHTML = '';
     return;
   }
   renderConfigFields();
@@ -529,25 +572,23 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('worldSelect')?.addEventListener('change', saveWorldSelection);
   document.getElementById('btnSaveWM')?.addEventListener('click', saveWorldModifiers);
-  document.querySelectorAll('.nav-btn[data-tab="worldmod"]').forEach(b => {
+  document.querySelectorAll('.nav-btn[data-tab="config"]').forEach(b => {
     b.addEventListener('click', () => {
       if (!_valheimWorldsLoaded) loadValheimWorlds();
       else loadValheimWorlds();
       loadWorldModifiers();
+      loadConfig();
     });
   });
   document.querySelectorAll('.nav-btn[data-tab="users"]').forEach(b => {
     b.addEventListener('click', loadValheimAdmins);
   });
-  // Config mods nav check — déclenché après auth (voir checkConfigNav ci-dessous)
 });
 </script>
 {% endblock %}
 
 {# ── NAV SUPPLÉMENTAIRE ──────────────────────────────────────────────────── #}
-{% block extra_nav %}
-<button class="nav-btn" data-tab="worldmod"><span class="nav-icon">🌍</span><span>Monde</span></button>
-{% endblock %}
+{% block extra_nav %}{% endblock %}
 
 {% block users_tab_extra %}
 <div class="panel">
@@ -565,72 +606,4 @@ document.addEventListener('DOMContentLoaded', () => {
 {% endblock %}
 
 {# ── PANEL SUPPLÉMENTAIRE ────────────────────────────────────────────────── #}
-{% block extra_panels %}
-<section class="tab-panel" id="tab-worldmod">
-  <div class="content-wrap">
-
-    <!-- Mise à jour Steam -->
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">Mise à jour serveur</span>
-        <button class="btn-primary btn-sm" id="btnUpdate" data-requires-perm="restart_server">⬆ Mettre à jour via Steam</button>
-      </div>
-      <div id="updateLog" style="display:none; padding:.75rem 1rem;">
-        <div class="update-status-line">
-          Statut : <strong id="updateStatus">—</strong>
-        </div>
-        <pre class="update-log-text" id="updateLogText"></pre>
-      </div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">Monde actif</span>
-      </div>
-      <div style="padding:.75rem 1rem">
-        <div class="search-row">
-          <select class="search-input" id="worldSelect" data-requires-perm="manage_config"></select>
-        </div>
-        <div class="backups-meta" id="worldSelectNote" style="margin-top:.6rem"></div>
-      </div>
-    </div>
-
-    <div class="panel backups-panel">
-      <div class="panel-header">
-        <span class="panel-title">Sauvegardes</span>
-        <div class="panel-actions">
-          <button class="btn-ghost btn-sm" id="btnBackupUpload">Uploader un backup</button>
-          <button class="btn-primary btn-sm" id="btnRunBackup">Sauvegarder maintenant</button>
-        </div>
-      </div>
-      <input type="file" id="backupUploadInput" accept=".zip" multiple hidden>
-      <div class="backups-meta" id="backupsMeta"></div>
-      <div id="backupEntries" class="saves-list"></div>
-    </div>
-
-    <!-- World Modifiers -->
-    <div class="panel">
-      <div class="panel-header">
-        <span class="panel-title">World Modifiers</span>
-        <button class="btn-primary btn-sm" id="btnSaveWM" data-requires-perm="manage_config">Sauvegarder</button>
-      </div>
-
-      <div style="padding:.5rem 1rem .25rem">
-        <div class="config-section-header" style="margin-top:0">Presets</div>
-        <div id="wmPresets" class="wm-presets-row"></div>
-      </div>
-
-      <div style="padding:.25rem 1rem">
-        <div class="config-section-header">Modificateurs</div>
-        <div id="wmModifiers"></div>
-      </div>
-
-      <div style="padding:.25rem 1rem .75rem">
-        <div class="config-section-header">Options</div>
-        <div id="wmSetkeys" class="wm-setkeys-row"></div>
-      </div>
-    </div>
-
-  </div>
-</section>
-{% endblock %}
+{% block extra_panels %}{% endblock %}
