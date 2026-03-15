@@ -2,6 +2,32 @@
 
 {% block fonts %}family=Inter:wght@400;500;600{% endblock %}
 {% block sidebar_logo %}⛏{% endblock %}
+{% block extra_head %}
+<style>
+  .player-admin-btn.is-off,
+  .player-whitelist-btn.is-off {
+    background: rgba(122, 191, 142, 0.22);
+    border-color: rgba(122, 191, 142, 0.65);
+    color: #d8f3df;
+  }
+  .player-admin-btn.is-on,
+  .player-whitelist-btn.is-on {
+    background: rgba(224, 167, 94, 0.22);
+    border-color: rgba(224, 167, 94, 0.65);
+    color: #ffe4bd;
+  }
+  .player-ban-btn.is-off {
+    background: rgba(206, 82, 82, 0.18);
+    border-color: rgba(206, 82, 82, 0.65);
+    color: #ffc6c6;
+  }
+  .player-ban-btn.is-on {
+    background: rgba(122, 191, 142, 0.22);
+    border-color: rgba(122, 191, 142, 0.65);
+    color: #d8f3df;
+  }
+</style>
+{% endblock %}
 
 {# ── DASHBOARD EXTRA — Joueurs connectés ────────────────────────────────── #}
 {% block dashboard_extra %}
@@ -44,9 +70,20 @@ const CONFIG_SCHEMA = [
 let configData = {};
 
 async function loadPlayers() {
-  const r = await fetch(`${PREFIX}/api/players`).catch(() => null);
-  if (!r?.ok) return;
-  const {players} = await r.json();
+  const [playersResp, adminsResp, bansResp, whitelistResp] = await Promise.all([
+    fetch(`${PREFIX}/api/players`).catch(() => null),
+    fetch(`${PREFIX}/api/admins`).catch(() => null),
+    fetch(`${PREFIX}/api/bans`).catch(() => null),
+    fetch(`${PREFIX}/api/whitelist`).catch(() => null),
+  ]);
+  if (!playersResp?.ok) return;
+  const {players} = await playersResp.json();
+  const adminsData = adminsResp?.ok ? await adminsResp.json() : {entries: []};
+  const bansData = bansResp?.ok ? await bansResp.json() : {entries: []};
+  const whitelistData = whitelistResp?.ok ? await whitelistResp.json() : {entries: []};
+  const adminNames = new Set((adminsData.entries || []).map(entry => (entry.name || '').toLowerCase()));
+  const bannedNames = new Set((bansData.entries || []).map(entry => (entry.name || '').toLowerCase()));
+  const whitelistNames = new Set((whitelistData.entries || []).map(entry => (entry.name || '').toLowerCase()));
   const panel = document.getElementById('playersPanel');
   const list  = document.getElementById('playersList');
   const count = document.getElementById('playersCount');
@@ -54,10 +91,230 @@ async function loadPlayers() {
   panel.style.display = players.length > 0 ? '' : 'none';
   count.textContent = `${players.length} en ligne`;
   list.innerHTML = players.length
-    ? players.map(p => `<div class="player-row"><span class="player-dot">●</span><span class="player-name">${p.name}</span></div>`).join('')
+    ? players.map(p => {
+      const lowered = (p.name || '').toLowerCase();
+      const isAdmin = adminNames.has(lowered);
+      const isWhitelisted = whitelistNames.has(lowered);
+      const isBanned = bannedNames.has(lowered);
+      return `
+        <div class="player-row">
+          <span class="player-dot">●</span>
+          <span class="player-name">${p.name}</span>
+          <button class="btn-ghost btn-sm player-admin-btn ${isAdmin ? 'is-on' : 'is-off'}" data-name="${p.name}" data-admin="${isAdmin ? 'true' : 'false'}">${isAdmin ? 'Enlever admin' : 'Ajouter admin'}</button>
+          <button class="btn-ghost btn-sm player-whitelist-btn ${isWhitelisted ? 'is-on' : 'is-off'}" data-name="${p.name}" data-whitelisted="${isWhitelisted ? 'true' : 'false'}">${isWhitelisted ? 'Enlever whitelist' : 'Whitelister'}</button>
+          <button class="btn-ghost btn-sm player-ban-btn ${isBanned ? 'is-on' : 'is-off'}" data-name="${p.name}" data-banned="${isBanned ? 'true' : 'false'}">${isBanned ? 'Unban' : 'Bannir'}</button>
+        </div>`;
+    }).join('')
     : '';
+  list.querySelectorAll('.player-admin-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.admin === 'true') removeMinecraftAdmin(btn.dataset.name, true);
+      else addMinecraftAdmin(btn.dataset.name, true);
+    });
+  });
+  list.querySelectorAll('.player-whitelist-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.whitelisted === 'true') removeMinecraftWhitelist(btn.dataset.name, true);
+      else addMinecraftWhitelist(btn.dataset.name, true);
+    });
+  });
+  list.querySelectorAll('.player-ban-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.banned === 'true') removeMinecraftBan(btn.dataset.name, true);
+      else addMinecraftBan(btn.dataset.name, true);
+    });
+  });
 }
 setInterval(() => { if (typeof currentState !== 'undefined' && currentState === 20) loadPlayers(); }, 15000);
+
+async function loadMinecraftAdmins() {
+  const r = await fetch(`${PREFIX}/api/admins`).catch(() => null);
+  const list = document.getElementById('minecraftAdminsList');
+  if (!list) return;
+  if (!r?.ok) {
+    list.innerHTML = '<p class="empty-msg">Impossible de charger ops.json</p>';
+    return;
+  }
+  const d = await r.json();
+  const entries = d.entries || [];
+  if (!entries.length) {
+    list.innerHTML = '<p class="empty-msg">Aucun opérateur configuré</p>';
+    return;
+  }
+  list.innerHTML = '';
+  entries.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'save-row';
+    row.innerHTML = `
+      <div class="save-main">
+        <span class="save-icon">🛡</span>
+        <span class="save-link static">${entry.name}</span>
+      </div>
+      <div class="save-actions">
+        <button class="btn-ghost btn-sm admin-delete">Supprimer</button>
+      </div>`;
+    row.querySelector('.admin-delete').addEventListener('click', () => {
+      confirmThen(`Retirer ${entry.name} de ops.json ?`, () => removeMinecraftAdmin(entry.name));
+    });
+    list.appendChild(row);
+  });
+}
+
+async function loadMinecraftBans() {
+  const r = await fetch(`${PREFIX}/api/bans`).catch(() => null);
+  const list = document.getElementById('minecraftBansList');
+  if (!list) return;
+  if (!r?.ok) {
+    list.innerHTML = '<p class="empty-msg">Impossible de charger banned-players.json</p>';
+    return;
+  }
+  const d = await r.json();
+  const entries = d.entries || [];
+  if (!entries.length) {
+    list.innerHTML = '<p class="empty-msg">Aucun joueur banni</p>';
+    return;
+  }
+  list.innerHTML = '';
+  entries.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'save-row';
+    row.innerHTML = `
+      <div class="save-main">
+        <span class="save-icon">⛔</span>
+        <span class="save-link static">${entry.name}</span>
+      </div>
+      <div class="save-actions">
+        <button class="btn-ghost btn-sm ban-delete">Supprimer</button>
+      </div>`;
+    row.querySelector('.ban-delete').addEventListener('click', () => {
+      confirmThen(`Retirer ${entry.name} de banned-players.json ?`, () => removeMinecraftBan(entry.name));
+    });
+    list.appendChild(row);
+  });
+}
+
+async function loadMinecraftWhitelist() {
+  const r = await fetch(`${PREFIX}/api/whitelist`).catch(() => null);
+  const list = document.getElementById('minecraftWhitelistList');
+  if (!list) return;
+  if (!r?.ok) {
+    list.innerHTML = '<p class="empty-msg">Impossible de charger whitelist.json</p>';
+    return;
+  }
+  const d = await r.json();
+  const entries = d.entries || [];
+  if (!entries.length) {
+    list.innerHTML = '<p class="empty-msg">Aucun joueur whitelisté</p>';
+    return;
+  }
+  list.innerHTML = '';
+  entries.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'save-row';
+    row.innerHTML = `
+      <div class="save-main">
+        <span class="save-icon">✅</span>
+        <span class="save-link static">${entry.name}</span>
+      </div>
+      <div class="save-actions">
+        <button class="btn-ghost btn-sm whitelist-delete">Supprimer</button>
+      </div>`;
+    row.querySelector('.whitelist-delete').addEventListener('click', () => {
+      confirmThen(`Retirer ${entry.name} de whitelist.json ?`, () => removeMinecraftWhitelist(entry.name));
+    });
+    list.appendChild(row);
+  });
+}
+
+async function addMinecraftAdmin(name, fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/admins`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name}),
+  }).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur ajout admin Minecraft', 'error');
+    return;
+  }
+  showToast(d.already_present ? `${name} est déjà dans ops.json` : `${name} ajouté à ops.json`, 'success');
+  loadMinecraftAdmins();
+  if (fromPlayer) loadPlayers();
+}
+
+async function removeMinecraftAdmin(name, fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/admins/${encodeURIComponent(name)}`, {method: 'DELETE'}).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur suppression admin Minecraft', 'error');
+    return;
+  }
+  showToast(`${name} retiré de ops.json`, 'success');
+  loadMinecraftAdmins();
+  if (fromPlayer) loadPlayers();
+}
+
+async function addMinecraftBan(name, fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/bans`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name}),
+  }).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur ajout ban Minecraft', 'error');
+    return;
+  }
+  showToast(d.already_present ? `${name} est déjà dans banned-players.json` : `${name} ajouté à banned-players.json`, 'success');
+  loadMinecraftBans();
+  if (fromPlayer) loadPlayers();
+}
+
+async function removeMinecraftBan(name, fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/bans/${encodeURIComponent(name)}`, {method: 'DELETE'}).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur suppression ban Minecraft', 'error');
+    return;
+  }
+  showToast(`${name} retiré de banned-players.json`, 'success');
+  loadMinecraftBans();
+  if (fromPlayer) loadPlayers();
+}
+
+async function addMinecraftWhitelist(name, fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/whitelist`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name}),
+  }).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur ajout whitelist Minecraft', 'error');
+    return;
+  }
+  showToast(d.already_present ? `${name} est déjà dans whitelist.json` : `${name} ajouté à whitelist.json`, 'success');
+  loadMinecraftWhitelist();
+  if (fromPlayer) loadPlayers();
+}
+
+async function removeMinecraftWhitelist(name, fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/whitelist/${encodeURIComponent(name)}`, {method: 'DELETE'}).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur suppression whitelist Minecraft', 'error');
+    return;
+  }
+  showToast(`${name} retiré de whitelist.json`, 'success');
+  loadMinecraftWhitelist();
+  if (fromPlayer) loadPlayers();
+}
 
 async function loadConfig() {
   const el = document.getElementById('configPanel');
@@ -108,5 +365,77 @@ document.getElementById('btnSaveConfig')?.addEventListener('click', async () => 
   }).catch(()=>null);
   await handleConfigSaveResponse(r);
 });
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('btnAddMinecraftAdmin')?.addEventListener('click', () => {
+    const input = document.getElementById('minecraftAdminName');
+    const name = input?.value?.trim();
+    if (!name) return;
+    addMinecraftAdmin(name, false);
+    input.value = '';
+  });
+  document.getElementById('btnAddMinecraftBan')?.addEventListener('click', () => {
+    const input = document.getElementById('minecraftBanName');
+    const name = input?.value?.trim();
+    if (!name) return;
+    addMinecraftBan(name, false);
+    input.value = '';
+  });
+  document.getElementById('btnAddMinecraftWhitelist')?.addEventListener('click', () => {
+    const input = document.getElementById('minecraftWhitelistName');
+    const name = input?.value?.trim();
+    if (!name) return;
+    addMinecraftWhitelist(name, false);
+    input.value = '';
+  });
+  document.querySelectorAll('.nav-btn[data-tab="users"]').forEach(b => {
+    b.addEventListener('click', () => {
+      loadMinecraftAdmins();
+      loadMinecraftBans();
+      loadMinecraftWhitelist();
+    });
+  });
+});
 </script>
+{% endblock %}
+
+{% block users_tab_extra %}
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Ops Minecraft</span>
+  </div>
+  <div style="padding:.75rem 1rem">
+    <div class="search-row">
+      <input type="text" class="search-input" id="minecraftAdminName" placeholder="Pseudo Minecraft">
+      <button class="btn-primary btn-sm" id="btnAddMinecraftAdmin" data-requires-perm="manage_users">Ajouter</button>
+    </div>
+  </div>
+  <div id="minecraftAdminsList"></div>
+</div>
+
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Joueurs bannis</span>
+  </div>
+  <div style="padding:.75rem 1rem">
+    <div class="search-row">
+      <input type="text" class="search-input" id="minecraftBanName" placeholder="Pseudo Minecraft">
+      <button class="btn-primary btn-sm" id="btnAddMinecraftBan" data-requires-perm="manage_users">Ajouter</button>
+    </div>
+  </div>
+  <div id="minecraftBansList"></div>
+</div>
+
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Whitelist</span>
+  </div>
+  <div style="padding:.75rem 1rem">
+    <div class="search-row">
+      <input type="text" class="search-input" id="minecraftWhitelistName" placeholder="Pseudo Minecraft">
+      <button class="btn-primary btn-sm" id="btnAddMinecraftWhitelist" data-requires-perm="manage_users">Ajouter</button>
+    </div>
+  </div>
+  <div id="minecraftWhitelistList"></div>
+</div>
 {% endblock %}

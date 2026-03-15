@@ -54,6 +54,13 @@ if GAME['features'].get('config'):
     except ImportError as e:
         print(f'[WARN] Module config introuvable pour {GAME_ID}: {e}')
 
+minecraft_admins_module = None
+if GAME_ID in ('minecraft', 'minecraft-fabric'):
+    try:
+        minecraft_admins_module = importlib.import_module(f'games.{MODULE_ID}.admins')
+    except ImportError as e:
+        print(f'[WARN] Module admins introuvable pour {GAME_ID}: {e}')
+
 # ── Context processor Jinja2 ──────────────────────────────────────────────────
 @app.context_processor
 def inject_globals():
@@ -711,6 +718,73 @@ if GAME_ID == 'valheim':
             return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
     except ImportError as e:
         print(f'[WARN] world_modifiers non chargé: {e}')
+
+if minecraft_admins_module is not None:
+    @app.route(f'{PREFIX}/api/admins', methods=['GET'])
+    @auth.require_auth
+    @auth.require_perm('manage_users')
+    def api_minecraft_admins():
+        data, err = minecraft_admins_module.list_admins()
+        return jsonify(data) if not err else (jsonify({'error': err}), 400)
+
+    @app.route(f'{PREFIX}/api/admins', methods=['POST'])
+    @auth.require_auth
+    @auth.require_perm('manage_users')
+    def api_minecraft_admins_add():
+        payload = request.get_json() or {}
+        data, err = minecraft_admins_module.add_admin(payload.get('name', ''))
+        return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+    @app.route(f'{PREFIX}/api/admins/<name>', methods=['DELETE'])
+    @auth.require_auth
+    @auth.require_perm('manage_users')
+    def api_minecraft_admins_delete(name):
+        data, err = minecraft_admins_module.remove_admin(name)
+        return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+    @app.route(f'{PREFIX}/api/bans', methods=['GET'])
+    @auth.require_auth
+    @auth.require_perm('manage_users')
+    def api_minecraft_bans():
+        data, err = minecraft_admins_module.list_bans()
+        return jsonify(data) if not err else (jsonify({'error': err}), 400)
+
+    @app.route(f'{PREFIX}/api/bans', methods=['POST'])
+    @auth.require_auth
+    @auth.require_perm('manage_users')
+    def api_minecraft_bans_add():
+        payload = request.get_json() or {}
+        data, err = minecraft_admins_module.add_ban(payload.get('name', ''))
+        return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+    @app.route(f'{PREFIX}/api/bans/<name>', methods=['DELETE'])
+    @auth.require_auth
+    @auth.require_perm('manage_users')
+    def api_minecraft_bans_delete(name):
+        data, err = minecraft_admins_module.remove_ban(name)
+        return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+    @app.route(f'{PREFIX}/api/whitelist', methods=['GET'])
+    @auth.require_auth
+    @auth.require_perm('manage_users')
+    def api_minecraft_whitelist():
+        data, err = minecraft_admins_module.list_whitelist()
+        return jsonify(data) if not err else (jsonify({'error': err}), 400)
+
+    @app.route(f'{PREFIX}/api/whitelist', methods=['POST'])
+    @auth.require_auth
+    @auth.require_perm('manage_users')
+    def api_minecraft_whitelist_add():
+        payload = request.get_json() or {}
+        data, err = minecraft_admins_module.add_whitelist(payload.get('name', ''))
+        return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+    @app.route(f'{PREFIX}/api/whitelist/<name>', methods=['DELETE'])
+    @auth.require_auth
+    @auth.require_perm('manage_users')
+    def api_minecraft_whitelist_delete(name):
+        data, err = minecraft_admins_module.remove_whitelist(name)
+        return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # API — JOUEURS CONNECTÉS (conditionnel)

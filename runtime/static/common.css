@@ -68,7 +68,7 @@ html, body {
 .brand-name {
   display: block;
   font-family: var(--font-main);
-  font-size: .82rem;
+  font-size: 1.23rem;
   letter-spacing: .08em;
   text-transform: uppercase;
   color: var(--color-text);

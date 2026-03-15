@@ -26,8 +26,8 @@
     <div class="sidebar-header">
       <div class="brand-logo">{% block sidebar_logo %}{{ game.logo }}{% endblock %}</div>
       <div class="brand-text">
-        <span class="brand-name">{{ game.name }}</span>
-        <span class="brand-sub">{{ game.subtitle }}</span>
+        <span class="brand-name">{% block brand_title %}{{ game.name }}{% endblock %}</span>
+        <span class="brand-sub">{% block brand_subtitle %}{{ game.subtitle }}{% endblock %}</span>
       </div>
     </div>
 
