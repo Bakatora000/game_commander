@@ -949,9 +949,13 @@ BKPEOF
     chown "$SYS_USER:$SYS_USER" "$BACKUP_SCRIPT"
     ok "Script de sauvegarde : $BACKUP_SCRIPT"
 
-    sudo -u "$SYS_USER" bash "$BACKUP_SCRIPT" 2>/dev/null \
-        && ok "Test sauvegarde réussi" \
-        || warn "Test sauvegarde : aucun fichier trouvé (normal avant le premier lancement)"
+    if [[ "${SKIP_BACKUP_TEST:-false}" == "true" ]]; then
+        info "Test sauvegarde ignoré pour cette mise à jour"
+    else
+        sudo -u "$SYS_USER" bash "$BACKUP_SCRIPT" 2>/dev/null \
+            && ok "Test sauvegarde réussi" \
+            || warn "Test sauvegarde : aucun fichier trouvé (normal avant le premier lancement)"
+    fi
 
     CRON_LINE="0 3 * * * $BACKUP_SCRIPT >> $APP_DIR/backup_${GAME_ID}.log 2>&1"
     EXISTING=$(crontab -u "$SYS_USER" -l 2>/dev/null || echo "")

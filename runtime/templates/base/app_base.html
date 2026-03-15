@@ -1129,16 +1129,21 @@ async function saveUser() {
   else showToast((await r?.json())?.error || 'Erreur', 'error');
 }
 async function deleteUser(username) {
-  const r = await fetch(`${PREFIX}/api/users/${username}`, {method:'DELETE'}).catch(() => null);
+  const r = await fetch(`${PREFIX}/api/users/${encodeURIComponent(username)}`, {method:'DELETE'}).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
   if (r?.ok) { showToast('Supprimé', 'success'); loadUsers(); }
-  else showToast('Erreur', 'error');
+  else showToast(d.error || 'Erreur suppression utilisateur', 'error');
 }
 
 // ── MODAL ─────────────────────────────────────────────────────────────────────
 let _modalCb = null;
 function initModal() {
   document.getElementById('modalCancel').addEventListener('click', closeModal);
-  document.getElementById('modalConfirm').addEventListener('click', () => { _modalCb?.(); });
+  document.getElementById('modalConfirm').addEventListener('click', () => {
+    const cb = _modalCb;
+    closeModal();
+    cb?.();
+  });
   document.getElementById('modalOverlay').addEventListener('click', e => { if(e.target===e.currentTarget) closeModal(); });
 }
 function confirmThen(msg, cb) {

@@ -40,6 +40,14 @@ def _safe_world_name(name: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "-", (name or "").strip()).strip("-")
 
 
+def _is_backup_world_stem(stem: str) -> bool:
+    lower = stem.lower()
+    return bool(
+        re.search(r"_backup_auto-\d{8,14}$", lower)
+        or re.search(r"_backup_(auto|manual)-\d{8,14}$", lower)
+    )
+
+
 def _known_worlds():
     root = _world_root()
     worlds = {}
@@ -50,7 +58,10 @@ def _known_worlds():
             lower = child.name.lower()
             for suffix in (".db.old", ".fwl.old", ".db", ".fwl"):
                 if lower.endswith(suffix):
-                    worlds[child.name[: -len(suffix)]] = True
+                    stem = child.name[: -len(suffix)]
+                    if _is_backup_world_stem(stem):
+                        break
+                    worlds[stem] = True
                     break
     current = (_game()["server"].get("world_name") or "").strip()
     if current:

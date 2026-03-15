@@ -527,7 +527,7 @@ document.addEventListener('DOMContentLoaded', () => {
     addValheimAdmin(steamid, false);
     input.value = '';
   });
-  document.getElementById('btnSaveWorldSelect')?.addEventListener('click', saveWorldSelection);
+  document.getElementById('worldSelect')?.addEventListener('change', saveWorldSelection);
   document.getElementById('btnSaveWM')?.addEventListener('click', saveWorldModifiers);
   document.querySelectorAll('.nav-btn[data-tab="worldmod"]').forEach(b => {
     b.addEventListener('click', () => {
@@ -586,11 +586,10 @@ document.addEventListener('DOMContentLoaded', () => {
     <div class="panel">
       <div class="panel-header">
         <span class="panel-title">Monde actif</span>
-        <button class="btn-primary btn-sm" id="btnSaveWorldSelect" data-requires-perm="manage_config">Sélectionner</button>
       </div>
       <div style="padding:.75rem 1rem">
         <div class="search-row">
-          <select class="search-input" id="worldSelect"></select>
+          <select class="search-input" id="worldSelect" data-requires-perm="manage_config"></select>
         </div>
         <div class="backups-meta" id="worldSelectNote" style="margin-top:.6rem"></div>
       </div>

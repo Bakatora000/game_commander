@@ -120,6 +120,7 @@ update_process_config() {
     chown "$SYS_USER:$SYS_USER" "$APP_DIR/game.json"
     ok "game.json régénéré"
 
+    SKIP_BACKUP_TEST=true
     deploy_step_backups
 
     systemctl restart "$GC_SERVICE"

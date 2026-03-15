@@ -933,6 +933,16 @@ class ValheimWorldSelectionTests(unittest.TestCase):
         self.assertEqual(data["current_world"], "Monde")
         self.assertEqual(data["worlds"][0]["label"], "Monde")
 
+    def test_list_worlds_ignores_auto_backup_world_files(self):
+        worlds = self.root / "data" / "worlds_local"
+        (worlds / "Cauchemar2.db").write_text("db")
+        (worlds / "ParkAPouet.fwl").write_text("fwl")
+        (worlds / "ParcEssai_backup_auto-20260315130210.db").write_text("backup")
+        with self.app.app_context():
+            data, err = valheim_worlds.list_worlds()
+        self.assertIsNone(err)
+        self.assertEqual([w["name"] for w in data["worlds"]], ["Cauchemar2", "Monde", "ParkAPouet"])
+
     def test_select_world_updates_runtime_and_scripts(self):
         worlds = self.root / "data" / "worlds_local"
         (worlds / "Monde.db").write_text("db")
