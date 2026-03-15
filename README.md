@@ -110,25 +110,17 @@ runtime/
 
 ## Développement runtime
 
-Le mode standalone `runtime/game.json` existe toujours pour le développement local du
-runtime Flask, mais ce n’est plus le flux nominal du produit.
+Le runtime Flask peut toujours être lancé seul pour du développement local, mais ce n’est
+plus le flux nominal du produit.
 
-```bash
-# 1. Copier un template runtime en game.json
-cp runtime/game_valheim.json runtime/game.json
+En pratique :
+- `runtime/game.json` et `runtime/users.json` sont des artefacts d’instance générés par le
+  déploiement ou par `update`
+- les templates `runtime/game_*.json` servent de base interne au générateur de config
+- le développement normal doit donc plutôt partir d’une instance déployée puis d’un
+  `update --instance ...` pour propager les changements
 
-# 2. Créer users.json avec un compte admin
-python3 -c "
-import bcrypt, json
-pw = input('Mot de passe admin : ').encode()
-h  = bcrypt.hashpw(pw, bcrypt.gensalt()).decode()
-print(json.dumps({'admin': {'password_hash': h, 'permissions': []}}, indent=2))
-" > runtime/users.json
-
-# 3. Lancer
-export GAME_COMMANDER_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-python3 runtime/app.py
-```
+Le mode standalone ne doit être utilisé que pour du debug ciblé du runtime.
 
 ## `game.json` — Variables clés
 

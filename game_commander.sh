@@ -4,13 +4,14 @@
 #
 #  Usage :
 #    sudo bash game_commander.sh                          # menu interactif
-#    sudo bash game_commander.sh deploy                   # déploiement interactif
-#    sudo bash game_commander.sh deploy --config FILE     # déploiement silencieux
+#    sudo bash game_commander.sh deploy                   # nouvelle instance complète
+#    sudo bash game_commander.sh attach                   # commander sur serveur existant
+#    sudo bash game_commander.sh deploy --config FILE     # déploiement depuis un fichier
 #    sudo bash game_commander.sh deploy --generate-config # générer un modèle
 #    sudo bash game_commander.sh uninstall                # désinstallation guidée
 #    sudo bash game_commander.sh uninstall --dry-run      # simulation
 #    sudo bash game_commander.sh status                   # état de toutes les instances
-#    sudo bash game_commander.sh update                   # met à jour l'app d'une instance
+#    sudo bash game_commander.sh update                   # resynchronise une instance
 # ═══════════════════════════════════════════════════════════════════════════════
 set -uo pipefail
 IFS=$'\n\t'
@@ -40,21 +41,30 @@ show_help() {
   game_commander.sh — Déploiement et gestion des instances Game Commander
 
   COMMANDES :
-    deploy                   Déploiement interactif
-    deploy --attach          Attacher Game Commander à un serveur existant
-    deploy --config FILE     Déploiement silencieux depuis un fichier de config
+    deploy                   Nouvelle instance complète gérée par Game Commander
+    attach                   Ajouter Commander à un serveur/service jeu existant
+    deploy --attach          Alias CLI de la commande attach
+    deploy --config FILE     Déploiement depuis un fichier de config
     deploy --generate-config Générer un modèle de fichier de config
-    uninstall                Désinstallation guidée
+    uninstall                Retirer une instance ou nettoyer des reliquats
     uninstall --dry-run      Simulation (aucune modification)
-    status                   Liste l'état de toutes les instances
-    update                   Met à jour l'app d'une instance existante
-    update --instance ID     Met à jour une instance précise
+    status                   Voir l'état des instances déployées
+    update                   Resynchroniser le runtime d'une instance existante
+    update --instance ID     Mettre à jour une instance précise
     update --all             Met à jour toutes les instances
+
+  MENU PRINCIPAL :
+    [1] deploy     Nouvelle instance complète
+    [2] attach     Commander sur serveur existant
+    [3] uninstall  Retirer / nettoyer
+    [4] status     Voir l'état
+    [5] update     Propager les changements du dépôt
+    [0] quit       Quitter
 
   EXEMPLES :
     sudo bash game_commander.sh
     sudo bash game_commander.sh deploy
-    sudo bash game_commander.sh deploy --attach
+    sudo bash game_commander.sh attach
     sudo bash game_commander.sh deploy --config env/deploy_config.env
     sudo bash game_commander.sh uninstall
     sudo bash game_commander.sh status
@@ -97,13 +107,14 @@ if [[ -z "$COMMAND" ]]; then
     while true; do
         echo ""
         echo -e "  ${BOLD}${CYAN}╔══ GAME COMMANDER ══╗${RESET}"
+        echo -e "  ${DIM}Déployer, attacher, mettre à jour ou retirer une interface Commander.${RESET}"
         echo ""
         echo -e "  ${CYAN}[0]${RESET} ${BOLD}quit${RESET}       — Quitter"
-        echo -e "  ${CYAN}[1]${RESET} ${BOLD}deploy${RESET}     — Installer une nouvelle instance complète"
-        echo -e "  ${CYAN}[2]${RESET} ${BOLD}attach${RESET}     — Ajouter Game Commander à un serveur existant"
-        echo -e "  ${CYAN}[3]${RESET} ${BOLD}uninstall${RESET}  — Retirer une instance ou nettoyer"
-        echo -e "  ${CYAN}[4]${RESET} ${BOLD}status${RESET}     — État de toutes les instances"
-        echo -e "  ${CYAN}[5]${RESET} ${BOLD}update${RESET}     — Mettre à jour une instance existante"
+        echo -e "  ${CYAN}[1]${RESET} ${BOLD}deploy${RESET}     — Nouvelle instance complète gérée par Game Commander"
+        echo -e "  ${CYAN}[2]${RESET} ${BOLD}attach${RESET}     — Ajouter Commander à un serveur/service déjà existant"
+        echo -e "  ${CYAN}[3]${RESET} ${BOLD}uninstall${RESET}  — Retirer une instance ou nettoyer des reliquats"
+        echo -e "  ${CYAN}[4]${RESET} ${BOLD}status${RESET}     — Voir l'état des instances déployées"
+        echo -e "  ${CYAN}[5]${RESET} ${BOLD}update${RESET}     — Propager les changements du dépôt vers une instance"
         echo ""
         echo -en "  ${YELLOW}?  Votre choix : ${RESET}"
         read -r _choice

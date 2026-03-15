@@ -66,22 +66,12 @@ Observed behavior during real validation:
 
 ## Running the App
 
-```bash
-# 1. Select a game config
-cp runtime/game_valheim.json runtime/game.json   # or runtime/game_enshrouded.json
+The normal product flow is no longer “copy a template game JSON and run Flask manually”.
 
-# 2. Create users.json with an admin account
-python3 -c "
-import bcrypt, json
-pw = input('Password: ').encode()
-h  = bcrypt.hashpw(pw, bcrypt.gensalt()).decode()
-print(json.dumps({'admin': {'password_hash': h, 'permissions': []}}, indent=2))
-" > runtime/users.json
-
-# 3. Launch
-export GAME_COMMANDER_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-python3 runtime/app.py
-```
+Operationally:
+- instances are deployed through `game_commander.sh`
+- `runtime/game.json` and `runtime/users.json` are generated per instance
+- repository changes are propagated to an installed instance through `update --instance ...`
 
 The app is deployed behind Nginx (for example `gaming.example.com.conf`). Flask listens on
 `127.0.0.1:<flask_port>` from `runtime/game.json`. The shared Nginx entrypoint `/commander`
