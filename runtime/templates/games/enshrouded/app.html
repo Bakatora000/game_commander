@@ -13,6 +13,16 @@
   <div id="configFields" class="config-fields"></div>
   <p class="config-note">Les changements sont pris en compte au prochain redémarrage du serveur Enshrouded.</p>
 </div>
+
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Mondes détectés</span>
+  </div>
+  <div style="padding:.75rem 1rem">
+    <div class="backups-meta" id="worldsNote">Analyse du dossier savegame en lecture seule.</div>
+  </div>
+  <div id="enshroudedWorldsList"></div>
+</div>
 {% endblock %}
 
 {# ── DASHBOARD EXTRA — Joueurs connectés ────────────────────────────────── #}
@@ -82,6 +92,44 @@ async function loadConfig() {
   if (!r?.ok) return;
   configData = await r.json();
   renderConfigFields();
+}
+
+async function loadWorlds() {
+  const r = await fetch(`${PREFIX}/api/worlds`).catch(() => null);
+  const list = document.getElementById('enshroudedWorldsList');
+  const note = document.getElementById('worldsNote');
+  if (!list || !note) return;
+  if (!r?.ok) {
+    list.innerHTML = '<p class="empty-msg">Impossible de lire les mondes Enshrouded</p>';
+    return;
+  }
+  const d = await r.json();
+  const worlds = d.worlds || [];
+  note.textContent = worlds.length
+    ? `${worlds.length} monde(s) détecté(s) dans ${d.save_root}`
+    : `Aucun monde détecté dans ${d.save_root}`;
+  if (!worlds.length) {
+    list.innerHTML = '<p class="empty-msg">Aucun monde détecté</p>';
+    return;
+  }
+  list.innerHTML = '';
+  worlds.forEach(world => {
+    const row = document.createElement('div');
+    row.className = 'save-row';
+    const meta = [
+      world.has_info ? 'avec _info' : 'sans _info',
+      Number.isInteger(world.latest) ? `latest ${world.latest}` : 'latest ?',
+      `${world.files} fichier(s)`,
+      world.deleted ? 'marqué supprimé' : 'actif',
+    ];
+    row.innerHTML = `
+      <div class="save-main">
+        <span class="save-icon">🌍</span>
+        <span class="save-link static">${world.label}</span>
+        <span class="save-meta">${meta.join(' • ')}</span>
+      </div>`;
+    list.appendChild(row);
+  });
 }
 
 function renderConfigFields() {
@@ -154,5 +202,13 @@ async function loadPlayers() {
   }
 }
 setInterval(() => { if (typeof currentState !== 'undefined' && currentState === 20) loadPlayers(); }, 15000);
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.nav-btn[data-tab="config"]').forEach(b => {
+    b.addEventListener('click', () => {
+      loadWorlds();
+    });
+  });
+});
 </script>
 {% endblock %}

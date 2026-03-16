@@ -41,6 +41,7 @@ from runtime.games.soulmask import players as soulmask_players
 from runtime.games.soulmask import config as soulmask_config
 from runtime.games.enshrouded import config as enshrouded_config
 from runtime.games.enshrouded import players as enshrouded_players
+from runtime.games.enshrouded import worlds as enshrouded_worlds
 from runtime.games.terraria import config as terraria_config
 from runtime.games.valheim import world_modifiers as valheim_world_modifiers
 
@@ -1881,6 +1882,40 @@ class EnshroudedPlayersTests(unittest.TestCase):
 
         self.assertIn("--since", captured['cmd'])
         self.assertIn("@123456", captured['cmd'])
+
+
+class EnshroudedWorldsTests(unittest.TestCase):
+
+    def _app(self, install_dir):
+        app = Flask(__name__)
+        app.config["GAME"] = {
+            "id": "enshrouded",
+            "name": "Enshrouded",
+            "server": {"install_dir": install_dir},
+        }
+        return app
+
+    def test_list_worlds_detects_slots_and_ignores_characters(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            savegame = Path(tmpdir) / "savegame"
+            savegame.mkdir(parents=True, exist_ok=True)
+            for name in (
+                "3ad85aea", "3ad85aea-1", "3ad85aea-index",
+                "3bd85c7d", "3bd85c7d_info", "3bd85c7d_info-index",
+                "characters", "characters-index",
+            ):
+                (savegame / name).write_text("{}", encoding="utf-8")
+            (savegame / "3ad85aea-index").write_text('{"latest": 6, "deleted": false}', encoding="utf-8")
+            (savegame / "3bd85c7d-index").write_text('{"latest": 2, "deleted": false}', encoding="utf-8")
+            app = self._app(tmpdir)
+            with app.app_context():
+                data, err = enshrouded_worlds.list_worlds()
+            self.assertIsNone(err)
+            self.assertEqual([w["id"] for w in data["worlds"]], ["3ad85aea", "3bd85c7d"])
+            self.assertEqual(data["worlds"][0]["label"], "World 1 (3ad85aea)")
+            self.assertEqual(data["worlds"][1]["label"], "World 2 (3bd85c7d)")
+            self.assertFalse(data["worlds"][0]["has_info"])
+            self.assertTrue(data["worlds"][1]["has_info"])
 
         self.assertTrue(any("--since" in call and "@123456" in call for call in calls))
 

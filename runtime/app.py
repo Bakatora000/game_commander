@@ -729,6 +729,21 @@ if GAME_ID == 'valheim':
     except ImportError as e:
         print(f'[WARN] world_modifiers non chargé: {e}')
 
+if GAME_ID == 'enshrouded':
+    try:
+        import games.enshrouded.worlds as _ew
+
+        @app.route(f'{PREFIX}/api/worlds', methods=['GET'])
+        @auth.require_auth
+        def api_enshrouded_worlds():
+            data, err = _ew.list_worlds()
+            if err:
+                return jsonify({'error': err}), 400
+            data['server_running'] = server.get_status().get('state') == 20
+            return jsonify(data)
+    except ImportError as e:
+        print(f'[WARN] worlds Enshrouded non chargé: {e}')
+
 if minecraft_admins_module is not None:
     @app.route(f'{PREFIX}/api/admins', methods=['GET'])
     @auth.require_auth
