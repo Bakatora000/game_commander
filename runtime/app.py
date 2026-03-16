@@ -744,6 +744,33 @@ if GAME_ID == 'enshrouded':
     except ImportError as e:
         print(f'[WARN] worlds Enshrouded non chargé: {e}')
 
+if GAME_ID == 'terraria':
+    try:
+        import games.terraria.worlds as _tw
+
+        @app.route(f'{PREFIX}/api/worlds', methods=['GET'])
+        @auth.require_auth
+        def api_terraria_worlds():
+            data, err = _tw.list_worlds()
+            if err:
+                return jsonify({'error': err}), 400
+            data['server_running'] = server.get_status().get('state') == 20
+            return jsonify(data)
+
+        @app.route(f'{PREFIX}/api/worlds/select', methods=['POST'])
+        @auth.require_auth
+        @auth.require_perm('manage_config')
+        def api_terraria_worlds_select():
+            payload = request.get_json() or {}
+            world_name = (payload.get('world_name') or '').strip()
+            data, err = _tw.select_world(world_name)
+            if err:
+                return jsonify({'error': err}), 400
+            data['server_running'] = server.get_status().get('state') == 20
+            return jsonify({'ok': True, **data})
+    except ImportError as e:
+        print(f'[WARN] worlds Terraria non chargé: {e}')
+
 if minecraft_admins_module is not None:
     @app.route(f'{PREFIX}/api/admins', methods=['GET'])
     @auth.require_auth

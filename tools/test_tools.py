@@ -43,6 +43,7 @@ from runtime.games.enshrouded import config as enshrouded_config
 from runtime.games.enshrouded import players as enshrouded_players
 from runtime.games.enshrouded import worlds as enshrouded_worlds
 from runtime.games.terraria import config as terraria_config
+from runtime.games.terraria import worlds as terraria_worlds
 from runtime.games.valheim import world_modifiers as valheim_world_modifiers
 
 
@@ -1447,6 +1448,76 @@ class TerrariaConfigTests(unittest.TestCase):
                 })
             self.assertFalse(ok)
             self.assertIn("difficulty", err)
+
+
+class TerrariaWorldsTests(unittest.TestCase):
+
+    def _app(self, install_dir, data_dir):
+        app = Flask(__name__)
+        app.config["GAME"] = {
+            "id": "terraria",
+            "name": "Terraria",
+            "server": {
+                "install_dir": install_dir,
+                "data_dir": data_dir,
+                "port": 7777,
+                "max_players": 8,
+                "world_name": None,
+            },
+        }
+        return app
+
+    def test_list_worlds_detects_existing_world_files(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = os.path.join(tmpdir, "worlds")
+            os.makedirs(data_dir, exist_ok=True)
+            Path(os.path.join(data_dir, "alpha.wld")).write_text("", encoding="utf-8")
+            Path(os.path.join(data_dir, "beta.wld")).write_text("", encoding="utf-8")
+            app = self._app(tmpdir, data_dir)
+            with app.app_context():
+                data, err = terraria_worlds.list_worlds()
+            self.assertIsNone(err)
+            self.assertEqual(data["current_world"], "terraria")
+            self.assertEqual([w["name"] for w in data["worlds"]], ["alpha", "beta", "terraria"])
+            self.assertFalse(next(w for w in data["worlds"] if w["name"] == "terraria")["exists"])
+
+    def test_select_world_updates_serverconfig_and_app_state(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = os.path.join(tmpdir, "worlds")
+            os.makedirs(data_dir, exist_ok=True)
+            Path(os.path.join(data_dir, "bossrush.wld")).write_text("", encoding="utf-8")
+            app_dir = os.path.join(tmpdir, "runtime")
+            os.makedirs(app_dir, exist_ok=True)
+            Path(os.path.join(app_dir, "game.json")).write_text(json.dumps({
+                "id": "terraria",
+                "server": {
+                    "world_name": None,
+                },
+            }), encoding="utf-8")
+            Path(os.path.join(app_dir, "deploy_config.env")).write_text('WORLD_NAME="terraria"\n', encoding="utf-8")
+            Path(os.path.join(app_dir, "backup_terraria.sh")).write_text('WORLD_NAME="terraria"\n', encoding="utf-8")
+            app = self._app(tmpdir, data_dir)
+            app.root_path = app_dir
+            with app.app_context():
+                ok, err = terraria_config.write_config({
+                    "worldname": "terraria",
+                    "motd": "Bienvenue",
+                    "maxplayers": "8",
+                    "password": "",
+                    "autocreate": "2",
+                    "difficulty": "0",
+                })
+                self.assertTrue(ok)
+                self.assertIsNone(err)
+                data, err = terraria_worlds.select_world("bossrush")
+                self.assertIsNone(err)
+                self.assertEqual(data["world_name"], "bossrush")
+                cfg, err = terraria_config.read_config()
+                self.assertIsNone(err)
+                self.assertEqual(cfg["worldname"], "bossrush")
+                self.assertEqual(app.config["GAME"]["server"]["world_name"], "bossrush")
+                self.assertIn('WORLD_NAME="bossrush"', Path(os.path.join(app_dir, "deploy_config.env")).read_text(encoding="utf-8"))
+                self.assertIn('WORLD_NAME="bossrush"', Path(os.path.join(app_dir, "backup_terraria.sh")).read_text(encoding="utf-8"))
 
 
 class EnshroudedConfigTests(unittest.TestCase):

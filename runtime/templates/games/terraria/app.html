@@ -4,34 +4,46 @@
 {% block sidebar_logo %}🌳{% endblock %}
 
 {% block config_tab %}
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Monde actif</span>
+  </div>
+  <div class="world-switcher">
+    <label class="config-label" for="terrariaWorldSelect">Monde utilisé au prochain démarrage</label>
+    <select id="terrariaWorldSelect" class="config-input" data-requires-perm="manage_config"></select>
+    <p class="config-note" id="terrariaWorldNote">Sélectionne un monde existant. Le changement s’applique au prochain redémarrage du serveur.</p>
+  </div>
+</div>
+
 <div class="panel config-panel" id="configPanel">
   <div class="panel-header">
     <span class="panel-title">serverconfig.txt</span>
     <button class="btn-primary btn-sm" id="btnSaveConfig" data-requires-perm="manage_config">Enregistrer</button>
   </div>
   <div id="configFields" class="config-fields"></div>
-  <p class="config-note">Les changements nécessitent un redémarrage du serveur Terraria.</p>
+  <p class="config-note">Les changements sont pris en compte au prochain redémarrage du serveur Terraria.</p>
 </div>
 {% endblock %}
 
 {% block game_scripts %}
 <script>
 const CONFIG_SCHEMA = [
-  {key:'worldname',  label:'Nom du monde',   type:'text'},
-  {key:'motd',       label:'MOTD',           type:'text'},
-  {key:'maxplayers', label:'Joueurs max',    type:'number', min:1, max:255},
-  {key:'password',   label:'Mot de passe',   type:'password'},
-  {key:'autocreate', label:'Taille du monde',type:'select', options:[
+  {section:'Monde',   key:'worldname',  label:'Nom du monde',   type:'text', help:'Crée/ouvre ce monde au prochain démarrage'},
+  {section:'Monde',   key:'autocreate', label:'Taille du monde',type:'select', options:[
     {value:'1', label:'Petit'},
     {value:'2', label:'Moyen'},
     {value:'3', label:'Grand'},
   ]},
-  {key:'difficulty', label:'Difficulté',     type:'select', options:[
+  {section:'Monde',   key:'difficulty', label:'Difficulté',     type:'select', options:[
     {value:'0', label:'Classique'},
     {value:'1', label:'Expert'},
     {value:'2', label:'Maître'},
     {value:'3', label:'Journey'},
   ]},
+  {section:'Serveur', key:'motd',       label:'MOTD',           type:'text'},
+  {section:'Serveur', key:'maxplayers', label:'Joueurs max',    type:'number', min:1, max:255},
+  {section:'Accès',   key:'password',   label:'Mot de passe',   type:'password'},
+  {section:'Réseau',  key:'port',       label:'Port de jeu',    type:'number', min:1, max:65535, help:'1–65535'},
 ];
 let configData = {};
 
@@ -50,7 +62,15 @@ async function loadConfig() {
 function renderConfigFields() {
   const el = document.getElementById('configFields');
   el.innerHTML = '';
+  let lastSection = null;
   CONFIG_SCHEMA.forEach(f => {
+    if (f.section !== lastSection) {
+      const hdr = document.createElement('div');
+      hdr.className = 'config-section-header';
+      hdr.textContent = f.section;
+      el.appendChild(hdr);
+      lastSection = f.section;
+    }
     const val = configData[f.key] ?? '';
     const row = document.createElement('div');
     row.className = 'config-row';
@@ -66,10 +86,55 @@ function renderConfigFields() {
       const extra = f.min != null ? `min="${f.min}" max="${f.max}"` : '';
       input = `<input class="config-input" type="${f.type}" id="cfg_${f.key}" value="${val}" ${extra}>`;
     }
-    row.innerHTML = `<label class="config-label">${f.label}</label>${input}`;
+    row.innerHTML = `<label class="config-label">${f.label}${f.help?`<span class="config-help">${f.help}</span>`:''}</label>${input}`;
     el.appendChild(row);
   });
 }
+
+async function loadTerrariaWorlds() {
+  const select = document.getElementById('terrariaWorldSelect');
+  const note = document.getElementById('terrariaWorldNote');
+  if (!select) return;
+  const r = await fetch(`${PREFIX}/api/worlds`).catch(() => null);
+  if (!r?.ok) {
+    select.innerHTML = '<option value="">Erreur de chargement</option>';
+    return;
+  }
+  const data = await r.json();
+  select.innerHTML = '';
+  (data.worlds || []).forEach(w => {
+    const opt = document.createElement('option');
+    opt.value = w.name;
+    opt.textContent = w.label;
+    opt.selected = !!w.selected;
+    select.appendChild(opt);
+  });
+  note.textContent = data.server_running
+    ? 'Le changement de monde est enregistré immédiatement et s’appliquera au prochain redémarrage du serveur.'
+    : 'Le changement de monde est enregistré immédiatement.';
+}
+
+document.getElementById('terrariaWorldSelect')?.addEventListener('change', async (e) => {
+  const worldName = e.target.value;
+  const r = await fetch(`${PREFIX}/api/worlds/select`, {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({world_name: worldName}),
+  }).catch(() => null);
+  if (!r?.ok) {
+    const d = await r?.json().catch(() => ({})) || {};
+    showToast(d.error || 'Erreur sélection monde', true);
+    await loadTerrariaWorlds();
+    return;
+  }
+  const d = await r.json();
+  showToast(
+    d.server_running
+      ? `Monde actif défini sur ${d.world_name}. Redémarre le serveur pour l’appliquer.`
+      : `Monde actif défini sur ${d.world_name}.`,
+    false
+  );
+});
 
 document.getElementById('btnSaveConfig')?.addEventListener('click', async () => {
   const payload = {};
@@ -83,6 +148,10 @@ document.getElementById('btnSaveConfig')?.addEventListener('click', async () => 
     body:JSON.stringify(payload)
   }).catch(()=>null);
   await handleConfigSaveResponse(r);
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadTerrariaWorlds();
 });
 </script>
 {% endblock %}
