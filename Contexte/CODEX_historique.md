@@ -675,3 +675,14 @@ Jalon de stabilisation retenu avant le gros chantier de refonte UI / thèmes.
 
 Point explicitement repoussé après ce jalon :
 - refonte transversale UI/CSS/thèmes/accessibilité
+
+## Roadmap post-v2.3
+
+Priorités retenues après le gel `v2.3` :
+- laisser vivre la bêta test sur Valheim et Minecraft, puis traiter les régressions au fil de l'eau
+- propager ensuite le standard produit Valheim vers :
+  - Terraria
+  - Enshrouded
+- garder Soulmask sur son socle actuel tant qu'aucun besoin produit plus précis ne remonte des tests
+- continuer la rationalisation du hub `/commander` et conserver un polling de statut indépendant de l'auth par instance
+- poursuivre la refonte UI/CSS/accessibilité par petites passes, sans casser le socle validé

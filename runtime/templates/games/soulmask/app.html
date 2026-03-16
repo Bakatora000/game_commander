@@ -16,37 +16,37 @@
 {% block config_tab %}
 <div class="panel config-panel" id="configPanel">
   <div class="panel-header">
-    <span class="panel-title">Soulmask server config</span>
+    <span class="panel-title">soulmask_server.json</span>
     <button class="btn-primary btn-sm" id="btnSaveConfig" data-requires-perm="manage_config">Enregistrer</button>
   </div>
   <div id="configFields" class="config-fields"></div>
-  <p class="config-note">Les changements nécessitent un redémarrage du serveur Soulmask.</p>
+  <p class="config-note">Les changements sont pris en compte au prochain redémarrage du serveur Soulmask.</p>
 </div>
 {% endblock %}
 
 {% block game_scripts %}
 <script>
 const CONFIG_SCHEMA = [
-  {key:'server_name',     label:'Nom du serveur',        type:'text'},
-  {key:'max_players',     label:'Joueurs max',           type:'number', min:1, max:100},
-  {key:'password',        label:'Mot de passe',          type:'password'},
-  {key:'admin_password',  label:'Mot de passe admin',    type:'password'},
-  {key:'mode',            label:'Mode',                  type:'select', options:[
+  {section:'Serveur',     key:'server_name',     label:'Nom du serveur',        type:'text'},
+  {section:'Serveur',     key:'max_players',     label:'Joueurs max',           type:'number', min:1, max:100},
+  {section:'Serveur',     key:'mode',            label:'Mode',                  type:'select', options:[
     {value:'pve', label:'PvE'},
     {value:'pvp', label:'PvP'},
   ]},
-  {key:'port',            label:'Port de jeu',           type:'number'},
-  {key:'query_port',      label:'Port Query',            type:'number'},
-  {key:'echo_port',       label:'Port Echo',             type:'number'},
-  {key:'backup_enabled',  label:'Backups auto',          type:'select', options:[
+  {section:'Accès',       key:'password',        label:'Mot de passe',          type:'password'},
+  {section:'Accès',       key:'admin_password',  label:'Mot de passe admin',    type:'password'},
+  {section:'Réseau',      key:'port',            label:'Port de jeu',           type:'number', help:'1–65535'},
+  {section:'Réseau',      key:'query_port',      label:'Port Query',            type:'number', help:'1–65535'},
+  {section:'Réseau',      key:'echo_port',       label:'Port Echo',             type:'number', help:'1–65535'},
+  {section:'Sauvegardes', key:'saving_enabled',  label:'Sauvegarde auto en jeu', type:'select', options:[
     {value:true, label:'Oui'},
     {value:false, label:'Non'},
   ]},
-  {key:'saving_enabled',  label:'Sauvegardes auto',      type:'select', options:[
+  {section:'Sauvegardes', key:'backup_enabled',  label:'Backups auto',          type:'select', options:[
     {value:true, label:'Oui'},
     {value:false, label:'Non'},
   ]},
-  {key:'backup_interval', label:'Intervalle backup (s)', type:'number', min:60, max:86400},
+  {section:'Sauvegardes', key:'backup_interval', label:'Intervalle backup (s)', type:'number', min:60, max:86400, help:'60–86400'},
 ];
 let configData = {};
 
@@ -82,7 +82,15 @@ async function loadConfig() {
 function renderConfigFields() {
   const el = document.getElementById('configFields');
   el.innerHTML = '';
+  let lastSection = null;
   CONFIG_SCHEMA.forEach(f => {
+    if (f.section !== lastSection) {
+      const hdr = document.createElement('div');
+      hdr.className = 'config-section-header';
+      hdr.textContent = f.section;
+      el.appendChild(hdr);
+      lastSection = f.section;
+    }
     const val = configData[f.key];
     const row = document.createElement('div');
     row.className = 'config-row';
@@ -99,7 +107,7 @@ function renderConfigFields() {
       const extra = f.min != null ? `min="${f.min}" max="${f.max}"` : '';
       input = `<input class="config-input" type="${f.type}" id="cfg_${f.key}" value="${val ?? ''}" ${extra}>`;
     }
-    row.innerHTML = `<label class="config-label">${f.label}</label>${input}`;
+    row.innerHTML = `<label class="config-label">${f.label}${f.help?`<span class="config-help">${f.help}</span>`:''}</label>${input}`;
     el.appendChild(row);
   });
 }

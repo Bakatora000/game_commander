@@ -205,6 +205,13 @@ At each milestone, create a git commit and push to `origin/main`. Bump the versi
 
 Current validated milestone: `v2.3`
 
+Short roadmap after `v2.3`:
+- keep beta-testing Valheim / Minecraft Java / Minecraft Fabric and fix regressions first
+- propagate the Valheim-level product standard to Terraria, then Enshrouded
+- keep Soulmask at its current baseline unless beta feedback reveals specific missing product features
+- continue UI/CSS/accessibility cleanup incrementally after the first theme-system pass
+- preserve `/commander` as the normal entrypoint and keep hub status independent from per-instance auth
+
 ## Adding a New Game
 
 1. Create `runtime/games/{id}/config.py` and/or `runtime/games/{id}/mods.py` with the expected function signatures
