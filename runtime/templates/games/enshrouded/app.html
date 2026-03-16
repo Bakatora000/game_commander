@@ -7,11 +7,11 @@
 {% block config_tab %}
 <div class="panel config-panel">
   <div class="panel-header">
-    <span class="panel-title">Configuration serveur</span>
-    <button class="btn-primary btn-sm" id="btnSaveConfig">Enregistrer</button>
+    <span class="panel-title">enshrouded_server.json</span>
+    <button class="btn-primary btn-sm" id="btnSaveConfig" data-requires-perm="manage_config">Enregistrer</button>
   </div>
   <div id="configFields" class="config-fields"></div>
-  <p class="config-note">⚠ Redémarrez le serveur pour appliquer les changements.</p>
+  <p class="config-note">Les changements sont pris en compte au prochain redémarrage du serveur Enshrouded.</p>
 </div>
 {% endblock %}
 
@@ -30,12 +30,12 @@
 {% block game_scripts %}
 <script>
 const CONFIG_SCHEMA = [
-  {key:'name',          label:'Nom du serveur',  type:'text',     section:null},
-  {key:'password',      label:'Mot de passe',    type:'password', section:null},
-  {key:'slotCount',     label:'Joueurs max',     type:'number',   section:null, min:1, max:16},
-  {key:'gamePort',      label:'Port de jeu',     type:'number',   section:null},
-  {key:'queryPort',     label:'Port de requête', type:'number',   section:null},
-  {key:'saveDirectory', label:'Dossier saves',   type:'text',     section:null},
+  {section:'Serveur',  key:'name',          label:'Nom du serveur',  type:'text'},
+  {section:'Serveur',  key:'slotCount',     label:'Joueurs max',     type:'number', min:1, max:16, help:'1–16'},
+  {section:'Accès',    key:'password',      label:'Mot de passe',    type:'password'},
+  {section:'Réseau',   key:'gamePort',      label:'Port de jeu',     type:'number', help:'1–65535'},
+  {section:'Réseau',   key:'queryPort',     label:'Port de requête', type:'number', help:'1–65535'},
+  {section:'Stockage', key:'saveDirectory', label:'Dossier saves',   type:'text'},
 ];
 let configData = {};
 
@@ -49,13 +49,21 @@ async function loadConfig() {
 function renderConfigFields() {
   const el = document.getElementById('configFields');
   el.innerHTML = '';
+  let lastSection = null;
   CONFIG_SCHEMA.forEach(f => {
+    if (f.section !== lastSection) {
+      const hdr = document.createElement('div');
+      hdr.className = 'config-section-header';
+      hdr.textContent = f.section;
+      el.appendChild(hdr);
+      lastSection = f.section;
+    }
     const val = configData[f.key] ?? '';
     const row = document.createElement('div');
     row.className = 'config-row';
     const extra = f.min != null ? `min="${f.min}" max="${f.max}"` : '';
     row.innerHTML = `
-      <label class="config-label">${f.label}</label>
+      <label class="config-label">${f.label}${f.help?`<span class="config-help">${f.help}</span>`:''}</label>
       <input class="config-input" type="${f.type}" id="cfg_${f.key}" value="${val}" ${extra}>`;
     el.appendChild(row);
   });

@@ -12,6 +12,8 @@ Patterns :
 import re
 import subprocess
 
+import psutil
+
 _RE_ADDED   = re.compile(r'\[online\] Added peer #(\d+) \(steamid:(\d+)\)')
 _RE_REMOVED = re.compile(r'\[online\] Removed peer #(\d+)')
 _RE_FAILED  = re.compile(r'\[online\] Session failed for peer #(\d+)')
@@ -24,8 +26,7 @@ def get_players():
     """
     try:
         result = subprocess.run(
-            ['journalctl', '-u', _service_name(), '--since', '1 hour ago',
-             '--no-pager', '-o', 'cat'],
+            _journalctl_cmd(),
             capture_output=True, text=True, timeout=5
         )
         lines = result.stdout.splitlines()
@@ -56,6 +57,16 @@ def get_players():
     return [{'name': steamid} for steamid in peers.values()]
 
 
+def _journalctl_cmd():
+    cmd = ['journalctl', '-u', _service_name(), '--no-pager', '-o', 'cat']
+    since_arg = _current_session_since()
+    if since_arg:
+        cmd.extend(['--since', since_arg])
+    else:
+        cmd.extend(['--since', '1 hour ago'])
+    return cmd
+
+
 def _service_name():
     """Récupère le nom du service systemd depuis la config Flask."""
     try:
@@ -63,3 +74,22 @@ def _service_name():
         return current_app.config['GAME']['server']['service']
     except Exception:
         return 'enshrouded-server'
+
+
+def _current_session_since():
+    try:
+        result = subprocess.run(
+            ['systemctl', 'show', _service_name(), '--property=MainPID'],
+            capture_output=True, text=True, timeout=3
+        )
+        pid = 0
+        for line in result.stdout.splitlines():
+            if line.startswith('MainPID='):
+                pid = int(line.split('=', 1)[1].strip() or '0')
+                break
+        if pid <= 0:
+            return None
+        started = psutil.Process(pid).create_time()
+        return f"@{max(int(started) - 5, 0)}"
+    except Exception:
+        return None

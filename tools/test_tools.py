@@ -39,6 +39,7 @@ from runtime.games.valheim import admins as valheim_admins
 from runtime.games.valheim import players as valheim_players
 from runtime.games.soulmask import players as soulmask_players
 from runtime.games.soulmask import config as soulmask_config
+from runtime.games.enshrouded import players as enshrouded_players
 from runtime.games.terraria import config as terraria_config
 from runtime.games.valheim import world_modifiers as valheim_world_modifiers
 
@@ -1769,6 +1770,55 @@ class SoulmaskPlayersTests(unittest.TestCase):
         finally:
             soulmask_players.subprocess.run = original_run
             soulmask_players._current_session_since = original_since
+
+
+class EnshroudedPlayersTests(unittest.TestCase):
+
+    def test_tracks_connected_players_from_logs(self):
+        original_run = enshrouded_players.subprocess.run
+        original_since = enshrouded_players._current_session_since
+
+        class Result:
+            stdout = (
+                "[online] Added peer #1 (steamid:76561198000000001)\n"
+                "[online] Added peer #2 (steamid:76561198000000002)\n"
+                "[online] Removed peer #1\n"
+            )
+
+        def fake_run(*args, **kwargs):
+            return Result()
+
+        enshrouded_players.subprocess.run = fake_run
+        enshrouded_players._current_session_since = lambda: None
+        try:
+            players = enshrouded_players.get_players()
+        finally:
+            enshrouded_players.subprocess.run = original_run
+            enshrouded_players._current_session_since = original_since
+        self.assertEqual(players, [{'name': '76561198000000002'}])
+
+    def test_uses_current_session_when_available(self):
+        original_run = enshrouded_players.subprocess.run
+        original_since = enshrouded_players._current_session_since
+        captured = {}
+
+        class Result:
+            stdout = ""
+
+        def fake_run(cmd, *args, **kwargs):
+            captured['cmd'] = cmd
+            return Result()
+
+        enshrouded_players.subprocess.run = fake_run
+        enshrouded_players._current_session_since = lambda: "@123456"
+        try:
+            enshrouded_players.get_players()
+        finally:
+            enshrouded_players.subprocess.run = original_run
+            enshrouded_players._current_session_since = original_since
+
+        self.assertIn("--since", captured['cmd'])
+        self.assertIn("@123456", captured['cmd'])
 
         self.assertTrue(any("--since" in call and "@123456" in call for call in calls))
 
