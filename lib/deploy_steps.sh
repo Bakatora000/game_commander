@@ -1217,11 +1217,15 @@ deploy_step_validation() {
         _GAME_PORTS=("${SERVER_PORT}/tcp")
     elif [[ "$GAME_ID" == "soulmask" ]]; then
         _GAME_PORTS=("${SERVER_PORT}/udp" "${QUERY_PORT}/udp" "${ECHO_PORT}/tcp")
+    elif [[ "$GAME_ID" == "terraria" ]]; then
+        _GAME_PORTS=("${SERVER_PORT}/tcp")
     else
         _GAME_PORTS=("${SERVER_PORT}/udp" "$((SERVER_PORT+1))/udp")
     fi
     echo -e "  ${BOLD}Ports à ouvrir (firewall) :${RESET}"
     if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
+        echo -e "    Jeu  : ${SERVER_PORT}/TCP"
+    elif [[ "$GAME_ID" == "terraria" ]]; then
         echo -e "    Jeu  : ${SERVER_PORT}/TCP"
     elif [[ "$GAME_ID" == "soulmask" ]]; then
         echo -e "    Jeu  : ${SERVER_PORT}/UDP  ${QUERY_PORT}/UDP  ${ECHO_PORT}/TCP"
@@ -1239,6 +1243,8 @@ deploy_step_validation() {
     else
         warn "UFW inactif ou absent — pensez à ouvrir les ports dans le firewall Hetzner :"
         if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
+            echo "    ${SERVER_PORT}/TCP, 80/TCP, 443/TCP"
+        elif [[ "$GAME_ID" == "terraria" ]]; then
             echo "    ${SERVER_PORT}/TCP, 80/TCP, 443/TCP"
         elif [[ "$GAME_ID" == "soulmask" ]]; then
             echo "    ${SERVER_PORT}/UDP, ${QUERY_PORT}/UDP, ${ECHO_PORT}/TCP, 80/TCP, 443/TCP"
