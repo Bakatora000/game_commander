@@ -39,6 +39,7 @@ from runtime.games.valheim import admins as valheim_admins
 from runtime.games.valheim import players as valheim_players
 from runtime.games.soulmask import players as soulmask_players
 from runtime.games.soulmask import config as soulmask_config
+from runtime.games.enshrouded import config as enshrouded_config
 from runtime.games.enshrouded import players as enshrouded_players
 from runtime.games.terraria import config as terraria_config
 from runtime.games.valheim import world_modifiers as valheim_world_modifiers
@@ -1445,6 +1446,67 @@ class TerrariaConfigTests(unittest.TestCase):
                 })
             self.assertFalse(ok)
             self.assertIn("difficulty", err)
+
+
+class EnshroudedConfigTests(unittest.TestCase):
+
+    def _app(self, install_dir):
+        app = Flask(__name__)
+        app.config["GAME"] = {
+            "id": "enshrouded",
+            "name": "Enshrouded",
+            "server": {
+                "install_dir": install_dir,
+            },
+        }
+        return app
+
+    def test_read_defaults_when_file_missing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir)
+            with app.app_context():
+                data, err = enshrouded_config.read_config()
+            self.assertIsNone(err)
+            self.assertEqual(data["gameSettingsPreset"], "Default")
+            self.assertEqual(data["playerHealthFactor"], 1)
+            self.assertEqual(data["weatherFrequency"], "Normal")
+
+    def test_write_and_read_gameplay_settings(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir)
+            with app.app_context():
+                ok, err = enshrouded_config.write_config({
+                    "name": "Mon Enshrouded",
+                    "password": "secret",
+                    "slotCount": 10,
+                    "gameSettingsPreset": "Custom",
+                    "playerHealthFactor": 1.5,
+                    "enableStarvingDebuff": True,
+                    "shroudTimeFactor": 0.5,
+                    "weatherFrequency": "Often",
+                    "enemyDamageFactor": 1.75,
+                    "pacifyAllEnemies": False,
+                })
+                self.assertTrue(ok, err)
+                data, err = enshrouded_config.read_config()
+            self.assertIsNone(err)
+            self.assertEqual(data["gameSettingsPreset"], "Custom")
+            self.assertEqual(data["playerHealthFactor"], 1.5)
+            self.assertTrue(data["enableStarvingDebuff"])
+            self.assertEqual(data["shroudTimeFactor"], 0.5)
+            self.assertEqual(data["weatherFrequency"], "Often")
+            self.assertEqual(data["enemyDamageFactor"], 1.75)
+
+    def test_validation_rejects_invalid_gameplay_value(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir)
+            with app.app_context():
+                ok, err = enshrouded_config.write_config({
+                    "gameSettingsPreset": "Custom",
+                    "playerHealthFactor": 0.1,
+                })
+            self.assertFalse(ok)
+            self.assertIn("playerHealthFactor", err)
 
 
 class SoulmaskConfigTests(unittest.TestCase):

@@ -36,6 +36,44 @@ const CONFIG_SCHEMA = [
   {section:'Réseau',   key:'gamePort',      label:'Port de jeu',     type:'number', help:'1–65535'},
   {section:'Réseau',   key:'queryPort',     label:'Port de requête', type:'number', help:'1–65535'},
   {section:'Stockage', key:'saveDirectory', label:'Dossier saves',   type:'text'},
+  {section:'Gameplay', key:'gameSettingsPreset', label:'Preset gameplay', type:'select', options:['Default','Relaxed','Hard','Survival','Custom']},
+  {section:'Joueur',   key:'playerHealthFactor', label:'Player Health Factor', type:'number', min:0.25, max:4, step:0.25},
+  {section:'Joueur',   key:'playerManaFactor', label:'Player Mana Factor', type:'number', min:0.25, max:4, step:0.25},
+  {section:'Joueur',   key:'playerStaminaFactor', label:'Player Stamina Factor', type:'number', min:0.25, max:4, step:0.25},
+  {section:'Joueur',   key:'playerBodyHeatFactor', label:'Player Body Heat Factor', type:'number', min:0.5, max:2, step:0.25},
+  {section:'Joueur',   key:'playerDivingTimeFactor', label:'Player Diving Time Factor', type:'number', min:0.5, max:2, step:0.25},
+  {section:'Survie',   key:'enableDurability', label:'Enable Durability', type:'bool'},
+  {section:'Survie',   key:'enableStarvingDebuff', label:'Enable Hunger And Starvation', type:'bool'},
+  {section:'Survie',   key:'foodBuffDurationFactor', label:'Food Buff Duration Factor', type:'number', min:0.5, max:2, step:0.25},
+  {section:'Survie',   key:'fromHungerToStarving', label:'From Hunger To Starving', type:'number', min:300000000000, max:1200000000000, step:60000000000, help:'durée interne du serveur'},
+  {section:'Survie',   key:'shroudTimeFactor', label:'Shroud Time Duration Modifier', type:'number', min:0.5, max:2, step:0.25},
+  {section:'Survie',   key:'tombstoneMode', label:'Tombstone Mode', type:'select', options:['AddBackpackMaterials','Everything','NoTombstone']},
+  {section:'Monde',    key:'enableGliderTurbulences', label:'Enable Glider Turbulences', type:'bool'},
+  {section:'Monde',    key:'weatherFrequency', label:'Weather Frequency', type:'select', options:['Disabled','Rare','Normal','Often']},
+  {section:'Monde',    key:'fishingDifficulty', label:'Fishing Difficulty', type:'select', options:['VeryEasy','Easy','Normal','Hard','VeryHard']},
+  {section:'Monde',    key:'dayTimeDuration', label:'Day Time Duration', type:'number', min:120000000000, max:3600000000000, step:60000000000, help:'durée interne du serveur'},
+  {section:'Monde',    key:'nightTimeDuration', label:'Night Time Duration', type:'number', min:120000000000, max:3600000000000, step:60000000000, help:'durée interne du serveur'},
+  {section:'Monde',    key:'curseModifier', label:'Curse Modifier', type:'select', options:['Easy','Normal','Hard']},
+  {section:'Ressources', key:'miningDamageFactor', label:'Mining Damage Factor', type:'number', min:0.5, max:2, step:0.25},
+  {section:'Ressources', key:'plantGrowthSpeedFactor', label:'Plant Growth Speed Factor', type:'number', min:0.25, max:2, step:0.25},
+  {section:'Ressources', key:'resourceDropStackAmountFactor', label:'Resource Drop Stack Amount Factor', type:'number', min:0.25, max:2, step:0.25},
+  {section:'Ressources', key:'factoryProductionSpeedFactor', label:'Factory Production Speed Factor', type:'number', min:0.25, max:2, step:0.25},
+  {section:'Ressources', key:'perkUpgradeRecyclingFactor', label:'Perk Upgrade Recycling Factor', type:'number', min:0, max:1, step:0.1},
+  {section:'Ressources', key:'perkCostFactor', label:'Perk Cost Factor', type:'number', min:0.25, max:2, step:0.25},
+  {section:'Ressources', key:'experienceCombatFactor', label:'Combat XP Factor', type:'number', min:0.25, max:2, step:0.25},
+  {section:'Ressources', key:'experienceMiningFactor', label:'Mining XP Factor', type:'number', min:0, max:2, step:0.25},
+  {section:'Ressources', key:'experienceExplorationQuestsFactor', label:'Exploration And Quests XP Factor', type:'number', min:0.25, max:2, step:0.25},
+  {section:'Combat',   key:'randomSpawnerAmount', label:'Enemy Population', type:'select', options:['Few','Normal','Many','Extreme']},
+  {section:'Combat',   key:'aggroPoolAmount', label:'Aggro Pool Amount', type:'select', options:['Few','Normal','Many','Extreme']},
+  {section:'Combat',   key:'enemyDamageFactor', label:'Enemy Damage Factor', type:'number', min:0.25, max:5, step:0.25},
+  {section:'Combat',   key:'enemyHealthFactor', label:'Enemy Health Factor', type:'number', min:0.25, max:4, step:0.25},
+  {section:'Combat',   key:'enemyStaminaFactor', label:'Enemy Stamina Factor', type:'number', min:0.5, max:2, step:0.25},
+  {section:'Combat',   key:'enemyPerceptionRangeFactor', label:'Enemy Perception Range Factor', type:'number', min:0.5, max:2, step:0.25},
+  {section:'Combat',   key:'bossDamageFactor', label:'Boss Damage Factor', type:'number', min:0.2, max:5, step:0.2},
+  {section:'Combat',   key:'bossHealthFactor', label:'Boss Health Factor', type:'number', min:0.2, max:5, step:0.2},
+  {section:'Combat',   key:'threatBonus', label:'Threat Bonus', type:'number', min:0.25, max:4, step:0.25},
+  {section:'Combat',   key:'pacifyAllEnemies', label:'Pacify All Enemies', type:'bool'},
+  {section:'Divers',   key:'tamingStartleRepercussion', label:'Taming Startle Repercussion', type:'select', options:['KeepProgress','LoseSomeProgress','LoseAllProgress']},
 ];
 let configData = {};
 
@@ -61,10 +99,21 @@ function renderConfigFields() {
     const val = configData[f.key] ?? '';
     const row = document.createElement('div');
     row.className = 'config-row';
-    const extra = f.min != null ? `min="${f.min}" max="${f.max}"` : '';
+    let input = '';
+    if (f.type === 'select' && f.options) {
+      const opts = f.options.map(o => `<option value="${o}"${String(o)===String(val)?' selected':''}>${o}</option>`).join('');
+      input = `<select class="config-input" id="cfg_${f.key}">${opts}</select>`;
+    } else if (f.type === 'bool') {
+      const opts = ['true', 'false'].map(o => `<option value="${o}"${String(val)===o?' selected':''}>${o === 'true' ? 'Oui' : 'Non'}</option>`).join('');
+      input = `<select class="config-input" id="cfg_${f.key}">${opts}</select>`;
+    } else {
+      const extra = f.min != null ? `min="${f.min}" max="${f.max}"` : '';
+      const step = f.step != null ? `step="${f.step}"` : '';
+      input = `<input class="config-input" type="${f.type}" id="cfg_${f.key}" value="${val}" ${extra} ${step}>`;
+    }
     row.innerHTML = `
       <label class="config-label">${f.label}${f.help?`<span class="config-help">${f.help}</span>`:''}</label>
-      <input class="config-input" type="${f.type}" id="cfg_${f.key}" value="${val}" ${extra}>`;
+      ${input}`;
     el.appendChild(row);
   });
 }
@@ -73,7 +122,10 @@ document.getElementById('btnSaveConfig')?.addEventListener('click', async () => 
   const payload = {};
   CONFIG_SCHEMA.forEach(f => {
     const inp = document.getElementById(`cfg_${f.key}`);
-    if (inp) payload[f.key] = f.type === 'number' ? parseInt(inp.value)||0 : inp.value;
+    if (!inp) return;
+    if (f.type === 'number') payload[f.key] = inp.value === '' ? 0 : Number(inp.value);
+    else if (f.type === 'bool') payload[f.key] = inp.value === 'true';
+    else payload[f.key] = inp.value;
   });
   const r = await fetch(`${PREFIX}/api/config`, {
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
