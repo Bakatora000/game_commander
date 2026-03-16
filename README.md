@@ -23,17 +23,17 @@ principale.
 ### Dashboard
 ![Valheim Dashboard](docs/screenshots/valheim/Menu1.png)
 
+### Mods
+![Valheim Mods](docs/screenshots/valheim/Menu2.png)
+
 ### Configuration
-![Valheim Configuration](docs/screenshots/valheim/Menu2.png)
+![Valheim Configuration](docs/screenshots/valheim/Menu3.png)
 
 ### Fichiers
-![Valheim Files](docs/screenshots/valheim/Menu3.png)
+![Valheim Files](docs/screenshots/valheim/Menu4.png)
 
 ### Utilisateurs
-![Valheim Users](docs/screenshots/valheim/Menu4.png)
-
-### Mods
-![Valheim Mods](docs/screenshots/valheim/Menu5.png)
+![Valheim Users](docs/screenshots/valheim/Menu5.png)
 
 ## Utilisation courante
 
