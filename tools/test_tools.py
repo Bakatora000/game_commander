@@ -44,6 +44,7 @@ from runtime.games.enshrouded import players as enshrouded_players
 from runtime.games.enshrouded import worlds as enshrouded_worlds
 from runtime.games.terraria import config as terraria_config
 from runtime.games.terraria import worlds as terraria_worlds
+from runtime.games.terraria import players as terraria_players
 from runtime.games.valheim import world_modifiers as valheim_world_modifiers
 
 
@@ -467,7 +468,7 @@ class ConfigGenGameJsonTests(unittest.TestCase):
         self.assertEqual(data["id"], "terraria")
         self.assertEqual(data["server"]["binary"], "TerrariaServer.bin.x86_64")
         self.assertTrue(data["features"]["config"])
-        self.assertFalse(data["features"]["players"])
+        self.assertTrue(data["features"]["players"])
         self.assertTrue(data["features"]["saves"])
         self.assertIn("manage_config", data["permissions"])
 
@@ -1424,6 +1425,16 @@ class TerrariaConfigTests(unittest.TestCase):
                     "password": "secret",
                     "autocreate": "3",
                     "difficulty": "2",
+                    "seed": "abc123",
+                    "banlist": "custom-banlist.txt",
+                    "secure": "1",
+                    "noupnp": "1",
+                    "steam": "1",
+                    "lobby": "private",
+                    "ip": "0.0.0.0",
+                    "forcepriority": "1",
+                    "disableannouncementbox": "1",
+                    "announcementboxrange": "250",
                 })
                 self.assertTrue(ok)
                 self.assertIsNone(err)
@@ -1432,6 +1443,9 @@ class TerrariaConfigTests(unittest.TestCase):
             self.assertEqual(data["worldname"], "bossrush")
             self.assertEqual(data["motd"], "Bienvenue")
             self.assertEqual(data["difficulty"], "2")
+            self.assertEqual(data["seed"], "abc123")
+            self.assertEqual(data["lobby"], "private")
+            self.assertEqual(data["announcementboxrange"], "250")
             self.assertEqual(data["world"], os.path.join(tmpdir, "worlds", "bossrush.wld"))
 
     def test_validation_rejects_invalid_difficulty(self):
@@ -1448,6 +1462,22 @@ class TerrariaConfigTests(unittest.TestCase):
                 })
             self.assertFalse(ok)
             self.assertIn("difficulty", err)
+
+    def test_validation_rejects_invalid_lobby(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir, os.path.join(tmpdir, "worlds"))
+            with app.app_context():
+                ok, err = terraria_config.write_config({
+                    "worldname": "bossrush",
+                    "motd": "Bienvenue",
+                    "maxplayers": "12",
+                    "password": "",
+                    "autocreate": "2",
+                    "difficulty": "0",
+                    "lobby": "public",
+                })
+            self.assertFalse(ok)
+            self.assertIn("lobby", err)
 
 
 class TerrariaWorldsTests(unittest.TestCase):
@@ -1518,6 +1548,24 @@ class TerrariaWorldsTests(unittest.TestCase):
                 self.assertEqual(app.config["GAME"]["server"]["world_name"], "bossrush")
                 self.assertIn('WORLD_NAME="bossrush"', Path(os.path.join(app_dir, "deploy_config.env")).read_text(encoding="utf-8"))
                 self.assertIn('WORLD_NAME="bossrush"', Path(os.path.join(app_dir, "backup_terraria.sh")).read_text(encoding="utf-8"))
+
+
+class TerrariaPlayersTests(unittest.TestCase):
+
+    def test_tracks_connected_players_from_logs(self):
+        lines = "\n".join([
+            "Server started",
+            "Expevay has joined.",
+            "Alice has joined.",
+            "Expevay has left.",
+        ])
+        original = terraria_players.subprocess.run
+        terraria_players.subprocess.run = lambda *args, **kwargs: types.SimpleNamespace(stdout=lines)
+        try:
+            players = terraria_players.get_players()
+        finally:
+            terraria_players.subprocess.run = original
+        self.assertEqual(players, [{'name': 'Alice'}])
 
 
 class EnshroudedConfigTests(unittest.TestCase):

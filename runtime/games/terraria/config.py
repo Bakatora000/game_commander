@@ -24,6 +24,16 @@ def _defaults():
         'maxplayers': str(game['server'].get('max_players', 8)),
         'password': '',
         'motd': game['name'],
+        'seed': '',
+        'banlist': 'banlist.txt',
+        'secure': '1',
+        'noupnp': '0',
+        'steam': '1',
+        'lobby': 'friends',
+        'ip': '',
+        'forcepriority': '0',
+        'disableannouncementbox': '0',
+        'announcementboxrange': '0',
     }
 
 
@@ -74,6 +84,8 @@ def write_config(new_data):
         ordered_keys = [
             'world', 'worldpath', 'worldname', 'autocreate', 'difficulty',
             'port', 'maxplayers', 'password', 'motd',
+            'seed', 'banlist', 'secure', 'noupnp', 'steam', 'lobby', 'ip',
+            'forcepriority', 'disableannouncementbox', 'announcementboxrange',
         ]
         for key in ordered_keys:
             lines.append(f'{key}={current.get(key, "")}')
@@ -90,6 +102,12 @@ def _validate(data):
         'maxplayers': (1, 255),
         'autocreate': (1, 3),
         'difficulty': (0, 3),
+        'secure': (0, 1),
+        'noupnp': (0, 1),
+        'steam': (0, 1),
+        'forcepriority': (0, 1),
+        'disableannouncementbox': (0, 1),
+        'announcementboxrange': (0, 10000),
     }
     for key, (min_v, max_v) in ints.items():
         try:
@@ -103,6 +121,9 @@ def _validate(data):
         return False, 'worldpath requis'
     if not data.get('worldname', '').strip():
         return False, 'worldname requis'
+    lobby = (data.get('lobby') or '').strip().lower()
+    if lobby and lobby not in {'friends', 'private'}:
+        return False, 'lobby doit être friends ou private'
     return True, None
 
 
@@ -114,4 +135,15 @@ def get_schema():
         {'key': 'password', 'label': 'Mot de passe', 'type': 'password'},
         {'key': 'autocreate', 'label': 'Taille du monde', 'type': 'select', 'options': ['1', '2', '3']},
         {'key': 'difficulty', 'label': 'Difficulté', 'type': 'select', 'options': ['0', '1', '2', '3']},
+        {'key': 'port', 'label': 'Port', 'type': 'number', 'min': 1, 'max': 65535},
+        {'key': 'seed', 'label': 'Seed', 'type': 'text'},
+        {'key': 'banlist', 'label': 'Banlist', 'type': 'text'},
+        {'key': 'secure', 'label': 'Mode sécurisé', 'type': 'select', 'options': ['0', '1']},
+        {'key': 'noupnp', 'label': 'Désactiver UPnP', 'type': 'select', 'options': ['0', '1']},
+        {'key': 'steam', 'label': 'Activer Steam', 'type': 'select', 'options': ['0', '1']},
+        {'key': 'lobby', 'label': 'Lobby', 'type': 'select', 'options': ['friends', 'private']},
+        {'key': 'ip', 'label': 'IP d’écoute', 'type': 'text'},
+        {'key': 'forcepriority', 'label': 'Priorité forcée', 'type': 'select', 'options': ['0', '1']},
+        {'key': 'disableannouncementbox', 'label': 'Désactiver announcement box', 'type': 'select', 'options': ['0', '1']},
+        {'key': 'announcementboxrange', 'label': 'Portée announcement box', 'type': 'number', 'min': 0, 'max': 10000},
     ]

@@ -25,6 +25,16 @@
 </div>
 {% endblock %}
 
+{% block dashboard_extra %}
+<div class="panel players-panel" id="playersPanel" style="display:none">
+  <div class="panel-header">
+    <span class="panel-title">Joueurs connectés</span>
+    <span class="panel-count" id="playersCount"></span>
+  </div>
+  <div id="playersList" class="players-list"></div>
+</div>
+{% endblock %}
+
 {% block game_scripts %}
 <script>
 const CONFIG_SCHEMA = [
@@ -44,8 +54,55 @@ const CONFIG_SCHEMA = [
   {section:'Serveur', key:'maxplayers', label:'Joueurs max',    type:'number', min:1, max:255},
   {section:'Accès',   key:'password',   label:'Mot de passe',   type:'password'},
   {section:'Réseau',  key:'port',       label:'Port de jeu',    type:'number', min:1, max:65535, help:'1–65535'},
+  {section:'Réseau',  key:'ip',         label:'IP d’écoute',    type:'text', help:'Vide = toutes les interfaces'},
+  {section:'Réseau',  key:'steam',      label:'Activer Steam',  type:'select', options:[
+    {value:'1', label:'Oui'},
+    {value:'0', label:'Non'},
+  ]},
+  {section:'Réseau',  key:'lobby',      label:'Lobby',          type:'select', options:[
+    {value:'friends', label:'Friends'},
+    {value:'private', label:'Private'},
+  ]},
+  {section:'Réseau',  key:'secure',     label:'Mode sécurisé',  type:'select', options:[
+    {value:'1', label:'Oui'},
+    {value:'0', label:'Non'},
+  ]},
+  {section:'Réseau',  key:'noupnp',     label:'Désactiver UPnP',type:'select', options:[
+    {value:'1', label:'Oui'},
+    {value:'0', label:'Non'},
+  ]},
+  {section:'Avancé',  key:'seed',       label:'Seed',           type:'text'},
+  {section:'Avancé',  key:'banlist',    label:'Fichier banlist',type:'text'},
+  {section:'Avancé',  key:'forcepriority', label:'Priorité forcée', type:'select', options:[
+    {value:'1', label:'Oui'},
+    {value:'0', label:'Non'},
+  ]},
+  {section:'Avancé',  key:'disableannouncementbox', label:'Désactiver announcement box', type:'select', options:[
+    {value:'1', label:'Oui'},
+    {value:'0', label:'Non'},
+  ]},
+  {section:'Avancé',  key:'announcementboxrange', label:'Portée announcement box', type:'number', min:0, max:10000, help:'0–10000'},
 ];
 let configData = {};
+
+async function loadPlayers() {
+  const r = await fetch(`${PREFIX}/api/players`).catch(() => null);
+  if (!r?.ok) return;
+  const {players} = await r.json();
+  const panel = document.getElementById('playersPanel');
+  const list = document.getElementById('playersList');
+  const count = document.getElementById('playersCount');
+  if (!panel || !list || !count) return;
+  panel.style.display = players.length > 0 ? '' : 'none';
+  count.textContent = `${players.length} en ligne`;
+  list.innerHTML = players.length
+    ? players.map(p => `
+      <div class="player-row">
+        <span class="player-dot"></span>
+        <span class="player-name">${p.name}</span>
+      </div>`).join('')
+    : '';
+}
 
 async function loadConfig() {
   const panel = document.getElementById('configPanel');
@@ -152,6 +209,11 @@ document.getElementById('btnSaveConfig')?.addEventListener('click', async () => 
 
 document.addEventListener('DOMContentLoaded', () => {
   loadTerrariaWorlds();
+  if (typeof currentState !== 'undefined' && currentState === 20) loadPlayers();
 });
+
+setInterval(() => {
+  if (typeof currentState !== 'undefined' && currentState === 20) loadPlayers();
+}, 15000);
 </script>
 {% endblock %}
