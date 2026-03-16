@@ -13,6 +13,7 @@ import subprocess
 import psutil
 
 
+_RE_CONNECT = re.compile(r'^\s*([0-9a-fA-F:.]+):\d+\s+is connecting\.\.\.\s*$')
 _RE_JOIN = re.compile(r'^\s*(.+?) has joined\.\s*$')
 _RE_LEFT = re.compile(r'^\s*(.+?) has left\.\s*$')
 
@@ -65,21 +66,26 @@ def get_players():
         return []
 
     players = {}
-    order = []
+    pending_ip = None
     for line in lines:
+        m = _RE_CONNECT.search(line)
+        if m:
+            pending_ip = m.group(1).strip()
+            continue
+
         m = _RE_JOIN.search(line)
         if m:
             name = m.group(1).strip()
-            if name and name not in players:
-                order.append(name)
             if name:
-                players[name] = True
+                players[name] = pending_ip or players.get(name, {}).get('ip', '')
+            pending_ip = None
             continue
 
         m = _RE_LEFT.search(line)
         if m:
             name = m.group(1).strip()
             players.pop(name, None)
+            pending_ip = None
             continue
 
-    return [{'name': name} for name in order if name in players]
+    return [{'name': name, 'ip': ip} for name, ip in players.items()]

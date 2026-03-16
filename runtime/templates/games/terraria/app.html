@@ -2,6 +2,20 @@
 
 {% block fonts %}family=Press+Start+2P&family=Inter:wght@400;500;600{% endblock %}
 {% block sidebar_logo %}🌳{% endblock %}
+{% block extra_head %}
+<style>
+  .player-ban-btn.is-off {
+    background: rgba(206, 82, 82, 0.18);
+    border-color: rgba(206, 82, 82, 0.65);
+    color: #ffc6c6;
+  }
+  .player-ban-btn.is-on {
+    background: rgba(122, 191, 142, 0.22);
+    border-color: rgba(122, 191, 142, 0.65);
+    color: #d8f3df;
+  }
+</style>
+{% endblock %}
 
 {% block config_tab %}
 <div class="panel">
@@ -32,6 +46,15 @@
     <span class="panel-count" id="playersCount"></span>
   </div>
   <div id="playersList" class="players-list"></div>
+</div>
+{% endblock %}
+
+{% block users_tab_extra %}
+<div class="panel">
+  <div class="panel-header">
+    <span class="panel-title">Joueurs bannis</span>
+  </div>
+  <div id="terrariaBansList"></div>
 </div>
 {% endblock %}
 
@@ -86,9 +109,14 @@ const CONFIG_SCHEMA = [
 let configData = {};
 
 async function loadPlayers() {
-  const r = await fetch(`${PREFIX}/api/players`).catch(() => null);
-  if (!r?.ok) return;
-  const {players} = await r.json();
+  const [playersResp, bansResp] = await Promise.all([
+    fetch(`${PREFIX}/api/players`).catch(() => null),
+    fetch(`${PREFIX}/api/bans`).catch(() => null),
+  ]);
+  if (!playersResp?.ok) return;
+  const {players} = await playersResp.json();
+  const bansData = bansResp?.ok ? await bansResp.json() : {entries: []};
+  const bannedNames = new Set((bansData.entries || []).map(entry => (entry.name || '').toLowerCase()));
   const panel = document.getElementById('playersPanel');
   const list = document.getElementById('playersList');
   const count = document.getElementById('playersCount');
@@ -100,8 +128,84 @@ async function loadPlayers() {
       <div class="player-row">
         <span class="player-dot"></span>
         <span class="player-name">${p.name}</span>
+        <button class="btn-ghost btn-sm player-ban-btn ${bannedNames.has((p.name || '').toLowerCase()) ? 'is-on' : 'is-off'}" data-name="${p.name}" data-ip="${p.ip || ''}" data-banned="${bannedNames.has((p.name || '').toLowerCase()) ? 'true' : 'false'}">${bannedNames.has((p.name || '').toLowerCase()) ? 'Unban' : 'Bannir'}</button>
       </div>`).join('')
     : '';
+  list.querySelectorAll('.player-ban-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.banned === 'true') {
+        removeTerrariaBan(btn.dataset.name, true);
+      } else {
+        addTerrariaBan(btn.dataset.name, btn.dataset.ip || '', true);
+      }
+    });
+  });
+}
+
+async function loadTerrariaBans() {
+  const r = await fetch(`${PREFIX}/api/bans`).catch(() => null);
+  const list = document.getElementById('terrariaBansList');
+  if (!list) return;
+  if (!r?.ok) {
+    list.innerHTML = '<p class="empty-msg">Impossible de lire la banlist</p>';
+    return;
+  }
+  const d = await r.json();
+  const entries = d.entries || [];
+  if (!entries.length) {
+    list.innerHTML = '<p class="empty-msg">Aucun joueur banni</p>';
+    return;
+  }
+  list.innerHTML = '';
+  entries.forEach(entry => {
+    const row = document.createElement('div');
+    row.className = 'save-row';
+    row.innerHTML = `
+      <div class="save-main">
+        <span class="save-icon">⛔</span>
+        <span class="save-link static">${entry.name}</span>
+        <span class="save-meta">${entry.ip || 'IP inconnue'}</span>
+      </div>
+      <div class="save-actions">
+        <button class="btn-ghost btn-sm terraria-ban-delete">Supprimer</button>
+      </div>`;
+    row.querySelector('.terraria-ban-delete').addEventListener('click', () => {
+      confirmThen(`Retirer ${entry.name} de la banlist Terraria ?`, () => removeTerrariaBan(entry.name));
+    });
+    list.appendChild(row);
+  });
+}
+
+async function addTerrariaBan(name, ip = '', fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/bans`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name, ip}),
+  }).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error === 'missing_ip' ? `IP introuvable pour ${name}` : (d.error || 'Erreur ajout ban Terraria'), 'error');
+    return;
+  }
+  showToast(d.already_present ? `${name} est déjà dans la banlist` : `${name} ajouté à la banlist`, 'success');
+  loadTerrariaBans();
+  if (fromPlayer) loadPlayers();
+}
+
+async function removeTerrariaBan(name, fromPlayer = false) {
+  closeModal();
+  const r = await fetch(`${PREFIX}/api/bans/${encodeURIComponent(name)}`, {
+    method: 'DELETE',
+  }).catch(() => null);
+  const d = r ? await r.json().catch(() => ({})) : {};
+  if (!r?.ok) {
+    showToast(d.error || 'Erreur suppression ban Terraria', 'error');
+    return;
+  }
+  showToast(`${name} retiré de la banlist`, 'success');
+  loadTerrariaBans();
+  if (fromPlayer) loadPlayers();
 }
 
 async function loadConfig() {
@@ -210,6 +314,7 @@ document.getElementById('btnSaveConfig')?.addEventListener('click', async () => 
 document.addEventListener('DOMContentLoaded', () => {
   loadTerrariaWorlds();
   if (typeof currentState !== 'undefined' && currentState === 20) loadPlayers();
+  loadTerrariaBans();
 });
 
 setInterval(() => {

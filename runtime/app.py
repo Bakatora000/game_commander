@@ -746,6 +746,7 @@ if GAME_ID == 'enshrouded':
 
 if GAME_ID == 'terraria':
     try:
+        import games.terraria.admins as _ta
         import games.terraria.worlds as _tw
 
         @app.route(f'{PREFIX}/api/worlds', methods=['GET'])
@@ -768,6 +769,28 @@ if GAME_ID == 'terraria':
                 return jsonify({'error': err}), 400
             data['server_running'] = server.get_status().get('state') == 20
             return jsonify({'ok': True, **data})
+
+        @app.route(f'{PREFIX}/api/bans', methods=['GET'])
+        @auth.require_auth
+        @auth.require_perm('manage_users')
+        def api_terraria_bans():
+            data, err = _ta.list_bans()
+            return jsonify(data) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/bans', methods=['POST'])
+        @auth.require_auth
+        @auth.require_perm('manage_users')
+        def api_terraria_bans_add():
+            payload = request.get_json() or {}
+            data, err = _ta.add_ban(payload.get('name', ''))
+            return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/bans/<name>', methods=['DELETE'])
+        @auth.require_auth
+        @auth.require_perm('manage_users')
+        def api_terraria_bans_delete(name):
+            data, err = _ta.remove_ban(name)
+            return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
     except ImportError as e:
         print(f'[WARN] worlds Terraria non chargé: {e}')
 

@@ -43,6 +43,7 @@ from runtime.games.enshrouded import config as enshrouded_config
 from runtime.games.enshrouded import players as enshrouded_players
 from runtime.games.enshrouded import worlds as enshrouded_worlds
 from runtime.games.terraria import config as terraria_config
+from runtime.games.terraria import admins as terraria_admins
 from runtime.games.terraria import worlds as terraria_worlds
 from runtime.games.terraria import players as terraria_players
 from runtime.games.valheim import world_modifiers as valheim_world_modifiers
@@ -1555,6 +1556,7 @@ class TerrariaPlayersTests(unittest.TestCase):
     def test_tracks_connected_players_from_logs(self):
         lines = "\n".join([
             "Server started",
+            "88.120.128.49:60232 is connecting...",
             "Expevay has joined.",
             "Alice has joined.",
             "Expevay has left.",
@@ -1565,7 +1567,75 @@ class TerrariaPlayersTests(unittest.TestCase):
             players = terraria_players.get_players()
         finally:
             terraria_players.subprocess.run = original
-        self.assertEqual(players, [{'name': 'Alice'}])
+        self.assertEqual(players, [{'name': 'Alice', 'ip': ''}])
+
+    def test_reconnect_does_not_duplicate_player(self):
+        lines = "\n".join([
+            "88.120.128.49:60232 is connecting...",
+            "Expevay has joined.",
+            "Expevay has left.",
+            "88.120.128.49:60233 is connecting...",
+            "Expevay has joined.",
+        ])
+        original = terraria_players.subprocess.run
+        terraria_players.subprocess.run = lambda *args, **kwargs: types.SimpleNamespace(stdout=lines)
+        try:
+            players = terraria_players.get_players()
+        finally:
+            terraria_players.subprocess.run = original
+        self.assertEqual(players, [{'name': 'Expevay', 'ip': '88.120.128.49'}])
+
+
+class TerrariaBanlistTests(unittest.TestCase):
+
+    def _app(self, install_dir, data_dir):
+        app = Flask(__name__)
+        app.config["GAME"] = {
+            "id": "terraria",
+            "name": "Terraria",
+            "server": {
+                "install_dir": install_dir,
+                "data_dir": data_dir,
+                "port": 7777,
+                "max_players": 8,
+            },
+        }
+        return app
+
+    def test_add_and_remove_ban(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            data_dir = os.path.join(tmpdir, "worlds")
+            os.makedirs(data_dir, exist_ok=True)
+            app = self._app(tmpdir, data_dir)
+            with app.app_context():
+                ok, err = terraria_config.write_config({
+                    "worldname": "terraria",
+                    "motd": "Bienvenue",
+                    "maxplayers": "8",
+                    "password": "",
+                    "autocreate": "2",
+                    "difficulty": "0",
+                    "banlist": "banlist.txt",
+                })
+                self.assertTrue(ok)
+                self.assertIsNone(err)
+                terraria_admins._journal_lines = lambda: [
+                    "88.120.128.49:60232 is connecting...",
+                    "Expevay has joined.",
+                ]
+                data, err = terraria_admins.add_ban("Expevay")
+                self.assertIsNone(err)
+                self.assertFalse(data["already_present"])
+                self.assertEqual(data["ip"], "88.120.128.49")
+                data, err = terraria_admins.list_bans()
+                self.assertIsNone(err)
+                self.assertEqual(data["entries"], [{"name": "Expevay", "ip": "88.120.128.49"}])
+                data, err = terraria_admins.remove_ban("Expevay")
+                self.assertIsNone(err)
+                self.assertEqual(data["name"], "Expevay")
+                data, err = terraria_admins.list_bans()
+                self.assertIsNone(err)
+                self.assertEqual(data["entries"], [])
 
 
 class EnshroudedConfigTests(unittest.TestCase):
