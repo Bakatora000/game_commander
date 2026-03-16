@@ -3,6 +3,18 @@
 Suite de déploiement et d’administration de serveurs de jeu,
 basée sur `systemd`, `psutil`, `Flask`, `bcrypt` et Nginx.
 
+## Prérequis
+
+- serveur Linux requis
+- OS validé en réel : `Ubuntu 24.04`
+- `systemd` requis pour le pilotage des services
+- `nginx`, `sudo`, `python3` et `apt` requis côté système
+
+Le projet n’est pas prévu pour :
+- Windows
+- hébergement mutualisé
+- environnements sans `systemd`
+
 ## Point d'entrée recommandé
 
 L’entrée utilisateur normale est maintenant :
