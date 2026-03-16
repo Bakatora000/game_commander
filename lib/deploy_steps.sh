@@ -546,10 +546,10 @@ SVCEOF
         START_SCRIPT="$SERVER_DIR/start_server.sh"
         WRAPPER_SCRIPT="$SERVER_DIR/start_server_service.sh"
         mkdir -p "$SERVER_DIR/logs"
-        cat > "$START_SCRIPT" << STARTEOF
+        cat > "$START_SCRIPT" << 'STARTEOF'
 #!/usr/bin/env bash
-cd "${SERVER_DIR}"
-CFG="${SERVER_DIR}/serverconfig.txt"
+cd "__SERVER_DIR__"
+CFG="__SERVER_DIR__/serverconfig.txt"
 cfg_get() {
     local key="$1"
     sed -n "s/^${key}=//p" "$CFG" | head -1
@@ -578,6 +578,7 @@ ARGS=(
 [[ -n "\$PASSWORD" ]] && ARGS+=(-password "\$PASSWORD")
 exec ./TerrariaServer.bin.x86_64 "\${ARGS[@]}"
 STARTEOF
+        sed -i "s|__SERVER_DIR__|${SERVER_DIR}|g" "$START_SCRIPT"
         chmod +x "$START_SCRIPT"
         chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
         ok "Script de démarrage : $START_SCRIPT"
