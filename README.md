@@ -18,6 +18,23 @@ Cette page hub liste les instances disponibles et ouvre ensuite leur interface d
 Les URLs d’instance existent toujours, mais `/commander` est désormais la porte d’entrée
 principale.
 
+## Valheim Screenshots
+
+### Dashboard
+![Valheim Dashboard](docs/screenshots/valheim/Menu1.png)
+
+### Configuration
+![Valheim Configuration](docs/screenshots/valheim/Menu2.png)
+
+### Fichiers
+![Valheim Files](docs/screenshots/valheim/Menu3.png)
+
+### Utilisateurs
+![Valheim Users](docs/screenshots/valheim/Menu4.png)
+
+### Mods
+![Valheim Mods](docs/screenshots/valheim/Menu5.png)
+
 ## Utilisation courante
 
 ```bash
