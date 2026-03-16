@@ -30,6 +30,18 @@ Cette page hub liste les instances disponibles et ouvre ensuite leur interface d
 Les URLs d’instance existent toujours, mais `/commander` est désormais la porte d’entrée
 principale.
 
+## Jeux gérés actuellement
+
+- `Valheim`
+- `Enshrouded`
+- `Minecraft Java`
+- `Minecraft Fabric`
+- `Terraria` (vanilla)
+- `Soulmask`
+
+Un tableau plus détaillé avec moteur d'installation, mods et fichier de configuration principal
+est disponible plus bas dans la section `Jeux supportés`.
+
 ## Valheim Screenshots
 
 ### Dashboard
