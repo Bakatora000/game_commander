@@ -7,11 +7,18 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 import time
 from pathlib import Path
 
 import requests
 from flask import current_app
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from shared import hostctl
 
 
 def _manifest_path() -> Path:
@@ -51,6 +58,9 @@ def _instance_app_dir(instance_name: str) -> Path:
 
 
 def _instance_config_file(instance_name: str) -> Path:
+    resolved = hostctl.resolve_instance_config(instance_name)
+    if resolved:
+        return resolved
     return _instance_app_dir(instance_name) / "deploy_config.env"
 
 

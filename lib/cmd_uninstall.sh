@@ -42,11 +42,7 @@ cmd_uninstall() {
         if [[ -n "$target_config" ]]; then
             cfg="$target_config"
         else
-            while IFS= read -r candidate; do
-                grep -q "^INSTANCE_ID=\"${target_instance}\"" "$candidate" 2>/dev/null || continue
-                cfg="$candidate"
-                break
-            done < <(find /home /opt /root -maxdepth 5 -name "deploy_config.env" 2>/dev/null | sort -u)
+            cfg="$(python3 "$SCRIPT_DIR/shared/hostctl.py" resolve-config --instance "$target_instance" 2>/dev/null || true)"
         fi
         [[ -n "$cfg" && -f "$cfg" ]] || die "Configuration d'instance introuvable"
         uninstall_gc_process_entry "$cfg" "$gc_action"

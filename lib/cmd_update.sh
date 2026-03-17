@@ -2,9 +2,7 @@
 # Commande : sudo bash game_commander.sh update [--instance ID] [--all]
 
 update_collect_configs() {
-    find /home /opt /root -maxdepth 5 -name "deploy_config.env" 2>/dev/null \
-        | xargs -I{} grep -l "GAME_ID=" {} 2>/dev/null \
-        | sort -u
+    python3 "$SCRIPT_DIR/shared/hostctl.py" list-configs
 }
 
 update_game_meta() {

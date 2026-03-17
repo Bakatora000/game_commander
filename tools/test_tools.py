@@ -29,6 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
+from shared import hostctl
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -228,6 +229,54 @@ class NginxInjectTests(unittest.TestCase):
             self.assertEqual(len(baks), 1, "Un backup doit être créé")
         finally:
             os.unlink(conf)
+
+
+class HostCtlTests(unittest.TestCase):
+
+    def test_parse_env_file_reads_simple_pairs(self):
+        with tempfile.TemporaryDirectory() as d:
+            env_path = Path(d) / "deploy_config.env"
+            env_path.write_text('INSTANCE_ID="valheim2"\nGAME_ID="valheim"\n', encoding="utf-8")
+            data = hostctl.parse_env_file(env_path)
+            self.assertEqual(data["INSTANCE_ID"], "valheim2")
+            self.assertEqual(data["GAME_ID"], "valheim")
+
+    def test_discover_instance_configs_filters_non_gc_envs(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            good_dir = root / "game-commander-valheim2"
+            bad_dir = root / "other"
+            good_dir.mkdir()
+            bad_dir.mkdir()
+            (good_dir / "deploy_config.env").write_text(
+                'INSTANCE_ID="valheim2"\nGAME_ID="valheim"\n',
+                encoding="utf-8",
+            )
+            (bad_dir / "deploy_config.env").write_text(
+                'INSTANCE_ID="ghost"\n',
+                encoding="utf-8",
+            )
+            configs = hostctl.discover_instance_configs(search_roots=[str(root)])
+            self.assertEqual(configs, [(good_dir / "deploy_config.env").resolve()])
+
+    def test_resolve_instance_config_returns_matching_config(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            first_dir = root / "game-commander-a"
+            second_dir = root / "game-commander-b"
+            first_dir.mkdir()
+            second_dir.mkdir()
+            (first_dir / "deploy_config.env").write_text(
+                'INSTANCE_ID="alpha"\nGAME_ID="valheim"\n',
+                encoding="utf-8",
+            )
+            target = second_dir / "deploy_config.env"
+            target.write_text(
+                'INSTANCE_ID="beta"\nGAME_ID="satisfactory"\n',
+                encoding="utf-8",
+            )
+            resolved = hostctl.resolve_instance_config("beta", search_roots=[str(root)])
+            self.assertEqual(resolved, target.resolve())
             for b in Path(conf).parent.glob(Path(conf).name + ".bak.*"):
                 b.unlink(missing_ok=True)
 
