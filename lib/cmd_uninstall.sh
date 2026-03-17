@@ -42,7 +42,7 @@ cmd_uninstall() {
         if [[ -n "$target_config" ]]; then
             cfg="$target_config"
         else
-            cfg="$(python3 "$SCRIPT_DIR/shared/hostctl.py" resolve-config --instance "$target_instance" 2>/dev/null || true)"
+            cfg="$(python3 "$SCRIPT_DIR/tools/host_cli.py" resolve-config --instance "$target_instance" 2>/dev/null || true)"
         fi
         [[ -n "$cfg" && -f "$cfg" ]] || die "Configuration d'instance introuvable"
         uninstall_gc_process_entry "$cfg" "$gc_action"

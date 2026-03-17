@@ -2,7 +2,7 @@
 # Commande : sudo bash game_commander.sh update [--instance ID] [--all]
 
 update_collect_configs() {
-    python3 "$SCRIPT_DIR/shared/hostctl.py" list-configs
+    python3 "$SCRIPT_DIR/tools/host_cli.py" list-configs
 }
 
 update_game_meta() {

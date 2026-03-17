@@ -312,6 +312,32 @@ class HostOpsTests(unittest.TestCase):
             ["sudo", "/bin/bash", script, "rebalance", "--restart"],
         )
 
+
+class HostCliTests(unittest.TestCase):
+
+    def test_list_configs_uses_hostctl_discovery(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            root = Path(d)
+            inst = root / "game-commander-valheim2"
+            inst.mkdir()
+            (inst / "deploy_config.env").write_text('INSTANCE_ID="valheim2"\nGAME_ID="valheim"\n', encoding="utf-8")
+            from tools import host_cli
+            rc = host_cli.main(["list-configs", "--root", str(root)])
+            self.assertEqual(rc, 0)
+            self.assertIn(str((inst / "deploy_config.env").resolve()), stdout.getvalue())
+
+    def test_resolve_config_returns_matching_path(self):
+        with tempfile.TemporaryDirectory() as d, mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            root = Path(d)
+            inst = root / "game-commander-satisfactory"
+            inst.mkdir()
+            target = inst / "deploy_config.env"
+            target.write_text('INSTANCE_ID="satisfactory"\nGAME_ID="satisfactory"\n', encoding="utf-8")
+            from tools import host_cli
+            rc = host_cli.main(["resolve-config", "--root", str(root), "--instance", "satisfactory"])
+            self.assertEqual(rc, 0)
+            self.assertEqual(stdout.getvalue().strip(), str(target.resolve()))
+
     def test_inject_missing_file(self):
         """Retourne 1 si le fichier n'existe pas."""
         rc = nginx_manager.cmd_inject(make_args(

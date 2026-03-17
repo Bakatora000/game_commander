@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from shared import hostops
+from shared import hostctl, hostops
 
 
 def _existing_path(value: str) -> Path:
@@ -85,9 +85,35 @@ def cmd_rebalance(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_list_configs(args: argparse.Namespace) -> int:
+    configs = hostctl.discover_instance_configs(search_roots=args.root, max_depth=args.max_depth)
+    for path in configs:
+        print(path)
+    return 0
+
+
+def cmd_list_instances(args: argparse.Namespace) -> int:
+    records = hostctl.discover_instance_records(search_roots=args.root, max_depth=args.max_depth)
+    for item in records:
+        print(f"{item['instance_id']} {item['game_id']} {item['config']}")
+    return 0
+
+
+def cmd_resolve_config(args: argparse.Namespace) -> int:
+    path = hostctl.resolve_instance_config(args.instance, search_roots=args.root, max_depth=args.max_depth)
+    if not path:
+        return 1
+    print(path)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Game Commander host action CLI")
     sub = parser.add_subparsers(dest="command", required=True)
+
+    def add_search_flags(cmd):
+        cmd.add_argument("--root", action="append", default=[])
+        cmd.add_argument("--max-depth", type=int, default=hostctl.DEFAULT_MAX_DEPTH)
 
     service = sub.add_parser("service-action")
     service.add_argument("--service", required=True)
@@ -114,15 +140,29 @@ def build_parser() -> argparse.ArgumentParser:
     rebalance.add_argument("--restart", action="store_true")
     rebalance.set_defaults(func=cmd_rebalance)
 
+    list_configs = sub.add_parser("list-configs")
+    add_search_flags(list_configs)
+    list_configs.set_defaults(func=cmd_list_configs)
+
+    list_instances = sub.add_parser("list-instances")
+    add_search_flags(list_instances)
+    list_instances.set_defaults(func=cmd_list_instances)
+
+    resolve_config = sub.add_parser("resolve-config")
+    add_search_flags(resolve_config)
+    resolve_config.add_argument("--instance", required=True)
+    resolve_config.set_defaults(func=cmd_resolve_config)
+
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    if hasattr(args, "root") and not args.root:
+        args.root = list(hostctl.DEFAULT_SEARCH_ROOTS)
     return args.func(args)
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
