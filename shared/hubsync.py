@@ -9,11 +9,18 @@ import pwd
 import secrets
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import bcrypt
 
-from . import instanceenv
+if __package__ in {None, ""}:
+    ROOT_DIR = Path(__file__).resolve().parents[1]
+    if str(ROOT_DIR) not in sys.path:
+        sys.path.insert(0, str(ROOT_DIR))
+    from shared import instanceenv
+else:
+    from . import instanceenv
 
 GC_NGINX_MANIFEST = "/etc/nginx/game-commander-manifest.json"
 GC_CPU_MONITOR_STATE = "/var/lib/game-commander/cpu-monitor.json"

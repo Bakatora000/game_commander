@@ -6,10 +6,17 @@ import argparse
 import os
 import pwd
 import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 
-from . import deployenv, instanceenv
+if __package__ in {None, ""}:
+    ROOT_DIR = Path(__file__).resolve().parents[1]
+    if str(ROOT_DIR) not in sys.path:
+        sys.path.insert(0, str(ROOT_DIR))
+    from shared import deployenv, instanceenv
+else:
+    from . import deployenv, instanceenv
 
 
 def _bool(env: dict[str, str], key: str, default: bool = False) -> bool:
