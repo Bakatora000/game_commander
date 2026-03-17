@@ -51,6 +51,7 @@ update_game_meta() {
 update_process_config() {
     local cfg="$1"
     local hooks_only="${2:-false}"
+    local hub_only="${3:-false}"
     unset GAME_ID INSTANCE_ID SYS_USER SERVER_DIR DATA_DIR BACKUP_DIR APP_DIR SRC_DIR \
           WORLD_NAME SERVER_NAME SERVER_PASSWORD SERVER_ADMIN_PASSWORD SERVER_PORT QUERY_PORT ECHO_PORT \
           MAX_PLAYERS SERVER_MODE BACKUP_ENABLED SAVING_ENABLED BACKUP_INTERVAL CROSSPLAY BEPINEX DOMAIN \
@@ -126,10 +127,12 @@ update_process_config() {
         ok "game.json régénéré"
     fi
 
-    SKIP_BACKUP_TEST=true
-    deploy_step_backups
-    cpu_affinity_apply_all false
-    cpu_monitor_install
+    if [[ "$hub_only" != "true" ]]; then
+        SKIP_BACKUP_TEST=true
+        deploy_step_backups
+        cpu_affinity_apply_all false
+        cpu_monitor_install
+    fi
     deploy_step_hub_service
 
     systemctl restart "$GC_SERVICE"
@@ -144,7 +147,7 @@ cmd_update() {
     [[ $EUID -eq 0 ]] || die "Lancez en root : sudo bash $0 update"
 
     local target_instance="" update_all=false
-    local hooks_only=false
+    local hooks_only=false hub_only=false
     local -a args=("$@")
     local i
     for ((i=0; i<${#args[@]}; i++)); do
@@ -158,6 +161,10 @@ cmd_update() {
                 ;;
             --hooks-only)
                 hooks_only=true
+                ;;
+            --hub-only)
+                hooks_only=true
+                hub_only=true
                 ;;
         esac
     done
@@ -204,12 +211,12 @@ cmd_update() {
             die "Choix invalide."
         fi
     else
-        die "--hooks-only exige --instance"
+        die "--hooks-only/--hub-only exigent --instance"
     fi
 
     local cfg
     for cfg in "${selected[@]}"; do
         sep
-        update_process_config "$cfg" "$hooks_only"
+        update_process_config "$cfg" "$hooks_only" "$hub_only"
     done
 }
