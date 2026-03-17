@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import appfiles, appservice, cpuplan, deploybackups, deployenv, deploynginx, deploypost, deployssl, deploysudo, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
+from shared import appfiles, appservice, cpuplan, deploybackups, deploydeps, deployenv, deploynginx, deploypost, deployssl, deploysudo, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -1350,6 +1350,27 @@ class DeployHelpersTests(unittest.TestCase):
         ok, messages = deployssl.apply_ssl("existing", "gaming.example.com")
         self.assertTrue(ok)
         self.assertEqual(messages, ["SSL existant — non modifié"])
+
+    def test_inspect_dependencies_reports_missing_from_empty_system(self):
+        with mock.patch.object(deploydeps, "_is_dpkg_installed", return_value=False), \
+             mock.patch.object(deploydeps, "_python_module_available", return_value=False), \
+             mock.patch.object(deploydeps, "_cmd_exists", return_value=False), \
+             mock.patch("subprocess.run") as run_mock:
+            run_mock.return_value = mock.Mock(stdout="", returncode=0)
+            payload = deploydeps.inspect_dependencies(
+                deploy_mode="managed",
+                steam_appid="896660",
+                ssl_mode="certbot",
+                game_id="enshrouded",
+                home_dir="/home/gameserver",
+            )
+        self.assertIn("python3", payload["apt_missing"])
+        self.assertIn("python3-flask", payload["python_apt_missing"])
+        self.assertIn("requests", payload["python_pip_missing"])
+        self.assertTrue(payload["need_i386"])
+        self.assertFalse(payload["i386_enabled"])
+        self.assertIn("lib32gcc-s1", payload["extra_apt_missing"])
+        self.assertTrue(payload["enshrouded"]["required"])
 
 
 class ConfigGenUsersJsonTests(unittest.TestCase):
