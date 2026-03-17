@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from shared import cpuplan, hostctl, hostops, hubsync, uninstallcore, updatecore, updatehooks
+from shared import cpuplan, hostctl, hostops, hubsync, redeploycore, uninstallcore, updatecore, updatehooks
 
 
 def _existing_path(value: str) -> Path:
@@ -60,15 +60,12 @@ def cmd_update_instance(args: argparse.Namespace) -> int:
 
 
 def cmd_redeploy_instance(args: argparse.Namespace) -> int:
-    ok, message = hostops.run_command(
-        hostops.redeploy_instance_cmd(args.main_script, args.config),
-        timeout=1200,
-    )
-    if not ok and message:
-        print(message, file=sys.stderr)
+    ok, result = redeploycore.run_redeploy(args.config, args.main_script)
+    if not ok:
+        print(result, file=sys.stderr)
         return 1
-    if message:
-        print(message)
+    for line in result:
+        print(line)
     return 0
 
 
