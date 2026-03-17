@@ -294,10 +294,6 @@ deploy_configure_server() {
     SERVER_NAME="$REPLY"
     prompt_secret "Mot de passe (vide = public)" "${SERVER_PASSWORD}"
     SERVER_PASSWORD="$REPLY"
-    if [[ "$GAME_ID" == "soulmask" ]]; then
-        prompt_secret "Mot de passe administrateur serveur" "${SERVER_ADMIN_PASSWORD}"
-        SERVER_ADMIN_PASSWORD="$REPLY"
-    fi
 
     if [[ "$DEPLOY_MODE" != "attach" ]] && conflict="$(deploy_first_port_group_conflict)"; then
         IFS='|' read -r spec proto label port <<< "$conflict"
@@ -346,13 +342,7 @@ deploy_configure_server() {
             echo -e "  ${DIM}  (config) Sauvegardes  : ${BOLD}${SAVING_ENABLED}${RESET}"
             echo -e "  ${DIM}  (config) Backup intervalle : ${BOLD}${BACKUP_INTERVAL}${RESET}"
         else
-            echo -e "  ${BOLD}Mode serveur :${RESET}"
-            echo -e "  ${CYAN}[0]${RESET} Quit"
-            echo -e "  ${CYAN}[1]${RESET} PvE"
-            echo -e "  ${CYAN}[2]${RESET} PvP"
-            prompt "Votre choix" "$([[ "$SERVER_MODE" == "pvp" ]] && echo 2 || echo 1)"
-            [[ "$REPLY" == "0" ]] && return 10
-            [[ "$REPLY" == "2" ]] && SERVER_MODE="pvp" || SERVER_MODE="pve"
+            SERVER_MODE="pve"
             confirm "Activer les backups Soulmask ?" "o" && BACKUP_ENABLED=true || BACKUP_ENABLED=false
             confirm "Activer les sauvegardes périodiques ?" "o" && SAVING_ENABLED=true || SAVING_ENABLED=false
         fi
