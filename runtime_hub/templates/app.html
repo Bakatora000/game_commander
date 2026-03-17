@@ -274,6 +274,19 @@
     </section>
 
     <section class="grid" id="cards"></section>
+
+    <section class="accounts-panel">
+      <div class="monitor-head">
+        <div>
+          <h2 class="section-title">Console Hub</h2>
+          <p class="section-subtitle">Trace globale des opérations déclenchées depuis le Hub, tous jeux confondus.</p>
+        </div>
+        <button class="monitor-toggle" type="button" id="btnToggleGlobalConsole">Console</button>
+      </div>
+      <div class="console-panel" id="globalConsolePanel" hidden>
+        <pre class="console-output" id="globalConsoleOutput">Chargement…</pre>
+      </div>
+    </section>
   </main>
   <script>
     const STATE_LABELS = { 0: 'Hors ligne', 10: 'Démarrage', 20: 'En ligne', 30: 'Arrêt', 40: 'Busy' };
@@ -339,15 +352,6 @@
               data-label="Désinstaller"
               data-confirm="Désinstaller complètement ${inst.name} ?"
             >Désinstaller</button>
-            <button
-              class="secondary-btn is-compact"
-              type="button"
-              data-action="toggle-console"
-              data-instance="${inst.name}"
-            >Console</button>
-          </div>
-          <div class="console-panel" id="console-panel-${inst.name}" hidden>
-            <pre class="console-output" id="console-output-${inst.name}">Chargement…</pre>
           </div>
           <div class="action-feedback" id="feedback-instance-${inst.name}"></div>
         </article>
@@ -405,30 +409,20 @@
           }
         });
       });
-      cardsEl.querySelectorAll('[data-action="toggle-console"]').forEach((button) => {
-        button.addEventListener('click', async () => {
-          const instance = button.dataset.instance;
-          const panel = document.getElementById(`console-panel-${instance}`);
-          const output = document.getElementById(`console-output-${instance}`);
-          const willShow = panel.hasAttribute('hidden');
-          if (!willShow) {
-            panel.setAttribute('hidden', '');
-            return;
-          }
-          panel.removeAttribute('hidden');
-          output.textContent = 'Chargement…';
-          try {
-            const response = await fetch(`{{ prefix }}/api/instances/${encodeURIComponent(instance)}/console`, {
-              credentials: 'same-origin',
-            });
-            const data = await response.json().catch(() => ({}));
-            const lines = Array.isArray(data.lines) ? data.lines : [];
-            output.textContent = lines.length ? lines.join('\n') : 'Aucune trace pour cette instance.';
-          } catch (_err) {
-            output.textContent = 'Impossible de charger la console.';
-          }
+    }
+    async function loadGlobalConsole() {
+      const output = document.getElementById('globalConsoleOutput');
+      output.textContent = 'Chargement…';
+      try {
+        const response = await fetch(`{{ prefix }}/api/console`, {
+          credentials: 'same-origin',
         });
-      });
+        const data = await response.json().catch(() => ({}));
+        const lines = Array.isArray(data.lines) ? data.lines : [];
+        output.textContent = lines.length ? lines.join('\n') : 'Aucune trace Hub pour le moment.';
+      } catch (_err) {
+        output.textContent = 'Impossible de charger la console du Hub.';
+      }
     }
     function setFeedback(id, message, ok = false) {
       const el = document.getElementById(id);
@@ -557,6 +551,15 @@
       const hidden = panel.hidden;
       panel.hidden = !hidden;
       document.getElementById('btnToggleChangePassword').textContent = hidden ? 'Masquer' : 'Changer mon mot de passe';
+    });
+    document.getElementById('btnToggleGlobalConsole').addEventListener('click', async () => {
+      const panel = document.getElementById('globalConsolePanel');
+      const hidden = panel.hidden;
+      panel.hidden = !hidden;
+      document.getElementById('btnToggleGlobalConsole').textContent = hidden ? 'Masquer' : 'Console';
+      if (hidden) {
+        await loadGlobalConsole();
+      }
     });
     async function load() {
       const [instancesResponse] = await Promise.all([

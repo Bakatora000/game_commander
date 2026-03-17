@@ -1302,7 +1302,7 @@ class HubHostTests(unittest.TestCase):
             self.assertEqual(payload["monitor"]["status"], "Stable")
             self.assertEqual(payload["instances"][0]["cpu_monitor"]["instance"]["affinity"], "4 5")
 
-    def test_instance_console_reads_last_lines(self):
+    def test_global_console_reads_last_lines(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             manifest_path = root / "manifest.json"
@@ -1310,9 +1310,9 @@ class HubHostTests(unittest.TestCase):
             app = self._make_app(root, manifest_path)
             log_dir = root / "action-logs"
             log_dir.mkdir()
-            (log_dir / "valheim2.log").write_text("line1\nline2\nline3\n", encoding="utf-8")
+            (log_dir / "hub-actions.log").write_text("line1\nline2\nline3\n", encoding="utf-8")
             with app.app_context():
-                lines = hub_host.get_instance_console("valheim2", max_lines=2)
+                lines = hub_host.get_global_console(max_lines=2)
             self.assertEqual(lines, ["line2", "line3"])
 
 

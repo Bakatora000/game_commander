@@ -88,11 +88,11 @@ def api_instances():
     return jsonify(host.get_hub_payload())
 
 
-@app.route(f"{PREFIX}/api/instances/<instance_name>/console")
+@app.route(f"{PREFIX}/api/console")
 @auth.require_auth
 @auth.require_perm("view_hub")
-def api_instance_console(instance_name):
-    return jsonify({"lines": host.get_instance_console(instance_name)})
+def api_console():
+    return jsonify({"lines": host.get_global_console()})
 
 
 @app.route(f"{PREFIX}/api/accounts")

@@ -42,9 +42,8 @@ def _action_log_dir() -> Path:
     return Path(current_app.config.get("ACTION_LOG_DIR") or (Path(current_app.root_path).parent / "action-logs"))
 
 
-def _instance_log_path(instance_name: str) -> Path:
-    safe_name = "".join(ch for ch in instance_name if ch.isalnum() or ch in {"-", "_", "."}) or "unknown"
-    return _action_log_dir() / f"{safe_name}.log"
+def _global_log_path() -> Path:
+    return _action_log_dir() / "hub-actions.log"
 
 
 def _append_action_log(instance_name: str, action: str, ok: bool, message: str) -> None:
@@ -53,15 +52,15 @@ def _append_action_log(instance_name: str, action: str, ok: bool, message: str) 
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     status = "OK" if ok else "ERR"
     content = (message or "").strip() or "(aucun détail)"
-    with _instance_log_path(instance_name).open("a", encoding="utf-8") as fh:
-        fh.write(f"[{timestamp}] {status} {action}\n")
+    with _global_log_path().open("a", encoding="utf-8") as fh:
+        fh.write(f"[{timestamp}] {status} {instance_name} {action}\n")
         for line in content.splitlines():
             fh.write(f"  {line}\n")
         fh.write("\n")
 
 
-def get_instance_console(instance_name: str, max_lines: int = 120) -> list[str]:
-    path = _instance_log_path(instance_name)
+def get_global_console(max_lines: int = 240) -> list[str]:
+    path = _global_log_path()
     if not path.is_file():
         return []
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
