@@ -192,7 +192,7 @@ def install_mod(namespace, name, version):
                     selected_members = _selected_bepinex_members(names, namespace, name)
                     if not selected_members:
                         return False, 'Archive mod BepInEx invalide : fichiers du mod introuvables'
-                    dest_base = os.path.dirname(plugins)
+                    dest_base = os.path.dirname(_bepinex_path())
                     dest_root = os.path.realpath(dest_base)
                     for member in selected_members:
                         target = os.path.realpath(os.path.join(dest_base, member))

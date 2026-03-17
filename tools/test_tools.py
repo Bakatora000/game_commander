@@ -2299,7 +2299,9 @@ class ValheimModsTests(unittest.TestCase):
 
     def test_install_mod_accepts_direct_plugin_dll_when_slug_is_longer_than_filename(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            app = self._app(tmpdir)
+            bepinex = Path(tmpdir, "BepInEx")
+            bepinex.mkdir(parents=True)
+            app = self._app(str(bepinex))
             original_get = valheim_mods.http.get
 
             class FakeResp:
@@ -2319,7 +2321,7 @@ class ValheimModsTests(unittest.TestCase):
             finally:
                 valheim_mods.http.get = original_get
 
-            self.assertTrue(Path(tmpdir, "plugins", "ValheimPlus.dll").is_file())
+            self.assertTrue(Path(tmpdir, "BepInEx", "plugins", "ValheimPlus.dll").is_file())
 
     def test_remove_mod_accepts_single_dll_install(self):
         with tempfile.TemporaryDirectory() as tmpdir:
