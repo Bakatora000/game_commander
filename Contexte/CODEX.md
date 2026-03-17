@@ -47,6 +47,20 @@ UI. The startup path was hardened to pass the critical world/server parameters d
 to `TerrariaServer.bin.x86_64` rather than relying only on `-config serverconfig.txt`.
 The systemd launch also uses a PTY wrapper (`script -qefc`) to avoid the high CPU behavior
 seen when the Terraria server runs headless without a pseudo-terminal.
+Terraria has now also reached a usable product baseline in real conditions:
+- active world selection from detected `.wld` files
+- file manager and backups on the server world directory
+- connected players list based on `has joined` / `has left`
+- functional vanilla ban management from the Commander
+- Terraria-specific advanced server options exposed from `serverconfig.txt`
+
+Operational note: vanilla Terraria bans are not equivalent to Valheim or Minecraft roles.
+There is no native whitelist/admin model comparable to those games. The useful vanilla
+server-side control exposed so far is the `banlist`, which must store both player name
+and IP. For connected players, the Commander correlates:
+- `<ip>:<port> is connecting...`
+- `<name> has joined.`
+to build a valid `banlist` entry.
 
 Validated deployment note: Valheim support has now reached a stable beta-test state in
 real use. The current validated scope includes:
@@ -180,6 +194,7 @@ Current backup policy by game:
 - Enshrouded: `savegame/`
 - Minecraft Java / Fabric: `world/` + main admin files
 - Terraria: server world/data directory
+- Satisfactory: `SaveGames/` under the instance-specific Linux data dir
 - Soulmask: `WS/Saved`
 
 Current save manager scope:
@@ -211,6 +226,18 @@ Short roadmap after `v2.3`:
 - keep Soulmask at its current baseline unless beta feedback reveals specific missing product features
 - continue UI/CSS/accessibility cleanup incrementally after the first theme-system pass
 - preserve `/commander` as the normal entrypoint and keep hub status independent from per-instance auth
+
+Roadmap status update:
+- Terraria has now largely caught up to the baseline standard expected for vanilla support
+- Enshrouded remains the next best candidate for deeper product work (roles, bans, possible world-slot switching abstraction)
+- A later dedicated `terraria-tshock` variant remains a valid product path, but it is deferred
+- `Satisfactory` is now started in V1:
+  - managed deploy
+  - systemd service
+  - Commander runtime
+  - save/file manager on `SaveGames`
+  - backups isolated per instance
+  - connection info with `7777/TCP+UDP` and `8888/TCP`
 
 ## Adding a New Game
 

@@ -38,6 +38,7 @@ principale.
 - `Minecraft Fabric`
 - `Terraria` (vanilla)
 - `Soulmask`
+- `Satisfactory`
 
 Un tableau plus détaillé avec moteur d'installation, mods et fichier de configuration principal
 est disponible plus bas dans la section `Jeux supportés`.
@@ -304,6 +305,7 @@ La documentation de contexte du projet repose désormais sur :
 | Minecraft Fabric | ✅ Fabric | ✅ Modrinth | `server.properties` |
 | Terraria | ✅ serveur officiel | — | `serverconfig.txt` |
 | Soulmask | ✅ 3017300 | — | `soulmask_server.json` |
+| Satisfactory | ✅ 1690800 | — | — |
 
 Note Minecraft Java :
 - le serveur téléchargé automatiquement peut être plus récent que ton client Java local

@@ -686,3 +686,72 @@ Priorités retenues après le gel `v2.3` :
 - garder Soulmask sur son socle actuel tant qu'aucun besoin produit plus précis ne remonte des tests
 - continuer la rationalisation du hub `/commander` et conserver un polling de statut indépendant de l'auth par instance
 - poursuivre la refonte UI/CSS/accessibilité par petites passes, sans casser le socle validé
+
+## Terraria — montée au standard produit vanilla
+
+Validé en réel sur l'instance `terraria` :
+- déploiement corrigé avec vrai `start_server.sh` fonctionnel
+- protocole de port corrigé côté résumé de déploiement (`TCP`)
+- `Configuration` restructurée en sections
+- options avancées `serverconfig.txt` exposées
+- sélection de monde actif via les `.wld`
+- `Joueurs connectés` opérationnel
+- bannissement vanilla fonctionnel depuis le Commander
+
+Point important retenu :
+- pour Terraria vanilla, le bannissement fiable ne peut pas être modélisé comme une simple liste de pseudos
+- il faut corréler les logs :
+  - `<ip>:<port> is connecting...`
+  - `<name> has joined.`
+- puis écrire une entrée `nom + IP` dans `banlist.txt`
+
+Conséquence produit :
+- `banlist` : oui
+- `admin` / `whitelist` : non en vanilla
+- si un jour on veut ce niveau, il faudra traiter `TShock` comme un produit Terraria distinct
+
+## Terraria TShock — note pour plus tard
+
+Audit produit retenu :
+- `TShock` ne doit pas être traité comme un simple mod Terraria
+- il faut le modéliser comme un jeu/variant séparé, sur le modèle `Minecraft` / `Minecraft Fabric`
+- les releases Linux officielles existent, donc un vrai `deploy` automatique est envisageable
+
+Décision prise :
+- ne pas attaquer `terraria-tshock` maintenant
+- garder cette piste pour plus tard comme produit distinct :
+  - `terraria`
+  - `terraria-tshock`
+
+## Prochaine cible produit
+
+Après la stabilisation actuelle, la prochaine cible retenue n'est plus `Terraria TShock` mais `Satisfactory`.
+
+## Satisfactory — V1 en cours
+
+Premier socle ajouté :
+- `deploy` / `update` connaissent maintenant `satisfactory`
+- AppID SteamCMD : `1690800`
+- binaire attendu : `FactoryServer.sh`
+- ports exposés dans le produit :
+  - `7777` en `TCP+UDP`
+  - `8888` en `TCP` pour l'admin/API
+- les données d'instance sont isolées dans `DATA_DIR` via `HOME` / `XDG_CONFIG_HOME`
+- le `save manager` pointe sur :
+  - `.config/Epic/FactoryGame/Saved/SaveGames`
+- les backups prennent ce dossier `SaveGames` complet
+
+Périmètre volontairement limité pour cette V1 :
+- pas encore de panneau de config natif Satisfactory
+- pas encore de suivi joueurs
+- objectif immédiat : disposer d'un serveur déployable avec console, fichiers et sauvegardes
+
+## Note locale testsoul
+
+Le script non suivi [env/fix_testsoul.sh](/home/vhserver/gc/env/fix_testsoul.sh) est un utilitaire de dépannage local pour `testsoul` :
+- il régénère manuellement `start_server.sh` à partir de `soulmask_server.json`
+- il redémarre `soulmask-server-testsoul`
+- il affiche ensuite l'état systemd et le process Soulmask
+
+Ce script n'est pas une partie produit et doit rester hors Git sauf demande explicite.
+Inutile de le rappeler systématiquement à chaque push ; ne le mentionner que s'il devient pertinent pour la tâche en cours.

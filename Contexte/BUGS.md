@@ -23,6 +23,40 @@
 
 ## Bugs résolus
 
+### [17] Terraria — bannir un joueur via le Commander n'empêchait pas la reconnexion
+- **Statut :** Résolu
+- **Composant :** `runtime/games/terraria/admins.py` + `runtime/games/terraria/players.py`
+- **Instance(s) affectée(s) :** `terraria`
+- **Symptôme :**
+  - Le bouton `Bannir` ajoutait bien une entrée visible dans l'UI
+  - mais le joueur pouvait se reconnecter après redémarrage du serveur
+- **Cause racine :**
+  - En vanilla Terraria, écrire seulement le pseudo dans `banlist.txt` ne suffit pas
+  - la banlist utile doit stocker le nom **et** l'IP du joueur
+  - le Commander ne corrélait initialement que le nom, pas l'IP
+- **Solutions essayées :**
+  - ❌ Écrire uniquement le pseudo dans `banlist.txt`
+  - ✅ Corréler les lignes de logs :
+    - `<ip>:<port> is connecting...`
+    - `<name> has joined.`
+  - ✅ Stocker ensuite une entrée valide `// <name>` + `<ip>` dans `banlist.txt`
+  - ✅ Afficher aussi l'IP dans le panneau `Joueurs bannis`
+- **Régression connue :** Pour Terraria vanilla, ne pas modéliser la banlist comme une simple liste de pseudos.
+
+### [18] Terraria — reconnexions dupliquées dans `Joueurs connectés`
+- **Statut :** Résolu
+- **Composant :** `runtime/games/terraria/players.py`
+- **Instance(s) affectée(s) :** `terraria`
+- **Symptôme :**
+  - après `join -> left -> join`, le même joueur apparaissait en double
+  - une ligne supplémentaire était ajoutée à chaque reconnexion
+- **Cause racine :**
+  - le parser conservait une trace d'ordre historique des connexions, au lieu de reconstruire strictement l'ensemble courant des joueurs connectés
+- **Solutions essayées :**
+  - ❌ Conserver un tableau d'ordre puis filtrer après coup
+  - ✅ Recalculer la liste finale uniquement à partir des joueurs encore présents dans l'état courant
+- **Régression connue :** Pour les jeux basés sur un parser de logs, toujours reconstruire l'état final courant, pas l'historique de toutes les connexions.
+
 ### [16] Valheim PlayFab — `SteamID` absent de la liste joueurs malgré un joueur connecté
 - **Statut :** Résolu
 - **Composant :** `runtime/games/valheim/players.py`

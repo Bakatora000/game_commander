@@ -494,6 +494,28 @@ class ConfigGenGameJsonTests(unittest.TestCase):
         self.assertEqual(data["server"]["query_port"], 27015)
         self.assertEqual(data["server"]["echo_port"], 18888)
 
+    def test_satisfactory_support(self):
+        out = tmp_path(".json")
+        rc = config_gen.cmd_game_json(make_args(
+            out=out, game_id="satisfactory", game_label="Satisfactory",
+            game_binary="FactoryServer.sh", game_service="satisfactory-server-test",
+            server_dir="/home/gameserver/satisfactory_server",
+            data_dir="/home/gameserver/satisfactory_data", world_name="", max_players=8, port=7777,
+            query_port=8888, echo_port=None,
+            url_prefix="/satisfactory", flask_port=5007, admin_user="admin",
+            bepinex_path="", steam_appid="1690800", steamcmd_path="/home/gameserver/steamcmd/steamcmd.sh",
+        ))
+        self.assertEqual(rc, 0)
+        data = json.loads(Path(out).read_text())
+        self.assertEqual(data["id"], "satisfactory")
+        self.assertEqual(data["server"]["binary"], "FactoryServer.sh")
+        self.assertFalse(data["features"]["config"])
+        self.assertFalse(data["features"]["players"])
+        self.assertTrue(data["features"]["saves"])
+        self.assertEqual(data["theme"]["name"], "enshrouded")
+        self.assertEqual(data["server"]["query_port"], 8888)
+        self.assertEqual(data["steamcmd"]["app_id"], "1690800")
+
     def test_steamcmd_section(self):
         data = self._gen_valheim()
         self.assertIn("steamcmd", data)
@@ -564,6 +586,23 @@ class SaveManagerTests(unittest.TestCase):
             roots = core_saves.get_save_roots()
         self.assertEqual([r["id"] for r in roots], ["world", "playerdata"])
         self.assertTrue(all(r["exists"] for r in roots))
+
+    def test_get_save_roots_for_satisfactory(self):
+        self.app.config["GAME"] = {
+            "id": "satisfactory",
+            "server": {
+                "install_dir": str(self.root / "server"),
+                "data_dir": str(self.root / "data"),
+                "world_name": None,
+            }
+        }
+        savegames = self.root / "data" / ".config" / "Epic" / "FactoryGame" / "Saved" / "SaveGames" / "server"
+        savegames.mkdir(parents=True, exist_ok=True)
+        with self.app.app_context():
+            roots = core_saves.get_save_roots()
+        self.assertEqual([r["id"] for r in roots], ["savegames"])
+        self.assertEqual(roots[0]["label"], "SaveGames")
+        self.assertTrue(roots[0]["exists"])
 
     def test_list_entries_returns_directory_content(self):
         with self.app.app_context():

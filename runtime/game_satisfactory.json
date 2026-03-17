@@ -1,0 +1,39 @@
+{
+  "id": "satisfactory",
+  "name": "Satisfactory",
+  "subtitle": "Serveur dédié",
+  "logo": "🏭",
+  "server": {
+    "binary": "FactoryServer.sh",
+    "service": "satisfactory-server",
+    "install_dir": "/home/gameserver/satisfactory_server",
+    "data_dir": "/home/gameserver/satisfactory_data",
+    "world_name": null,
+    "max_players": 8,
+    "port": 7777,
+    "query_port": 8888
+  },
+  "web": {
+    "url_prefix": "/satisfactory",
+    "flask_port": 5007,
+    "admin_user": "admin"
+  },
+  "features": {
+    "mods": false,
+    "config": false,
+    "console": true,
+    "players": false,
+    "saves": true
+  },
+  "permissions": [
+    "start_server",
+    "stop_server",
+    "restart_server",
+    "manage_saves",
+    "console",
+    "manage_users"
+  ],
+  "theme": {
+    "name": "enshrouded"
+  }
+}

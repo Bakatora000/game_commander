@@ -34,6 +34,11 @@ update_game_meta() {
             GAME_BINARY="TerrariaServer.bin.x86_64"
             GAME_SERVICE="${GAME_SERVICE:-terraria-server-${INSTANCE_ID}}"
             ;;
+        satisfactory)
+            GAME_LABEL="Satisfactory"
+            GAME_BINARY="FactoryServer.sh"
+            GAME_SERVICE="${GAME_SERVICE:-satisfactory-server-${INSTANCE_ID}}"
+            ;;
         soulmask)
             GAME_LABEL="Soulmask"
             GAME_BINARY="StartServer.sh"

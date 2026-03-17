@@ -10,7 +10,7 @@ deploy_check_port_conflict() {
 
 deploy_game_port_proto() {
     case "${GAME_ID:-}" in
-        minecraft|minecraft-fabric|terraria) printf 't\n' ;;
+        minecraft|minecraft-fabric|terraria|satisfactory) printf 't\n' ;;
         *) printf 'u\n' ;;
     esac
 }
@@ -49,6 +49,11 @@ deploy_port_group_specs() {
             ;;
         terraria)
             printf 'SERVER_PORT|t|Port principal\n'
+            ;;
+        satisfactory)
+            printf 'SERVER_PORT|t|Port de jeu (TCP)\n'
+            printf 'SERVER_PORT|u|Port de jeu (UDP)\n'
+            printf 'QUERY_PORT|t|Port fiable / join\n'
             ;;
         soulmask)
             printf 'SERVER_PORT|u|Port de jeu\n'
@@ -133,6 +138,7 @@ deploy_select_game() {
         echo -e "  ${CYAN}[4]${RESET} Minecraft Fabric"
         echo -e "  ${CYAN}[5]${RESET} Terraria"
         echo -e "  ${CYAN}[6]${RESET} Soulmask"
+        echo -e "  ${CYAN}[7]${RESET} Satisfactory"
         echo ""
         prompt "Votre choix" "1"
         case "$REPLY" in
@@ -142,6 +148,7 @@ deploy_select_game() {
             4) GAME_ID="minecraft-fabric" ;;
             5) GAME_ID="terraria" ;;
             6) GAME_ID="soulmask" ;;
+            7) GAME_ID="satisfactory" ;;
             *) GAME_ID="valheim" ;;
         esac
     else
@@ -157,6 +164,7 @@ deploy_select_game() {
         minecraft-fabric) GAME_LABEL="Minecraft Fabric"; STEAM_APPID=""; GAME_BINARY="java" ;;
         terraria) GAME_LABEL="Terraria"; STEAM_APPID=""; GAME_BINARY="TerrariaServer.bin.x86_64" ;;
         soulmask) GAME_LABEL="Soulmask"; STEAM_APPID="3017300"; GAME_BINARY="StartServer.sh" ;;
+        satisfactory) GAME_LABEL="Satisfactory"; STEAM_APPID="1690800"; GAME_BINARY="FactoryServer.sh" ;;
     esac
     ok "Jeu sélectionné : ${BOLD}${GAME_LABEL}${RESET}"
 }
@@ -299,11 +307,13 @@ deploy_configure_server() {
 
     prompt "Port principal" "${SERVER_PORT}"
     SERVER_PORT="$REPLY"
-    if [[ "$GAME_ID" == "soulmask" ]]; then
-        prompt "Port Query" "${QUERY_PORT}"
+    if [[ "$GAME_ID" == "soulmask" || "$GAME_ID" == "satisfactory" ]]; then
+        prompt "$([[ "$GAME_ID" == "satisfactory" ]] && echo 'Port fiable / join' || echo 'Port Query')" "${QUERY_PORT}"
         QUERY_PORT="$REPLY"
-        prompt "Port Echo" "${ECHO_PORT}"
-        ECHO_PORT="$REPLY"
+        if [[ "$GAME_ID" == "soulmask" ]]; then
+            prompt "Port Echo" "${ECHO_PORT}"
+            ECHO_PORT="$REPLY"
+        fi
     fi
     [[ "$DEPLOY_MODE" != "attach" ]] && deploy_warn_port_group_conflicts
     prompt "Joueurs max" "${MAX_PLAYERS}"

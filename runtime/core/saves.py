@@ -83,6 +83,10 @@ def _backup_pattern() -> str:
     return f"{game_id}_save_*.zip"
 
 
+def _satisfactory_savegames_dir() -> Path:
+    return _data_dir() / ".config" / "Epic" / "FactoryGame" / "Saved" / "SaveGames"
+
+
 def _is_safety_backup(path: Path) -> bool:
     name = path.name.lower()
     return name.startswith("gc_safety_") or name.startswith("valheim_worldfiles_")
@@ -194,6 +198,8 @@ def get_save_roots():
         roots.append({"id": "playerdata", "label": "Playerdata", "path": server_dir / "world" / "playerdata"})
     elif game_id == "terraria":
         roots.append({"id": "worlds", "label": "Données serveur", "path": data_dir})
+    elif game_id == "satisfactory":
+        roots.append({"id": "savegames", "label": "SaveGames", "path": _satisfactory_savegames_dir()})
     elif game_id == "soulmask":
         roots.append({"id": "saved", "label": "Saved", "path": server_dir / "WS" / "Saved"})
 
@@ -695,6 +701,16 @@ def _backup_restore_operations(backup_path: Path):
             operations.append((member.filename, dest, str(rel).replace(os.sep, "/")))
         return operations
 
+    if game_id == "satisfactory":
+        root = _satisfactory_savegames_dir()
+        members = _strip_named_root(members, {"SaveGames", root.name})
+        if not members:
+            raise ValueError("invalid_backup_layout")
+        for member, rel in members:
+            dest = (root / rel).resolve()
+            operations.append((member.filename, dest, str(rel).replace(os.sep, "/")))
+        return operations
+
     if game_id == "soulmask":
         members = _strip_named_root(members, {"Saved"})
         top_levels = {rel.parts[0] for _member, rel in members if rel.parts}
@@ -811,6 +827,11 @@ def _validate_archive_layout(root_id: str, rel_path: str, members):
 
     if game_id == "enshrouded":
         if root_id != "savegame" or not rel_paths:
+            raise ValueError("invalid_archive_layout")
+        return
+
+    if game_id == "satisfactory":
+        if root_id != "savegames" or not rel_paths:
             raise ValueError("invalid_archive_layout")
         return
 

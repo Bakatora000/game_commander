@@ -55,7 +55,7 @@ def cmd_game_json(args):
     game_id    = args.game_id
     game_label = args.game_label
 
-    logos = {"valheim": "⚔", "enshrouded": "🌿", "minecraft": "⛏", "minecraft-fabric": "🧵", "terraria": "🌳", "soulmask": "🗿"}
+    logos = {"valheim": "⚔", "enshrouded": "🌿", "minecraft": "⛏", "minecraft-fabric": "🧵", "terraria": "🌳", "soulmask": "🗿", "satisfactory": "🏭"}
     module_id = game_id.replace('-', '_')
     template_id = module_id
     theme_name = game_id
@@ -86,7 +86,7 @@ def cmd_game_json(args):
             "config":  game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria", "soulmask"),
             "console": True,
             "players": game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria", "soulmask"),
-            "saves":   game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria", "soulmask"),
+            "saves":   game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria", "soulmask", "satisfactory"),
         },
         "theme": {"name": theme_name if theme_name in ("valheim", "enshrouded", "minecraft") else "valheim"},
     }
@@ -97,9 +97,14 @@ def cmd_game_json(args):
     elif game_id == "soulmask":
         theme_name = "enshrouded"
         game["theme"]["name"] = theme_name
+    elif game_id == "satisfactory":
+        theme_name = "enshrouded"
+        game["theme"]["name"] = theme_name
 
     if game_id == "enshrouded":
         game["server"]["query_port"] = args.port + 1
+    elif game_id == "satisfactory":
+        game["server"]["query_port"] = args.query_port if args.query_port is not None else 8888
     elif game_id == "soulmask":
         game["server"]["query_port"] = args.query_port if args.query_port is not None else args.port + 1
         game["server"]["echo_port"] = args.echo_port if args.echo_port is not None else None
@@ -134,6 +139,11 @@ def cmd_game_json(args):
         game["permissions"] = [
             "start_server", "stop_server", "restart_server",
             "manage_config", "manage_saves", "console", "manage_users",
+        ]
+    elif game_id == "satisfactory":
+        game["permissions"] = [
+            "start_server", "stop_server", "restart_server",
+            "manage_saves", "console", "manage_users",
         ]
     else:
         game["permissions"] = [

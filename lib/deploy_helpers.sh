@@ -51,7 +51,7 @@ deploy_handle_special_args() {
 #  Usage : sudo bash game_commander.sh deploy --config env/deploy_config.env
 # ═══════════════════════════════════════════════════════════════════════════════
 
-# Jeu : valheim | enshrouded | minecraft | minecraft-fabric | terraria | soulmask
+# Jeu : valheim | enshrouded | minecraft | minecraft-fabric | terraria | soulmask | satisfactory
 GAME_ID="valheim"
 
 # Mode de déploiement : managed | attach
@@ -74,7 +74,7 @@ SERVER_NAME="Mon Serveur Valheim"
 SERVER_PASSWORD=""
 SERVER_ADMIN_PASSWORD=""
 SERVER_PORT=""          # vide = défaut du jeu
-QUERY_PORT=""           # Soulmask uniquement
+QUERY_PORT=""           # Soulmask / Satisfactory
 ECHO_PORT=""            # Soulmask uniquement
 MAX_PLAYERS=""
 SERVER_MODE="pve"       # Soulmask : pve | pvp
@@ -163,6 +163,14 @@ set_game_defaults() {
             URL_PREFIX="${URL_PREFIX:-/terraria}"
             FLASK_PORT="${FLASK_PORT:-5006}"
             SERVER_NAME="${SERVER_NAME:-Mon Serveur Terraria}"
+            ;;
+        satisfactory)
+            SERVER_PORT="${SERVER_PORT:-7777}"
+            QUERY_PORT="${QUERY_PORT:-8888}"
+            MAX_PLAYERS="${MAX_PLAYERS:-8}"
+            URL_PREFIX="${URL_PREFIX:-/satisfactory}"
+            FLASK_PORT="${FLASK_PORT:-5007}"
+            SERVER_NAME="${SERVER_NAME:-Mon Serveur Satisfactory}"
             ;;
         soulmask)
             SERVER_PORT="${SERVER_PORT:-8777}"

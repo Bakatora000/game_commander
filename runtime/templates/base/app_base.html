@@ -289,6 +289,10 @@ function renderConnectionInfo() {
 
   if (GAME_ID === 'minecraft' || GAME_ID === 'minecraft-fabric' || GAME_ID === 'terraria') {
     rows.push({label:'Connexion jeu', value: `${host}:${GAME_SERVER.port} (${GAME_ID === 'terraria' ? 'TCP' : 'TCP'})`});
+  } else if (GAME_ID === 'satisfactory') {
+    const queryPort = GAME_SERVER.query_port || 8888;
+    rows.push({label:'Connexion jeu', value: `${host}:${GAME_SERVER.port} (TCP+UDP)`});
+    rows.push({label:'Flux fiable / join', value: `${host}:${queryPort} (TCP)`});
   } else if (GAME_ID === 'enshrouded') {
     const queryPort = GAME_SERVER.query_port || (GAME_SERVER.port + 1);
     rows.push({label:'Port jeu', value: `${GAME_SERVER.port}/UDP`});

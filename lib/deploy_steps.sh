@@ -627,6 +627,56 @@ SVCEOF
         return
     fi
 
+    if [[ "$GAME_ID" == "satisfactory" ]]; then
+        START_SCRIPT="$SERVER_DIR/start_server.sh"
+        cat > "$START_SCRIPT" << STARTEOF
+#!/usr/bin/env bash
+set -euo pipefail
+export HOME="${DATA_DIR}"
+export XDG_CONFIG_HOME="${DATA_DIR}/.config"
+mkdir -p "${DATA_DIR}/.config/Epic/FactoryGame/Saved/SaveGames/server"
+cd "${SERVER_DIR}"
+exec ./FactoryServer.sh -Port="${SERVER_PORT}" -ReliablePort="${QUERY_PORT}" -unattended -log
+STARTEOF
+        chmod +x "$START_SCRIPT"
+        chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
+        ok "Script de démarrage : $START_SCRIPT"
+
+        cat > "/etc/systemd/system/${GAME_SERVICE}.service" << SVCEOF
+[Unit]
+Description=${GAME_LABEL} Dedicated Server
+After=network.target
+
+[Service]
+Type=simple
+User=${SYS_USER}
+WorkingDirectory=${SERVER_DIR}
+ExecStart=${START_SCRIPT}
+Restart=on-failure
+RestartSec=10
+SuccessExitStatus=0 130 143
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=${GAME_SERVICE}
+KillSignal=SIGINT
+KillMode=mixed
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+        systemctl daemon-reload
+        systemctl enable "$GAME_SERVICE"
+        info "Démarrage de $GAME_SERVICE..."
+        systemctl start "$GAME_SERVICE"
+        sleep 5
+        service_active "$GAME_SERVICE" \
+            && ok "Service $GAME_SERVICE actif" \
+            || warn "$GAME_SERVICE pas encore actif — journalctl -u $GAME_SERVICE -f"
+        return
+    fi
+
     if [[ "$GAME_ID" == "soulmask" ]]; then
         START_SCRIPT="$SERVER_DIR/start_server.sh"
         SOULMASK_CFG="$SERVER_DIR/soulmask_server.json"
@@ -875,6 +925,7 @@ deploy_step_backups() {
         enshrouded) WORLD_DIR="$SERVER_DIR/savegame" ;;
         minecraft|minecraft-fabric) WORLD_DIR="$SERVER_DIR/world" ;;
         terraria) WORLD_DIR="$DATA_DIR" ;;
+        satisfactory) WORLD_DIR="$DATA_DIR/.config/Epic/FactoryGame/Saved/SaveGames" ;;
         soulmask) WORLD_DIR="$SERVER_DIR/WS/Saved" ;;
     esac
 
@@ -1218,6 +1269,8 @@ deploy_step_validation() {
 
     if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
         _GAME_PORTS=("${SERVER_PORT}/tcp")
+    elif [[ "$GAME_ID" == "satisfactory" ]]; then
+        _GAME_PORTS=("${SERVER_PORT}/tcp" "${SERVER_PORT}/udp" "${QUERY_PORT}/tcp")
     elif [[ "$GAME_ID" == "soulmask" ]]; then
         _GAME_PORTS=("${SERVER_PORT}/udp" "${QUERY_PORT}/udp" "${ECHO_PORT}/tcp")
     elif [[ "$GAME_ID" == "terraria" ]]; then
@@ -1228,6 +1281,9 @@ deploy_step_validation() {
     echo -e "  ${BOLD}Ports à ouvrir (firewall) :${RESET}"
     if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
         echo -e "    Jeu  : ${SERVER_PORT}/TCP"
+    elif [[ "$GAME_ID" == "satisfactory" ]]; then
+        echo -e "    Jeu  : ${SERVER_PORT}/TCP  ${SERVER_PORT}/UDP"
+        echo -e "    Flux fiable / join  : ${QUERY_PORT}/TCP"
     elif [[ "$GAME_ID" == "terraria" ]]; then
         echo -e "    Jeu  : ${SERVER_PORT}/TCP"
     elif [[ "$GAME_ID" == "soulmask" ]]; then
@@ -1247,6 +1303,9 @@ deploy_step_validation() {
         warn "UFW inactif ou absent — pensez à ouvrir les ports dans le firewall Hetzner :"
         if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
             echo "    ${SERVER_PORT}/TCP, 80/TCP, 443/TCP"
+        elif [[ "$GAME_ID" == "satisfactory" ]]; then
+            echo "    ${SERVER_PORT}/TCP, ${SERVER_PORT}/UDP, ${QUERY_PORT}/TCP, 80/TCP, 443/TCP"
+            echo "    (${QUERY_PORT}/TCP est requis pour le join fiable des joueurs)"
         elif [[ "$GAME_ID" == "terraria" ]]; then
             echo "    ${SERVER_PORT}/TCP, 80/TCP, 443/TCP"
         elif [[ "$GAME_ID" == "soulmask" ]]; then
