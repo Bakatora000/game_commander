@@ -134,6 +134,7 @@ def api_hub_status():
             'players': (status.get('metrics') or {}).get('players', {'value': 0, 'max': 0}),
         },
         'cpu_alert': server.get_cpu_monitor_alert(),
+        'cpu_monitor': server.get_cpu_monitor_snapshot(),
     })
 
 @app.route(f'{PREFIX}/api/updates')

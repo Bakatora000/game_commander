@@ -125,7 +125,7 @@ def build_hub_html(vhost: str, instances: list[dict]) -> str:
         prefix = inst.get("prefix", "/")
         cards.append(
             f"""
-      <article class="card" data-prefix="{prefix}">
+      <article class="card" data-prefix="{prefix}" data-name="{name}" data-game="{game}">
         <div class="card-meta">{game}</div>
         <h2>{name}</h2>
         <dl class="card-stats">
@@ -252,7 +252,71 @@ def build_hub_html(vhost: str, instances: list[dict]) -> str:
     .card-alert.is-visible {{
       display: block;
     }}
+    .monitor-panel {{
+      margin-top: 20px;
+      padding: 18px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, rgba(24, 33, 42, .95), rgba(17, 25, 33, .95));
+    }}
+    .monitor-head {{
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }}
+    .monitor-label {{
+      color: var(--muted);
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      margin-bottom: .35rem;
+    }}
+    .monitor-status {{
+      font-size: 1.05rem;
+      font-weight: 700;
+    }}
+    .monitor-meta {{
+      margin-top: .55rem;
+      color: var(--muted);
+      font-size: .92rem;
+    }}
+    .monitor-toggle {{
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      border-radius: 999px;
+      padding: .6rem .9rem;
+      font-weight: 700;
+      cursor: pointer;
+    }}
+    .monitor-details {{
+      margin-top: 1rem;
+    }}
+    .monitor-table {{
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .92rem;
+    }}
+    .monitor-table th,
+    .monitor-table td {{
+      text-align: left;
+      padding: .7rem .5rem;
+      border-bottom: 1px solid var(--border);
+    }}
+    .monitor-table tbody tr.is-alert td {{
+      color: #ffd69b;
+    }}
     .empty {{ color: var(--muted); margin-top: 24px; }}
+    @media (max-width: 640px) {{
+      .monitor-head {{
+        flex-direction: column;
+        align-items: flex-start;
+      }}
+      .monitor-table {{
+        font-size: .85rem;
+      }}
+    }}
   </style>
 </head>
 <body>
@@ -262,12 +326,41 @@ def build_hub_html(vhost: str, instances: list[dict]) -> str:
       <p class="subtitle">Point d’entrée unique vers les interfaces d’instances déjà déployées. Cette page liste les Commander disponibles pour <strong>{vhost}</strong>.</p>
       <div class="meta">{len(instances)} instance(s) disponible(s)</div>
     </section>
+    <section class="monitor-panel">
+      <div class="monitor-head">
+        <div>
+          <div class="monitor-label">Monitor CPU</div>
+          <div class="monitor-status" data-field="cpu-monitor-status">Chargement…</div>
+        </div>
+        <button class="monitor-toggle" type="button" data-action="toggle-cpu-monitor" hidden>Voir le détail</button>
+      </div>
+      <div class="monitor-meta" data-field="cpu-monitor-meta"></div>
+      <div class="monitor-details" data-field="cpu-monitor-details" hidden>
+        <table class="monitor-table">
+          <thead>
+            <tr>
+              <th>Instance</th>
+              <th>Actuelle</th>
+              <th>Planifiée</th>
+              <th>CPU</th>
+            </tr>
+          </thead>
+          <tbody data-field="cpu-monitor-body"></tbody>
+        </table>
+      </div>
+    </section>
     <section class="grid">
       {cards_html}
     </section>
   </main>
   <script>
     const STATE_LABELS = {{ 0: 'Hors ligne', 10: 'Démarrage', 20: 'En ligne', 30: 'Arrêt', 40: 'Busy' }};
+    function formatAge(seconds) {{
+      if (!Number.isFinite(seconds) || seconds < 0) return 'âge inconnu';
+      if (seconds < 90) return 'mise à jour il y a moins de 2 min';
+      const minutes = Math.round(seconds / 60);
+      return `mise à jour il y a ${{minutes}} min`;
+    }}
     async function loadCard(card) {{
       const prefix = card.dataset.prefix;
       const statusEl = card.querySelector('[data-field="status"]');
@@ -295,15 +388,62 @@ def build_hub_html(vhost: str, instances: list[dict]) -> str:
           alertEl.hidden = true;
           alertEl.classList.remove('is-visible');
         }}
+        return {{
+          name: card.dataset.name,
+          game: card.dataset.game,
+          cpuAlert,
+          cpuMonitor: data?.cpu_monitor || null,
+        }};
       }} catch (e) {{
         statusEl.textContent = 'Indisponible';
         playersEl.textContent = '—';
         alertEl.textContent = '';
         alertEl.hidden = true;
         alertEl.classList.remove('is-visible');
+        return {{
+          name: card.dataset.name,
+          game: card.dataset.game,
+          cpuAlert: null,
+          cpuMonitor: null,
+        }};
       }}
     }}
-    document.querySelectorAll('.card[data-prefix]').forEach(loadCard);
+    function renderCpuMonitor(details) {{
+      const statusEl = document.querySelector('[data-field="cpu-monitor-status"]');
+      const metaEl = document.querySelector('[data-field="cpu-monitor-meta"]');
+      const detailsEl = document.querySelector('[data-field="cpu-monitor-details"]');
+      const bodyEl = document.querySelector('[data-field="cpu-monitor-body"]');
+      const toggleBtn = document.querySelector('[data-action="toggle-cpu-monitor"]');
+      const monitorEntries = details.filter(entry => entry.cpuMonitor?.instance);
+      if (!monitorEntries.length) {{
+        statusEl.textContent = 'Monitor indisponible';
+        metaEl.textContent = 'Aucune donnée CPU détaillée reçue depuis les instances.';
+        detailsEl.hidden = true;
+        toggleBtn.hidden = true;
+        bodyEl.innerHTML = '';
+        return;
+      }}
+      const hasAlert = monitorEntries.some(entry => entry.cpuAlert?.message);
+      const updatedAt = Math.max(...monitorEntries.map(entry => Number(entry.cpuMonitor.updated_at || 0)));
+      const ageSeconds = updatedAt > 0 ? Math.max(0, Math.round(Date.now() / 1000) - updatedAt) : NaN;
+      statusEl.textContent = hasAlert ? 'Alerte' : (ageSeconds <= 180 ? 'Stable' : 'Données anciennes');
+      metaEl.textContent = `${{monitorEntries.length}} instance(s) suivie(s) · ${{formatAge(ageSeconds)}}`;
+      bodyEl.innerHTML = monitorEntries.map(entry => {{
+        const info = entry.cpuMonitor.instance;
+        const cls = entry.cpuAlert?.message ? ' class="is-alert"' : '';
+        return `<tr${{cls}}><td>${{entry.name}} <span style="color:var(--muted)">(${{entry.game}})</span></td><td>${{info.affinity || '—'}}</td><td>${{info.planned_affinity || '—'}}</td><td>${{Number(info.cpu_percent || 0).toFixed(1)}}%</td></tr>`;
+      }}).join('');
+      toggleBtn.hidden = false;
+    }}
+    const monitorToggleBtn = document.querySelector('[data-action="toggle-cpu-monitor"]');
+    monitorToggleBtn?.addEventListener('click', () => {{
+      const detailsEl = document.querySelector('[data-field="cpu-monitor-details"]');
+      const isHidden = detailsEl.hidden;
+      detailsEl.hidden = !isHidden;
+      monitorToggleBtn.textContent = isHidden ? 'Masquer le détail' : 'Voir le détail';
+    }});
+    Promise.all(Array.from(document.querySelectorAll('.card[data-prefix]')).map(loadCard))
+      .then(renderCpuMonitor);
   </script>
 </body>
 </html>

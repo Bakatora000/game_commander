@@ -519,6 +519,15 @@ class ConfigGenGameJsonTests(unittest.TestCase):
         self.assertEqual(data["steamcmd"]["app_id"], "1690800")
         self.assertIn("manage_config", data["permissions"])
 
+    def test_steamcmd_section(self):
+        data = self._gen_valheim()
+        self.assertIn("steamcmd", data)
+        self.assertEqual(data["steamcmd"]["app_id"], "896660")
+
+    def test_no_steamcmd_when_empty(self):
+        data = self._gen_valheim(steam_appid="")
+        self.assertNotIn("steamcmd", data)
+
 
 class SatisfactoryConfigTests(unittest.TestCase):
 
@@ -624,14 +633,36 @@ class ServerCpuMonitorTests(unittest.TestCase):
                     os.environ["GAME_COMMANDER_CPU_MONITOR_STATE"] = previous
         self.assertEqual(alert["message"], "Déséquilibre CPU durable")
 
-    def test_steamcmd_section(self):
-        data = self._gen_valheim()
-        self.assertIn("steamcmd", data)
-        self.assertEqual(data["steamcmd"]["app_id"], "896660")
-
-    def test_no_steamcmd_when_empty(self):
-        data = self._gen_valheim(steam_appid="")
-        self.assertNotIn("steamcmd", data)
+    def test_get_cpu_monitor_snapshot_reads_instance_metrics(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "deploy_config.env").write_text('INSTANCE_ID="alpha"\n', encoding="utf-8")
+            state_file = root / "cpu-monitor.json"
+            state_file.write_text(
+                json.dumps({
+                    "updated_at": 1234567890,
+                    "samples_for_alert": 10,
+                    "instances": {
+                        "alpha": {"cpu_percent": 37.5, "affinity": "6 7", "planned_affinity": "4 5"},
+                    },
+                }),
+                encoding="utf-8",
+            )
+            app = Flask(__name__, root_path=str(root))
+            app.config["GAME"] = {"server": {"install_dir": str(root / "server")}}
+            previous = os.environ.get("GAME_COMMANDER_CPU_MONITOR_STATE")
+            os.environ["GAME_COMMANDER_CPU_MONITOR_STATE"] = str(state_file)
+            try:
+                with app.app_context():
+                    snapshot = core_server.get_cpu_monitor_snapshot()
+            finally:
+                if previous is None:
+                    os.environ.pop("GAME_COMMANDER_CPU_MONITOR_STATE", None)
+                else:
+                    os.environ["GAME_COMMANDER_CPU_MONITOR_STATE"] = previous
+        self.assertEqual(snapshot["updated_at"], 1234567890)
+        self.assertEqual(snapshot["instance"]["affinity"], "6 7")
+        self.assertEqual(snapshot["instance"]["planned_affinity"], "4 5")
 
 
 class ConfigGenUsersJsonTests(unittest.TestCase):
@@ -2702,6 +2733,8 @@ server {
             self.assertIn('data-field="status"', hub)
             self.assertIn('data-field="players"', hub)
             self.assertIn('data-field="cpu-alert"', hub)
+            self.assertIn('data-field="cpu-monitor-status"', hub)
+            self.assertIn('data-action="toggle-cpu-monitor"', hub)
 
     def test_regenerate_empty_manifest_produces_header_only(self):
         with tempfile.TemporaryDirectory() as d:

@@ -48,6 +48,15 @@ def _instance_id() -> str:
 def _cpu_monitor_state_path() -> Path:
     return Path(os.environ.get("GAME_COMMANDER_CPU_MONITOR_STATE", "/var/lib/game-commander/cpu-monitor.json"))
 
+def _read_cpu_monitor_state() -> dict:
+    path = _cpu_monitor_state_path()
+    if not path.is_file():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
 def _get_process():
     """
     Trouve le process du serveur de jeu par nom de binaire ET par port.
@@ -181,15 +190,23 @@ def get_cpu_monitor_alert():
     instance_id = _instance_id()
     if not instance_id:
         return None
-    path = _cpu_monitor_state_path()
-    if not path.is_file():
-        return None
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        return None
+    data = _read_cpu_monitor_state()
     alert = (data.get("alerts_by_instance") or {}).get(instance_id)
     return alert if isinstance(alert, dict) else None
+
+def get_cpu_monitor_snapshot():
+    instance_id = _instance_id()
+    if not instance_id:
+        return None
+    data = _read_cpu_monitor_state()
+    instance = (data.get("instances") or {}).get(instance_id)
+    if not isinstance(instance, dict):
+        return None
+    return {
+        "updated_at": data.get("updated_at"),
+        "samples_for_alert": data.get("samples_for_alert"),
+        "instance": instance,
+    }
 
 def _service_state():
     service = _game()['server']['service']
