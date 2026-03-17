@@ -258,19 +258,19 @@
       const state = Number(inst.state || 0);
       if (state === 20) {
         return [
-          { key: 'restart', label: 'Redémarrer', confirm: `Redémarrer ${inst.name} ?` },
-          { key: 'stop', label: 'Arrêter', confirm: `Arrêter ${inst.name} ?` },
-          { key: 'update', label: 'Mettre à jour', confirm: `Mettre à jour ${inst.name} ?` },
+          { key: 'restart', label: 'Redémarrer', progress: 'Redémarrage en cours…', confirm: `Redémarrer ${inst.name} ?` },
+          { key: 'stop', label: 'Arrêter', progress: 'Arrêt en cours…', confirm: `Arrêter ${inst.name} ?` },
+          { key: 'update', label: 'Mettre à jour', progress: 'Mise à jour en cours…', confirm: `Mettre à jour ${inst.name} ?` },
         ];
       }
       if (state === 0) {
         return [
-          { key: 'start', label: 'Démarrer', confirm: `Démarrer ${inst.name} ?` },
-          { key: 'update', label: 'Mettre à jour', confirm: `Mettre à jour ${inst.name} ?` },
+          { key: 'start', label: 'Démarrer', progress: 'Démarrage en cours…', confirm: `Démarrer ${inst.name} ?` },
+          { key: 'update', label: 'Mettre à jour', progress: 'Mise à jour en cours…', confirm: `Mettre à jour ${inst.name} ?` },
         ];
       }
       return [
-        { key: 'update', label: 'Mettre à jour', confirm: `Mettre à jour ${inst.name} ?` },
+        { key: 'update', label: 'Mettre à jour', progress: 'Mise à jour en cours…', confirm: `Mettre à jour ${inst.name} ?` },
       ];
     }
     function renderCards(instances) {
@@ -293,6 +293,7 @@
                 data-action="instance-${action.key}"
                 data-instance="${inst.name}"
                 data-label="${action.label}"
+                data-progress="${action.progress}"
                 data-confirm="${action.confirm}"
               >${action.label}</button>
             `).join('')}
@@ -305,6 +306,7 @@
           const instance = button.dataset.instance;
           const action = button.dataset.action.replace('instance-', '');
           const label = button.dataset.label || 'Action';
+          const progress = button.dataset.progress || `${label} en cours…`;
           const confirmMessage = button.dataset.confirm || `Confirmer ${label.toLowerCase()} ?`;
           if (!window.confirm(confirmMessage)) {
             return;
@@ -315,8 +317,8 @@
           const card = button.closest('.card');
           const cardButtons = card ? Array.from(card.querySelectorAll('.card-actions button')) : [button];
           cardButtons.forEach((btn) => { btn.disabled = true; });
-          button.textContent = `${label}…`;
-          setFeedback(`feedback-instance-${instance}`, `${label} en cours…`, true);
+          button.textContent = progress;
+          setFeedback(`feedback-instance-${instance}`, progress, true);
           const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
