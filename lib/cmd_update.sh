@@ -217,6 +217,16 @@ cmd_update() {
     local cfg
     for cfg in "${selected[@]}"; do
         sep
-        update_process_config "$cfg" "$hooks_only" "$hub_only"
+        if [[ "$hooks_only" == "true" || "$hub_only" == "true" ]]; then
+            update_process_config "$cfg" "$hooks_only" "$hub_only"
+        else
+            local instance_id=""
+            instance_id="$(grep '^INSTANCE_ID=' "$cfg" 2>/dev/null | cut -d= -f2- | tr -d '"')"
+            [[ -n "$instance_id" ]] || die "INSTANCE_ID introuvable dans $cfg"
+            python3 "$SCRIPT_DIR/tools/host_cli.py" update-instance \
+                --main-script "$SCRIPT_DIR/game_commander.sh" \
+                --instance "$instance_id" \
+            || die "Mise à jour échouée pour $instance_id"
+        fi
     done
 }

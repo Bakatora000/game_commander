@@ -38,14 +38,17 @@ cmd_uninstall() {
     $DRY_RUN && warn "MODE DRY-RUN — aucune modification ne sera effectuée"
 
     if [[ -n "$target_instance" || -n "$target_config" ]]; then
-        local cfg=""
-        if [[ -n "$target_config" ]]; then
-            cfg="$target_config"
-        else
-            cfg="$(python3 "$SCRIPT_DIR/tools/host_cli.py" resolve-config --instance "$target_instance" 2>/dev/null || true)"
+        if [[ "$gc_action" != "2" ]]; then
+            die "Le mode ciblé non interactif supporte seulement --full pour l'instant"
         fi
-        [[ -n "$cfg" && -f "$cfg" ]] || die "Configuration d'instance introuvable"
-        uninstall_gc_process_entry "$cfg" "$gc_action"
+        if [[ -n "$target_config" && -z "$target_instance" ]]; then
+            target_instance="$(python3 "$SCRIPT_DIR/tools/host_cli.py" list-instances | awk -v cfg="$target_config" '$3==cfg {print $1; exit}')"
+        fi
+        [[ -n "$target_instance" ]] || die "Identifiant d'instance introuvable"
+        python3 "$SCRIPT_DIR/tools/host_cli.py" uninstall-instance \
+            --main-script "$SCRIPT_DIR/game_commander.sh" \
+            --instance "$target_instance" \
+        || die "Désinstallation échouée pour $target_instance"
         echo ""
         hdr "Terminé"
         $DRY_RUN && warn "DRY-RUN — aucune modification n'a été effectuée"
