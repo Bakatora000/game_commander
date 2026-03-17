@@ -42,6 +42,12 @@ principale.
 Un tableau plus détaillé avec moteur d'installation, mods et fichier de configuration principal
 est disponible plus bas dans la section `Jeux supportés`.
 
+## Documentation des menus
+
+Documentation utilisateur disponible pour l'instant :
+
+- [Valheim Commander](docs/valheim-commander.md)
+
 ## Valheim Screenshots
 
 ### Dashboard
