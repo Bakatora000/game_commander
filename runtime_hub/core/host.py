@@ -95,6 +95,15 @@ def _run_command(cmd: list[str], timeout: int = 300) -> tuple[bool, str]:
     return False, message or f"Commande échouée ({result.returncode})"
 
 
+def _service_action_success_message(action: str, instance_name: str) -> str:
+    labels = {
+        "start": f"Démarrage lancé pour {instance_name}",
+        "stop": f"Arrêt lancé pour {instance_name}",
+        "restart": f"Redémarrage lancé pour {instance_name}",
+    }
+    return labels.get(action, "Action lancée")
+
+
 def _build_instance_card(inst: dict, cpu_monitor: dict, alerts_by_instance: dict, cpu_instances: dict) -> dict:
     name = inst.get("name", "?")
     prefix = inst.get("prefix", "/")
@@ -181,7 +190,7 @@ def run_instance_service_action(instance_name: str, action: str) -> tuple[bool, 
     payload = get_hub_payload()
     card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
     if ok:
-        return True, f"{action.capitalize()} demandé pour {instance_name}", card
+        return True, _service_action_success_message(action, instance_name), card
     return False, message or f"Échec {action}", card
 
 
