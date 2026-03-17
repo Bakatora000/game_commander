@@ -50,16 +50,25 @@ def _safe_extract(zf, dest):
 def _normalize_mod_token(value):
     return re.sub(r'[^a-z0-9]+', '', value.lower())
 
-def _selected_bepinex_members(names, namespace, name):
-    """Sélectionne uniquement les fichiers du mod ciblé dans une archive BepInEx."""
-    normalized_targets = {
+def _candidate_match_tokens(namespace, name):
+    tokens = {
         _normalize_mod_token(namespace),
         _normalize_mod_token(name),
         _normalize_mod_token(f'{namespace}-{name}'),
         _normalize_mod_token(f'{namespace}_{name}'),
         _normalize_mod_token(f'{namespace}.{name}'),
     }
-    normalized_targets.discard('')
+    ignored = {'', 'valheim', 'plugin', 'plugins', 'pack', 'mod', 'mods', 'bepinex', 'temporary'}
+    for raw in re.split(r'[^a-zA-Z0-9]+', f'{namespace} {name}'):
+        token = _normalize_mod_token(raw)
+        if len(token) >= 4 and token not in ignored:
+            tokens.add(token)
+    tokens.discard('')
+    return tokens
+
+def _selected_bepinex_members(names, namespace, name):
+    """Sélectionne uniquement les fichiers du mod ciblé dans une archive BepInEx."""
+    normalized_targets = _candidate_match_tokens(namespace, name)
 
     def rel_under(prefix, member):
         return member[len(prefix):] if member.startswith(prefix) else None

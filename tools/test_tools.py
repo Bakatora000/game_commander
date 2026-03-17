@@ -2297,6 +2297,30 @@ class ValheimModsTests(unittest.TestCase):
             self.assertTrue(Path(tmpdir, "plugins", "CW_Jesse-BetterNetworking_Valheim", "CW_Jesse.BetterNetworking.dll").is_file())
             self.assertFalse(Path(tmpdir, "plugins", "Valheim.DisplayBepInExInfo.dll").exists())
 
+    def test_install_mod_accepts_direct_plugin_dll_when_slug_is_longer_than_filename(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app = self._app(tmpdir)
+            original_get = valheim_mods.http.get
+
+            class FakeResp:
+                def raise_for_status(self):
+                    return None
+                def iter_content(self, _size):
+                    buf = io.BytesIO()
+                    with zipfile.ZipFile(buf, "w") as zf:
+                        zf.writestr("BepInEx/plugins/ValheimPlus.dll", b"vp")
+                    yield buf.getvalue()
+
+            valheim_mods.http.get = lambda *args, **kwargs: FakeResp()
+            try:
+                with app.app_context():
+                    ok, msg = valheim_mods.install_mod("Grantapher", "ValheimPlus_Grantapher_Temporary", "9.17.1")
+                self.assertTrue(ok, msg)
+            finally:
+                valheim_mods.http.get = original_get
+
+            self.assertTrue(Path(tmpdir, "plugins", "ValheimPlus.dll").is_file())
+
     def test_remove_mod_accepts_single_dll_install(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             plugins = Path(tmpdir, "plugins")
