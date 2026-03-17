@@ -2351,6 +2351,9 @@ class ValheimPlusConfigTests(unittest.TestCase):
 
     def test_read_config_finds_valheim_plus_cfg(self):
         with tempfile.TemporaryDirectory() as tmpdir:
+            plugins_dir = Path(tmpdir, "plugins")
+            plugins_dir.mkdir(parents=True)
+            (plugins_dir / "ValheimPlus.dll").write_bytes(b"dll")
             config_dir = Path(tmpdir, "config")
             config_dir.mkdir(parents=True)
             cfg = config_dir / "valheim_plus.cfg"
@@ -2368,8 +2371,22 @@ class ValheimPlusConfigTests(unittest.TestCase):
             self.assertEqual(data["sections"][0]["name"], "Server")
             self.assertEqual(data["sections"][0]["fields"][0]["type"], "select")
 
+    def test_read_config_requires_plugin_presence(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = Path(tmpdir, "config")
+            config_dir.mkdir(parents=True)
+            (config_dir / "valheim_plus.cfg").write_text("[Server]\nenabled = true\n", encoding="utf-8")
+            app = self._app(tmpdir)
+            with app.app_context():
+                data, err = valheim_valheimplus.read_config()
+            self.assertEqual(data, {})
+            self.assertEqual(err, "Plugin ValheimPlus introuvable")
+
     def test_write_config_updates_existing_values(self):
         with tempfile.TemporaryDirectory() as tmpdir:
+            plugins_dir = Path(tmpdir, "plugins")
+            plugins_dir.mkdir(parents=True)
+            (plugins_dir / "ValheimPlus.dll").write_bytes(b"dll")
             config_dir = Path(tmpdir, "config")
             config_dir.mkdir(parents=True)
             cfg = config_dir / "valheim_plus.cfg"

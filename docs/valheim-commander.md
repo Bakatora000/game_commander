@@ -35,6 +35,7 @@ Il contient notamment :
 - `Sauvegardes`
 - `World Modifiers`
 - `BetterNetworking` si le mod est installé
+- `ValheimPlus` si le plugin est installé
 
 #### Monde actif
 
@@ -132,6 +133,7 @@ Il permet :
 Exemple :
 
 - le panneau `BetterNetworking` n'apparaît que si le mod est réellement installé/configuré
+- le panneau `ValheimPlus` n'apparaît que si le plugin `ValheimPlus.dll` est réellement présent
 
 ### Console
 

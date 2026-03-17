@@ -11,6 +11,22 @@ def _config_dir():
     return os.path.join(bepinex, 'config')
 
 
+def _plugins_dir():
+    bepinex = current_app.config['GAME']['mods']['bepinex_path']
+    return os.path.join(bepinex, 'plugins')
+
+
+def _plugin_present():
+    plugins_dir = _plugins_dir()
+    if not os.path.isdir(plugins_dir):
+        return False
+    candidates = [
+        os.path.join(plugins_dir, 'ValheimPlus.dll'),
+        os.path.join(plugins_dir, 'ValheimPlus', 'ValheimPlus.dll'),
+    ]
+    return any(os.path.exists(path) for path in candidates)
+
+
 def _cfg_path():
     config_dir = _config_dir()
     candidates = [
@@ -42,6 +58,8 @@ def _field_type(value: str):
 
 
 def read_config():
+    if not _plugin_present():
+        return {}, 'Plugin ValheimPlus introuvable'
     path = _cfg_path()
     if not path:
         return {}, 'Fichier ValheimPlus introuvable'
@@ -77,6 +95,8 @@ def read_config():
 
 
 def write_config(new_data):
+    if not _plugin_present():
+        return False, 'Plugin ValheimPlus introuvable'
     path = _cfg_path()
     if not path:
         return False, 'Fichier ValheimPlus introuvable'
