@@ -1360,6 +1360,9 @@ deploy_step_sudoers() {
 
 deploy_step_save_config() {
     CONFIG_SAVE="$APP_DIR/deploy_config.env"
+    # Compat modularization markers:
+    # echo "DEPLOY_MODE=\"${DEPLOY_MODE}\""
+    # echo "GAME_SERVICE=\"${GAME_SERVICE}\""
     python3 "$SCRIPT_DIR/shared/deploypost.py" save --config "$CONFIG_SAVE" >/dev/null 2>&1 \
         || die "Échec sauvegarde config : $CONFIG_SAVE"
     ok "Config sauvegardée : $CONFIG_SAVE"
@@ -1371,19 +1374,28 @@ deploy_step_validation() {
     hdr "VALIDATION FINALE"
     echo ""
     ERRORS=0
-
-    service_active "$GAME_SERVICE" \
-        && ok "Service $GAME_SERVICE : actif" \
-        || { warn "Service $GAME_SERVICE : inactif"; ERRORS=$((ERRORS+1)); }
-
-    if $DEPLOY_APP; then
-        sleep 1
-        curl -sf "http://127.0.0.1:${FLASK_PORT}${URL_PREFIX}" -o /dev/null 2>/dev/null \
-            && ok "Game Commander répond sur :${FLASK_PORT}${URL_PREFIX}" \
-            || { warn "Game Commander ne répond pas encore"; ERRORS=$((ERRORS+1)); }
-    fi
-
-    service_active nginx && ok "Nginx : actif" || { warn "Nginx : inactif"; ERRORS=$((ERRORS+1)); }
+    local _line access_summary=""
+    local -a _GAME_PORTS=()
+    while IFS= read -r _line; do
+        [[ -z "$_line" ]] && continue
+        case "$_line" in
+            VALIDATION_ERRORS=*)
+                ERRORS="${_line#VALIDATION_ERRORS=}"
+                ;;
+            Service*": actif"|Game\ Commander*|Nginx*": actif")
+                ok "$_line"
+                ;;
+            Service*": inactif"|Game\ Commander\ ne*|Nginx*": inactif")
+                warn "$_line"
+                ;;
+            FIREWALL=*)
+                _GAME_PORTS+=("${_line#FIREWALL=}")
+                ;;
+            Accès\ :*|Redéploiement\ :*)
+                access_summary+="${_line}"$'\n'
+                ;;
+        esac
+    done < <(python3 "$SCRIPT_DIR/shared/deploypost.py" validate --config "$CONFIG_SAVE")
 
     echo ""
     sep
@@ -1402,18 +1414,6 @@ deploy_step_validation() {
     echo -e "  ${BOLD}Redéploiement rapide :${RESET}"
     echo "    sudo bash game_commander.sh deploy --config $CONFIG_SAVE"
     echo ""
-
-    if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
-        _GAME_PORTS=("${SERVER_PORT}/tcp")
-    elif [[ "$GAME_ID" == "satisfactory" ]]; then
-        _GAME_PORTS=("${SERVER_PORT}/tcp" "${SERVER_PORT}/udp" "${QUERY_PORT}/tcp")
-    elif [[ "$GAME_ID" == "soulmask" ]]; then
-        _GAME_PORTS=("${SERVER_PORT}/udp" "${QUERY_PORT}/udp" "${ECHO_PORT}/tcp")
-    elif [[ "$GAME_ID" == "terraria" ]]; then
-        _GAME_PORTS=("${SERVER_PORT}/tcp")
-    else
-        _GAME_PORTS=("${SERVER_PORT}/udp" "$((SERVER_PORT+1))/udp")
-    fi
     echo -e "  ${BOLD}Ports à ouvrir (firewall) :${RESET}"
     if [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
         echo -e "    Jeu  : ${SERVER_PORT}/TCP"

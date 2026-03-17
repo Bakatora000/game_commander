@@ -142,6 +142,29 @@ def validation_report(env: dict[str, str], config_path: str | Path) -> tuple[int
     return errors, lines, summary
 
 
+def firewall_specs(env: dict[str, str]) -> list[str]:
+    game_id = env.get("GAME_ID", "")
+    server_port = env.get("SERVER_PORT", "")
+    query_port = env.get("QUERY_PORT", "")
+    echo_port = env.get("ECHO_PORT", "")
+    if game_id in {"minecraft", "minecraft-fabric", "terraria"}:
+        return [f"{server_port}/tcp", "80/tcp", "443/tcp"]
+    if game_id == "satisfactory":
+        return [f"{server_port}/tcp", f"{server_port}/udp", f"{query_port}/tcp", "80/tcp", "443/tcp"]
+    if game_id == "soulmask":
+        return [f"{server_port}/udp", f"{query_port}/udp", f"{echo_port}/tcp", "80/tcp", "443/tcp"]
+    return [f"{server_port}/udp", f"{int(server_port) + 1}/udp", "80/tcp", "443/tcp"] if server_port else ["80/tcp", "443/tcp"]
+
+
+def validation_lines(env: dict[str, str], config_path: str | Path) -> list[str]:
+    errors, lines, summary = validation_report(env, config_path)
+    rendered = [f"VALIDATION_ERRORS={errors}"]
+    rendered.extend(lines)
+    rendered.append(summary)
+    rendered.extend(f"FIREWALL={spec}" for spec in firewall_specs(env))
+    return rendered
+
+
 def save_from_file(config_file: str | Path) -> tuple[bool, str]:
     env = deployenv.normalize_deploy_env(config_file)
     app_dir = Path(env.get("APP_DIR", ""))
@@ -160,12 +183,22 @@ def _cmd_save(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_validate(args: argparse.Namespace) -> int:
+    env = deployenv.normalize_deploy_env(args.config)
+    for line in validation_lines(env, args.config):
+        print(line)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Game Commander deploy post helpers")
     sub = parser.add_subparsers(dest="command", required=True)
     save = sub.add_parser("save")
     save.add_argument("--config", required=True)
     save.set_defaults(func=_cmd_save)
+    validate = sub.add_parser("validate")
+    validate.add_argument("--config", required=True)
+    validate.set_defaults(func=_cmd_validate)
     return parser
 
 

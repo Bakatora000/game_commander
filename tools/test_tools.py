@@ -405,6 +405,27 @@ class DeployPostTests(unittest.TestCase):
         self.assertIn('QUERY_PORT="8888"', text)
         self.assertIn('GAME_ID="satisfactory"', text)
 
+    def test_validation_lines_include_firewall_specs(self):
+        env = {
+            "GAME_ID": "satisfactory",
+            "INSTANCE_ID": "sat1",
+            "GAME_SERVICE": "satisfactory-server-sat1",
+            "APP_DIR": "/tmp/game-commander-sat1",
+            "FLASK_PORT": "5007",
+            "URL_PREFIX": "/satisfactory",
+            "DOMAIN": "gaming.example.com",
+            "SSL_MODE": "existing",
+            "SERVER_PORT": "7777",
+            "QUERY_PORT": "8888",
+        }
+        with mock.patch.object(deploypost, "_service_active", return_value=True), \
+             mock.patch.object(deploypost, "_http_ok", return_value=True):
+            lines = deploypost.validation_lines(env, "/tmp/game-commander-sat1/deploy_config.env")
+        self.assertIn("VALIDATION_ERRORS=0", lines)
+        self.assertIn("FIREWALL=7777/tcp", lines)
+        self.assertIn("FIREWALL=7777/udp", lines)
+        self.assertIn("FIREWALL=8888/tcp", lines)
+
 
 class HostOpsTests(unittest.TestCase):
 
