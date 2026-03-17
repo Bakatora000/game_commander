@@ -16,5 +16,13 @@ cmd_rebalance() {
         && warn "Les services actifs seront redémarrés pour appliquer l'affinité" \
         || info "Les services actifs conserveront l'ancienne affinité jusqu'au prochain redémarrage"
 
+    echo ""
+    echo -e "  ${BOLD}Affectation actuelle :${RESET}"
+    cpu_affinity_show_current || true
+    echo ""
+    echo -e "  ${BOLD}Affectation planifiée :${RESET}"
+    cpu_affinity_show_plan || true
+    echo ""
+
     cpu_affinity_apply_all "$restart_running"
 }

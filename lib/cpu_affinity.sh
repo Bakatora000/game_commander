@@ -152,6 +152,33 @@ cpu_affinity_systemd_line() {
     return 1
 }
 
+cpu_affinity_current_for_service() {
+    local service_name="$1"
+    local dropin_file="/etc/systemd/system/${service_name}.service.d/10-cpu-affinity.conf"
+    if [[ -f "$dropin_file" ]]; then
+        sed -n 's/^CPUAffinity=//p' "$dropin_file" | head -1
+        return 0
+    fi
+    echo "-"
+}
+
+cpu_affinity_show_current() {
+    local instance_id game_id service_name cpus
+    while IFS='|' read -r instance_id game_id service_name; do
+        [[ -n "$service_name" ]] || continue
+        cpus="$(cpu_affinity_current_for_service "$service_name")"
+        echo -e "  ${BOLD}${instance_id}${RESET} (${game_id}) : ${cpus}"
+    done < <(cpu_affinity_collect_instances)
+}
+
+cpu_affinity_show_plan() {
+    local instance_id game_id service_name cpus weight
+    while IFS='|' read -r instance_id game_id service_name cpus weight; do
+        [[ -n "$service_name" && -n "$cpus" ]] || continue
+        echo -e "  ${BOLD}${instance_id}${RESET} (${game_id}) : ${cpus}  ${DIM}[poids ${weight}]${RESET}"
+    done < <(cpu_affinity_plan_all)
+}
+
 cpu_affinity_apply_all() {
     local restart_running="${1:-false}"
     local changed=false
