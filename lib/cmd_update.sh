@@ -215,6 +215,10 @@ cmd_update() {
     fi
 
     local cfg
+    local batch_skip_hub_sync=false
+    if [[ "$hooks_only" != "true" && "$hub_only" != "true" && ${#selected[@]} -gt 1 ]]; then
+        batch_skip_hub_sync=true
+    fi
     for cfg in "${selected[@]}"; do
         sep
         if [[ "$hooks_only" == "true" || "$hub_only" == "true" ]]; then
@@ -223,10 +227,22 @@ cmd_update() {
             local instance_id=""
             instance_id="$(grep '^INSTANCE_ID=' "$cfg" 2>/dev/null | cut -d= -f2- | tr -d '"')"
             [[ -n "$instance_id" ]] || die "INSTANCE_ID introuvable dans $cfg"
-            python3 "$SCRIPT_DIR/tools/host_cli.py" update-instance \
+            local -a update_cmd=(
+                python3 "$SCRIPT_DIR/tools/host_cli.py" update-instance
                 --main-script "$SCRIPT_DIR/game_commander.sh" \
                 --instance "$instance_id" \
-            || die "Mise à jour échouée pour $instance_id"
+            )
+            $batch_skip_hub_sync && update_cmd+=(--skip-hub-sync)
+            "${update_cmd[@]}" || die "Mise à jour échouée pour $instance_id"
         fi
     done
+
+    if $batch_skip_hub_sync; then
+        sep
+        info "Synchronisation finale du Hub Admin"
+        python3 "$SCRIPT_DIR/shared/hubsync.py" sync-config \
+            --config "${selected[0]}" \
+            --repo-root "$SCRIPT_DIR" \
+        || die "Synchronisation finale du Hub échouée"
+    fi
 }
