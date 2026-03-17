@@ -778,6 +778,36 @@ Premier périmètre validé :
   - `restart`
   - `update --instance`
   - `rebalance`
+  - `redéployer` une instance depuis son `deploy_config.env`
+  - `désinstaller` une instance depuis le Hub avec confirmation forte
+
+## Milestone v3.0
+
+Jalon retenu pour démarrer la rationalisation d'architecture sans réécriture globale.
+
+État figé à ce stade :
+- le standard produit est maintenant bon sur :
+  - Valheim
+  - Minecraft Java / Fabric
+  - Terraria vanilla
+  - Soulmask (socle propre)
+  - Enshrouded (socle + gameplay)
+  - Satisfactory (baseline exploitable + claim/admin)
+- `/commander` est devenu un vrai `Hub Admin` séparé
+- les rôles `admin hôte` et `admin d'instance` sont désormais distincts dans le produit
+- les premières actions hôte sont disponibles depuis le Hub
+
+Direction validée pour `v3.0` :
+- garder `bash` pour la couche hôte/provisioning Linux
+- migrer progressivement la logique métier et l'orchestration vers `python`
+- formaliser un contrat commun par jeu
+- poursuivre le Hub Admin comme surface de pilotage principale côté hôte
+
+Prochaines priorités après ce gel :
+- refactoriser les actions hôte (`deploy`, `attach`, `update`, `uninstall`, `rebalance`) pour réduire la logique shell
+- documenter et stabiliser le contrat commun par jeu
+- continuer l'enrichissement ciblé de `Satisfactory`
+- revenir ensuite sur `Enshrouded` (`rôles / accès`, `bannis`)
 
 ## Note locale testsoul
 

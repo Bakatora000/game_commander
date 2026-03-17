@@ -52,19 +52,16 @@ Documentation utilisateur disponible pour l'instant :
 ## Valheim Screenshots
 
 ### Dashboard
-![Valheim Dashboard](docs/screenshots/valheim/Menu1.png)
+![Valheim Dashboard](docs/screenshots/valheim/valheim_dashboard.png)
 
 ### Mods
-![Valheim Mods](docs/screenshots/valheim/Menu2.png)
+![Valheim Mods](docs/screenshots/valheim/valheim_mods.png)
 
 ### Configuration
-![Valheim Configuration](docs/screenshots/valheim/Menu3.png)
+![Valheim Configuration](docs/screenshots/valheim/valheim_configuration.png)
 
-### Fichiers
-![Valheim Files](docs/screenshots/valheim/Menu4.png)
-
-### Utilisateurs
-![Valheim Users](docs/screenshots/valheim/Menu5.png)
+### Console
+![Valheim Console](docs/screenshots/valheim/valheim_console.png)
 
 ## Utilisation courante
 
@@ -315,6 +312,8 @@ Note Hub Admin :
   - `start / stop / restart`
   - `update` d'une instance
   - `rebalance` CPU
+  - `redéployer` une instance depuis son `deploy_config.env`
+  - `désinstaller` une instance avec confirmation forte
 
 Note Minecraft Java :
 - le serveur téléchargé automatiquement peut être plus récent que ton client Java local
@@ -357,6 +356,15 @@ Note Satisfactory :
   - renommage du serveur
 - la connexion dépend du port jeu et du `ReliablePort`
 - le Commander affiche l'état du claim et peut relire les infos serveur via le mot de passe admin actuel
+
+## Roadmap
+
+Le prochain chantier structurant est la refactorisation `v3.0` :
+
+- conserver `bash` comme couche hôte/provisioning
+- déplacer progressivement la logique métier et d'orchestration en `python`
+- formaliser un contrat commun par jeu
+- faire du `Hub Admin` le vrai backend de pilotage hôte
 
 ### Politique actuelle de sauvegarde
 

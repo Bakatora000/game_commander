@@ -23,6 +23,42 @@
 
 ## Bugs résolus
 
+### [19] Satisfactory — connexion impossible tant que le `ReliablePort` n'était pas correctement modélisé
+- **Statut :** Résolu
+- **Composant :** `lib/deploy_steps.sh` + support `satisfactory`
+- **Instance(s) affectée(s) :** `satisfactory`
+- **Symptôme :**
+  - claim du serveur possible
+  - mais connexion joueur impossible ou instable
+  - puis erreurs du type `Failed to connect to the server API`
+- **Cause racine :**
+  - le support initial traitait le second port comme un pseudo port `admin/query`
+  - alors que Satisfactory attend un vrai `ReliablePort`
+  - et ce port doit aussi être ouvert côté firewall
+- **Solutions essayées :**
+  - ❌ raisonner uniquement avec le port jeu
+  - ❌ présenter le second port comme un simple port admin
+  - ✅ lancer le serveur avec `-ReliablePort=...`
+  - ✅ rappeler explicitement à la fin du déploiement que ce port doit être ouvert
+- **Régression connue :** Pour Satisfactory, ne pas traiter le second port comme un détail facultatif ; sans `ReliablePort` correctement configuré et ouvert, le join n'est pas fiable.
+
+### [20] Hub Admin — le Hub dépendait trop des logins d'instance et mélangeait les rôles
+- **Statut :** Résolu
+- **Composant :** `runtime_hub/*`
+- **Instance(s) affectée(s) :** global
+- **Symptôme :**
+  - `/commander` devenait une interface d'exploitation hôte
+  - mais sans modèle d'auth/permissions vraiment distinct de celui des Commanders d'instance
+- **Cause racine :**
+  - le Hub était historiquement pensé comme un simple point d'entrée/landing page
+  - alors que son périmètre produit a évolué vers un vrai rôle `admin hôte`
+- **Solutions essayées :**
+  - ❌ conserver une simple page agrégée sans auth dédiée
+  - ✅ créer un Flask Hub séparé avec son propre `users.json`
+  - ✅ introduire des permissions Hub dédiées
+  - ✅ commencer à exposer les actions hôte depuis ce Hub
+- **Régression connue :** Ne pas redonner au Hub un comportement dépendant des comptes d'instance ; l'admin hôte et l'admin jeu doivent rester séparés.
+
 ### [17] Terraria — bannir un joueur via le Commander n'empêchait pas la reconnexion
 - **Statut :** Résolu
 - **Composant :** `runtime/games/terraria/admins.py` + `runtime/games/terraria/players.py`

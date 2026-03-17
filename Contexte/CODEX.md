@@ -218,14 +218,14 @@ Jinja2 context always has: `game` (full config dict), `prefix`, `game_id`, `modu
 
 At each milestone, create a git commit and push to `origin/main`. Bump the version in the `game_commander.sh` header (line 3, `v2.x`) accordingly.
 
-Current validated milestone: `v2.3`
+Current validated milestone: `v3.0`
 
-Short roadmap after `v2.3`:
-- keep beta-testing Valheim / Minecraft Java / Minecraft Fabric and fix regressions first
-- propagate the Valheim-level product standard to Terraria, then Enshrouded
-- keep Soulmask at its current baseline unless beta feedback reveals specific missing product features
-- continue UI/CSS/accessibility cleanup incrementally after the first theme-system pass
-- preserve `/commander` as the normal entrypoint and keep hub status independent from per-instance auth
+Short roadmap after `v3.0`:
+- keep stabilizing the separated `Hub Admin` and its guarded host actions
+- start the targeted refactorization of host actions so shell becomes thinner and Python becomes the main orchestration layer
+- formalize a clearer common contract per game (`config`, `players`, `users`, `saves`, `mods`, lifecycle hooks)
+- keep iterating on Satisfactory and Enshrouded once the first refactor lots are in place
+- continue UI/CSS/accessibility cleanup incrementally without destabilizing the validated product baseline
 
 Roadmap status update:
 - Terraria has now largely caught up to the baseline standard expected for vanilla support
@@ -242,7 +242,11 @@ Roadmap status update:
 - `/commander` is no longer only a landing page:
   - it is now a dedicated Hub Admin Flask app
   - auth is separate from per-instance Commanders
-  - first host actions are exposed there (`start/stop/restart`, `update --instance`, `rebalance`)
+  - first host actions are exposed there (`start/stop/restart`, `update --instance`, `rebalance`, `redeploy`, `uninstall`)
+- the `v3.0` direction is now explicit:
+  - keep shell for host-level provisioning and Linux integration
+  - move orchestration and product logic progressively into Python
+  - use the Hub Admin as the long-term host control surface
 
 ## Adding a New Game
 
