@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import appservice, cpuplan, deployenv, deploynginx, deploypost, deploysudo, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
+from shared import appfiles, appservice, cpuplan, deploybackups, deployenv, deploynginx, deploypost, deploysudo, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -1314,6 +1314,37 @@ class HubHostTests(unittest.TestCase):
             with app.app_context():
                 lines = hub_host.get_global_console(max_lines=2)
             self.assertEqual(lines, ["line2", "line3"])
+
+
+class DeployHelpersTests(unittest.TestCase):
+
+    def test_effective_backup_dir_uses_instance_subdirectory(self):
+        path = deploybackups.effective_backup_dir("/home/vhserver/gamebackups", "valheim2")
+        self.assertEqual(str(path), "/home/vhserver/gamebackups/valheim2")
+
+    def test_render_backup_script_for_minecraft_includes_admin_files(self):
+        content = deploybackups.render_backup_script(
+            game_id="minecraft-fabric",
+            backup_dir="/backups/minecraft-fabric",
+            world_dir="/srv/mc/world",
+            server_dir="/srv/mc",
+        )
+        self.assertIn('SERVER_DIR="/srv/mc"', content)
+        self.assertIn('for f in server.properties ops.json whitelist.json', content)
+        self.assertIn('PREFIX="minecraft-fabric"', content)
+
+    def test_resolve_runtime_src_dir_accepts_repo_root(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "runtime").mkdir()
+            (root / "runtime" / "app.py").write_text("print('ok')\n", encoding="utf-8")
+            self.assertEqual(appfiles.resolve_runtime_src_dir(root), root / "runtime")
+
+    def test_resolve_runtime_src_dir_accepts_runtime_dir(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "app.py").write_text("print('ok')\n", encoding="utf-8")
+            self.assertEqual(appfiles.resolve_runtime_src_dir(root), root)
 
 
 class ConfigGenUsersJsonTests(unittest.TestCase):

@@ -770,185 +770,63 @@ STARTEOF
 
 deploy_step_backups() {
     hdr "ÉTAPE 6 : Sauvegardes automatiques"
-    local effective_backup_dir="$BACKUP_DIR"
-    [[ -n "${INSTANCE_ID:-}" && "$(basename "$effective_backup_dir")" != "$INSTANCE_ID" ]] && effective_backup_dir="${effective_backup_dir}/${INSTANCE_ID}"
-
-    mkdir -p "$APP_DIR"
-    chown "$SYS_USER:$SYS_USER" "$APP_DIR"
-
-    mkdir -p "$effective_backup_dir"
-    chown "$SYS_USER:$SYS_USER" "$effective_backup_dir"
-
-    case "$GAME_ID" in
-        valheim)
-            WORLD_DIR="$DATA_DIR/worlds_local"
-            [[ ! -d "$WORLD_DIR" ]] && WORLD_DIR="$DATA_DIR/worlds"
-            ;;
-        enshrouded) WORLD_DIR="$SERVER_DIR/savegame" ;;
-        minecraft|minecraft-fabric) WORLD_DIR="$SERVER_DIR/world" ;;
-        terraria) WORLD_DIR="$DATA_DIR" ;;
-        satisfactory) WORLD_DIR="$DATA_DIR/.config/Epic/FactoryGame/Saved/SaveGames" ;;
-        soulmask) WORLD_DIR="$SERVER_DIR/WS/Saved" ;;
-    esac
-
-    BACKUP_SCRIPT="$APP_DIR/backup_${GAME_ID}.sh"
-    if [[ "$GAME_ID" == "valheim" ]]; then
-        cat > "$BACKUP_SCRIPT" << 'BKPEOF'
-#!/usr/bin/env bash
-BACKUP_DIR="__BACKUP_DIR__"
-WORLD_DIR="__WORLD_DIR__"
-WORLD_NAME="__WORLD_NAME__"
-RETENTION=7
-TS=$(date +%Y%m%d_%H%M%S)
-ARC="${BACKUP_DIR}/${WORLD_NAME}_${TS}.zip"
-FILES=()
-for f in "${WORLD_DIR}/${WORLD_NAME}.db" "${WORLD_DIR}/${WORLD_NAME}.fwl" \
-          "${WORLD_DIR}/${WORLD_NAME}.db.old" "${WORLD_DIR}/${WORLD_NAME}.fwl.old"; do
-    [[ -f "$f" ]] && FILES+=("$f")
-done
-[[ ${#FILES[@]} -eq 0 ]] && { echo "[$(date)] WARN: aucun fichier monde" >&2; exit 1; }
-mkdir -p "$BACKUP_DIR"
-zip -j "$ARC" "${FILES[@]}" -q \
-    && echo "[$(date)] OK: $(basename "$ARC") ($(du -sh "$ARC"|cut -f1))" \
-    || { echo "[$(date)] ERROR: zip échoué" >&2; exit 1; }
-find "$BACKUP_DIR" -name "${WORLD_NAME}_*.zip" -mtime +${RETENTION} -delete
-BKPEOF
-        sed -i "s|__BACKUP_DIR__|${effective_backup_dir}|g; s|__WORLD_DIR__|${WORLD_DIR}|g; s|__WORLD_NAME__|${WORLD_NAME}|g" "$BACKUP_SCRIPT"
-    elif [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
-        cat > "$BACKUP_SCRIPT" << 'BKPEOF'
-#!/usr/bin/env bash
-BACKUP_DIR="__BACKUP_DIR__"
-SERVER_DIR="__SERVER_DIR__"
-WORLD_DIR="__WORLD_DIR__"
-PREFIX="__GAME_ID__"
-RETENTION=7
-TS=$(date +%Y%m%d_%H%M%S)
-ARC="${BACKUP_DIR}/${PREFIX}_save_${TS}.zip"
-[[ ! -d "$WORLD_DIR" ]] && { echo "[$(date)] WARN: $WORLD_DIR introuvable" >&2; exit 1; }
-mkdir -p "$BACKUP_DIR"
-FILES=("$(basename "$WORLD_DIR")")
-for f in server.properties ops.json whitelist.json banned-players.json banned-ips.json usercache.json; do
-    [[ -f "$SERVER_DIR/$f" ]] && FILES+=("$f")
-done
-(
-    cd "$SERVER_DIR"
-    zip -r "$ARC" "${FILES[@]}" -q
-) && echo "[$(date)] OK: $(basename "$ARC") ($(du -sh "$ARC"|cut -f1))" \
-  || { echo "[$(date)] ERROR" >&2; exit 1; }
-find "$BACKUP_DIR" -name "${PREFIX}_save_*.zip" -mtime +${RETENTION} -delete
-BKPEOF
-        sed -i "s|__BACKUP_DIR__|${effective_backup_dir}|g; s|__SERVER_DIR__|${SERVER_DIR}|g; s|__WORLD_DIR__|${WORLD_DIR}|g; s|__GAME_ID__|${GAME_ID}|g" "$BACKUP_SCRIPT"
+    local backup_out=""
+    if backup_out="$(python3 "$SCRIPT_DIR/shared/deploybackups.py" install \
+        --sys-user "$SYS_USER" \
+        --app-dir "$APP_DIR" \
+        --backup-dir "$BACKUP_DIR" \
+        --instance-id "${INSTANCE_ID:-}" \
+        --game-id "$GAME_ID" \
+        --server-dir "$SERVER_DIR" \
+        --data-dir "${DATA_DIR:-$SERVER_DIR}" \
+        --world-name "${WORLD_NAME:-}" \
+        $([[ "${SKIP_BACKUP_TEST:-false}" == "true" ]] && printf '%s' '--skip-backup-test') 2>&1)"; then
+        while IFS= read -r _line; do
+            [[ -n "$_line" ]] && ok "$_line"
+        done <<< "$backup_out"
     else
-        cat > "$BACKUP_SCRIPT" << 'BKPEOF'
-#!/usr/bin/env bash
-BACKUP_DIR="__BACKUP_DIR__"
-WORLD_DIR="__WORLD_DIR__"
-PREFIX="__GAME_ID__"
-RETENTION=7
-TS=$(date +%Y%m%d_%H%M%S)
-ARC="${BACKUP_DIR}/${PREFIX}_save_${TS}.zip"
-[[ ! -d "$WORLD_DIR" ]] && { echo "[$(date)] WARN: $WORLD_DIR introuvable" >&2; exit 1; }
-mkdir -p "$BACKUP_DIR"
-ROOT_PARENT="$(dirname "$WORLD_DIR")"
-ROOT_NAME="$(basename "$WORLD_DIR")"
-(
-    cd "$ROOT_PARENT"
-    zip -r "$ARC" "$ROOT_NAME" -q
-) \
-    && echo "[$(date)] OK: $(basename "$ARC") ($(du -sh "$ARC"|cut -f1))" \
-    || { echo "[$(date)] ERROR" >&2; exit 1; }
-find "$BACKUP_DIR" -name "${PREFIX}_save_*.zip" -mtime +${RETENTION} -delete
-BKPEOF
-        sed -i "s|__BACKUP_DIR__|${effective_backup_dir}|g; s|__WORLD_DIR__|${WORLD_DIR}|g; s|__GAME_ID__|${GAME_ID}|g" "$BACKUP_SCRIPT"
+        [[ -n "$backup_out" ]] && while IFS= read -r _line; do
+            [[ -n "$_line" ]] && warn "$_line"
+        done <<< "$backup_out"
+        die "Échec configuration sauvegardes"
     fi
-
-    chmod +x "$BACKUP_SCRIPT"
-    chown "$SYS_USER:$SYS_USER" "$BACKUP_SCRIPT"
-    ok "Script de sauvegarde : $BACKUP_SCRIPT"
-
-    if [[ "${SKIP_BACKUP_TEST:-false}" == "true" ]]; then
-        info "Test sauvegarde ignoré pour cette mise à jour"
-    else
-        sudo -u "$SYS_USER" bash "$BACKUP_SCRIPT" 2>/dev/null \
-            && ok "Test sauvegarde réussi" \
-            || warn "Test sauvegarde : aucun fichier trouvé (normal avant le premier lancement)"
-    fi
-
-    CRON_LINE="0 3 * * * $BACKUP_SCRIPT >> $APP_DIR/backup_${GAME_ID}.log 2>&1"
-    EXISTING=$(crontab -u "$SYS_USER" -l 2>/dev/null || echo "")
-    echo "$EXISTING" | grep -qF "$BACKUP_SCRIPT" \
-        && ok "Cron déjà configuré" \
-        || { (echo "$EXISTING"; echo "$CRON_LINE") | crontab -u "$SYS_USER" -; ok "Cron : 3h00 quotidien"; }
 }
 
 deploy_step_app_files() {
     hdr "ÉTAPE 7 : Game Commander"
-    local runtime_src=""
-
-    if ! $DEPLOY_APP; then
-        warn "Sources introuvables — Game Commander ignoré"
+    local app_out=""
+    if app_out="$(python3 "$SCRIPT_DIR/shared/appfiles.py" install \
+        $($DEPLOY_APP && printf '%s' '--deploy-app') \
+        --src-dir "$SRC_DIR" \
+        --app-dir "$APP_DIR" \
+        --sys-user "$SYS_USER" \
+        --script-dir "$SCRIPT_DIR" \
+        --game-id "$GAME_ID" \
+        --game-label "$GAME_LABEL" \
+        --game-binary "$GAME_BINARY" \
+        --game-service "$GAME_SERVICE" \
+        --server-dir "$SERVER_DIR" \
+        --data-dir "${DATA_DIR:-$SERVER_DIR}" \
+        --world-name "${WORLD_NAME:-}" \
+        --max-players "$MAX_PLAYERS" \
+        --server-port "$SERVER_PORT" \
+        --query-port "${QUERY_PORT:-}" \
+        --echo-port "${ECHO_PORT:-}" \
+        --url-prefix "$URL_PREFIX" \
+        --flask-port "$FLASK_PORT" \
+        --admin-login "$ADMIN_LOGIN" \
+        --admin-password "$ADMIN_PASSWORD" \
+        --steam-appid "${STEAM_APPID:-}" \
+        --steamcmd-path "${STEAMCMD_PATH:-}" \
+        $([[ "$GAME_ID" == "valheim" ]] && $BEPINEX && printf '%s' '--bepinex') 2>&1)"; then
+        while IFS= read -r _line; do
+            [[ -n "$_line" ]] && ok "$_line"
+        done <<< "$app_out"
     else
-        runtime_src=$(deploy_runtime_src_dir "$SRC_DIR") || die "Sources runtime introuvables dans $SRC_DIR"
-        mkdir -p "$APP_DIR"
-        rsync -a --exclude='__pycache__' --exclude='*.pyc' --exclude='metrics.log' \
-                  --exclude='users.json' --exclude='game.json' --exclude='deploy_config.env' \
-                  "$runtime_src/" "$APP_DIR/"
-        chown -R "$SYS_USER:$SYS_USER" "$APP_DIR"
-        ok "Fichiers Game Commander copiés dans $APP_DIR"
-
-        GC_BEPINEX_PATH=""
-        [[ "$GAME_ID" == "valheim" ]] && $BEPINEX && GC_BEPINEX_PATH="${SERVER_DIR}/BepInEx"
-
-        local -a game_json_extra_args=()
-        [[ -n "${QUERY_PORT:-}" ]] && game_json_extra_args+=(--query-port "$QUERY_PORT")
-        [[ -n "${ECHO_PORT:-}" ]] && game_json_extra_args+=(--echo-port "$ECHO_PORT")
-
-        python3 "$SCRIPT_DIR/tools/config_gen.py" game-json \
-            --out          "$APP_DIR/game.json" \
-            --game-id      "$GAME_ID" \
-            --game-label   "$GAME_LABEL" \
-            --game-binary  "$GAME_BINARY" \
-            --game-service "$GAME_SERVICE" \
-            --server-dir   "$SERVER_DIR" \
-            --data-dir     "${DATA_DIR:-$SERVER_DIR}" \
-            --world-name   "${WORLD_NAME:-}" \
-            --max-players  "$MAX_PLAYERS" \
-            --port         "$SERVER_PORT" \
-            "${game_json_extra_args[@]}" \
-            --url-prefix   "$URL_PREFIX" \
-            --flask-port   "$FLASK_PORT" \
-            --admin-user   "$ADMIN_LOGIN" \
-            --bepinex-path "${GC_BEPINEX_PATH:-}" \
-            --steam-appid  "${STEAM_APPID:-}" \
-            --steamcmd-path "${STEAMCMD_PATH:-}" \
-        || die "Échec génération game.json"
-        ok "game.json généré"
-
-        USERS_FILE="$APP_DIR/users.json"
-        if [[ -f "$USERS_FILE" ]]; then
-            ok "users.json existant conservé"
-        else
-            ADMIN_HASH=$(python3 -c \
-                "import bcrypt,sys; print(bcrypt.hashpw(sys.argv[1].encode(), bcrypt.gensalt()).decode())" \
-                "$ADMIN_PASSWORD") || die "Échec hash bcrypt"
-            python3 "$SCRIPT_DIR/tools/config_gen.py" users-json \
-                --out     "$USERS_FILE" \
-                --admin   "$ADMIN_LOGIN" \
-                --hash    "$ADMIN_HASH" \
-                --game-id "$GAME_ID" \
-            || die "Échec génération users.json"
-            chmod 600 "$USERS_FILE"
-            chown "$SYS_USER:$SYS_USER" "$USERS_FILE"
-            ok "users.json créé — admin : $ADMIN_LOGIN"
-        fi
-    fi
-
-    METRICS_FILE="$APP_DIR/metrics.log"
-    if [[ ! -f "$METRICS_FILE" ]]; then
-        touch "$METRICS_FILE"
-        chown "$SYS_USER:$SYS_USER" "$METRICS_FILE"
-        chmod 640 "$METRICS_FILE"
-        ok "metrics.log créé"
+        [[ -n "$app_out" ]] && while IFS= read -r _line; do
+            [[ -n "$_line" ]] && warn "$_line"
+        done <<< "$app_out"
+        die "Échec installation fichiers Game Commander"
     fi
 }
 
