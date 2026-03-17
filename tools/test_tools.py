@@ -2232,6 +2232,18 @@ class ValheimModsTests(unittest.TestCase):
                 ["BetterNetworking", "CW_Jesse.BetterNetworking"],
             )
 
+    def test_get_installed_mods_ignores_display_bepinex_info_dll(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            plugins = Path(tmpdir, "plugins")
+            plugins.mkdir(parents=True)
+            Path(plugins, "Valheim.DisplayBepInExInfo.dll").write_bytes(b"dll")
+
+            app = self._app(tmpdir)
+            with app.app_context():
+                mods = valheim_mods.get_installed_mods()
+
+            self.assertEqual(mods, [])
+
     def test_install_mod_ignores_unrelated_bepinex_plugin_files(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             app = self._app(tmpdir)

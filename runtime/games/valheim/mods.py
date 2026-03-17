@@ -12,6 +12,9 @@ THUNDERSTORE_API = 'https://thunderstore.io/c/valheim/api/v1'
 ALLOWED_HOSTS    = {'thunderstore.io', 'gcdn.thunderstore.io'}
 _search_cache    = {'ts': None, 'data': []}
 _CACHE_TTL       = 3600  # 1h
+IGNORED_PLUGIN_DLLS = {
+    'valheim.displaybepinexinfo.dll',
+}
 
 def _bepinex_path():
     return current_app.config['GAME']['mods']['bepinex_path']
@@ -135,6 +138,8 @@ def get_installed_mods():
             mods.append({'name': entry.name, 'folder': entry.path})
             continue
         if entry.is_file() and entry.name.lower().endswith('.dll'):
+            if entry.name.lower() in IGNORED_PLUGIN_DLLS:
+                continue
             mods.append({'name': entry.name[:-4], 'file': entry.path})
     return sorted(mods, key=lambda x: x['name'].lower())
 

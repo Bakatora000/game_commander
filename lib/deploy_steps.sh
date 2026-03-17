@@ -432,6 +432,7 @@ EOF
                 SRC_BEP="$TMP/extracted"
                 [[ -d "$TMP/extracted/BepInExPack_Valheim" ]] && SRC_BEP="$TMP/extracted/BepInExPack_Valheim"
                 cp -r "$SRC_BEP/." "$SERVER_DIR/"
+                rm -f "$SERVER_DIR/BepInEx/plugins/Valheim.DisplayBepInExInfo.dll"
                 chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
                 rm -rf "$TMP"
                 ok "BepInEx installé"
