@@ -50,6 +50,7 @@ from runtime.games.terraria import players as terraria_players
 from runtime.games.satisfactory import config as satisfactory_config
 from runtime.games.valheim import world_modifiers as valheim_world_modifiers
 from runtime.core import server as core_server
+from runtime_hub.core import auth as hub_auth
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -663,6 +664,61 @@ class ServerCpuMonitorTests(unittest.TestCase):
         self.assertEqual(snapshot["updated_at"], 1234567890)
         self.assertEqual(snapshot["instance"]["affinity"], "6 7")
         self.assertEqual(snapshot["instance"]["planned_affinity"], "4 5")
+
+
+class HubAuthTests(unittest.TestCase):
+
+    def test_change_own_password_updates_hash(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            users_path = root / "users.json"
+            users_path.write_text(json.dumps({
+                "admin": {
+                    "password_hash": hub_auth.hash_password("oldpassword"),
+                    "permissions": ["view_hub"],
+                    "email": "",
+                }
+            }), encoding="utf-8")
+            app = Flask(__name__, root_path=str(root))
+            with app.app_context():
+                ok, err = hub_auth.change_own_password("admin", "oldpassword", "newpassword1")
+                self.assertTrue(ok, err)
+                self.assertTrue(hub_auth.verify_password("admin", "newpassword1"))
+
+    def test_update_account_email(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            users_path = root / "users.json"
+            users_path.write_text(json.dumps({
+                "admin": {
+                    "password_hash": hub_auth.hash_password("password123"),
+                    "permissions": ["view_hub"],
+                    "email": "",
+                }
+            }), encoding="utf-8")
+            app = Flask(__name__, root_path=str(root))
+            with app.app_context():
+                ok, err = hub_auth.update_account_email("admin", "admin@example.com")
+                self.assertTrue(ok, err)
+                record = hub_auth.get_user_record("admin")
+                self.assertEqual(record["email"], "admin@example.com")
+
+    def test_reset_account_password(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            users_path = root / "users.json"
+            users_path.write_text(json.dumps({
+                "admin": {
+                    "password_hash": hub_auth.hash_password("password123"),
+                    "permissions": ["view_hub"],
+                    "email": "",
+                }
+            }), encoding="utf-8")
+            app = Flask(__name__, root_path=str(root))
+            with app.app_context():
+                ok, err = hub_auth.reset_account_password("admin", "resetpass1")
+                self.assertTrue(ok, err)
+                self.assertTrue(hub_auth.verify_password("admin", "resetpass1"))
 
 
 class ConfigGenUsersJsonTests(unittest.TestCase):

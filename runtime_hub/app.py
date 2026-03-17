@@ -85,5 +85,49 @@ def api_instances():
     return jsonify(host.get_hub_payload())
 
 
+@app.route(f"{PREFIX}/api/accounts")
+@auth.require_auth
+@auth.require_perm("view_hub")
+def api_accounts():
+    return jsonify({"accounts": auth.list_accounts()})
+
+
+@app.route(f"{PREFIX}/api/accounts/change-password", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("view_hub")
+def api_change_own_password():
+    data = request.get_json() or {}
+    ok, err = auth.change_own_password(
+        session.get("username", ""),
+        data.get("current_password", ""),
+        data.get("new_password", ""),
+    )
+    if not ok:
+        return jsonify({"error": "invalid_request", "message": err}), 400
+    return jsonify({"ok": True})
+
+
+@app.route(f"{PREFIX}/api/accounts/<username>/email", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("view_hub")
+def api_update_account_email(username):
+    data = request.get_json() or {}
+    ok, err = auth.update_account_email(username, data.get("email", ""))
+    if not ok:
+        return jsonify({"error": "invalid_request", "message": err}), 400
+    return jsonify({"ok": True})
+
+
+@app.route(f"{PREFIX}/api/accounts/<username>/reset-password", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("view_hub")
+def api_reset_account_password(username):
+    data = request.get_json() or {}
+    ok, err = auth.reset_account_password(username, data.get("new_password", ""))
+    if not ok:
+        return jsonify({"error": "invalid_request", "message": err}), 400
+    return jsonify({"ok": True})
+
+
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=int(os.environ.get("GC_HUB_PORT", "5090")))

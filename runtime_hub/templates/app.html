@@ -47,13 +47,14 @@
       text-decoration: none;
       font-weight: 700;
     }
-    .monitor-panel, .card {
+    .monitor-panel, .card, .accounts-panel {
       border: 1px solid var(--border);
       border-radius: 18px;
       background: linear-gradient(180deg, var(--panel), var(--panel-2));
       box-shadow: 0 18px 50px rgba(0, 0, 0, .18);
     }
     .monitor-panel { padding: 18px; margin-bottom: 24px; }
+    .accounts-panel { padding: 18px; margin-bottom: 24px; }
     .monitor-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
     .monitor-label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; margin-bottom: .35rem; }
     .monitor-status { font-size: 1.05rem; font-weight: 700; }
@@ -72,6 +73,7 @@
     .monitor-table th, .monitor-table td { text-align: left; padding: .7rem .5rem; border-bottom: 1px solid var(--border); }
     .monitor-table tbody tr.is-alert td { color: #ffd69b; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .accounts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-top: 16px; }
     .card { padding: 18px; }
     .card-meta { color: var(--accent); font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; margin-bottom: .7rem; }
     .card h2 { margin: 0 0 .5rem; font-size: 1.25rem; }
@@ -103,6 +105,50 @@
       text-decoration: none;
       font-weight: 700;
     }
+    .section-title { margin: 0 0 .5rem; font-size: 1.15rem; }
+    .section-subtitle { margin: 0; color: var(--muted); line-height: 1.5; }
+    .field-label { display: block; margin: 0 0 .35rem; color: var(--muted); font-size: .92rem; }
+    .field-input {
+      width: 100%;
+      padding: .78rem .9rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      margin-bottom: .8rem;
+    }
+    .secondary-btn {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      border-radius: 999px;
+      padding: .65rem .9rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .primary-btn {
+      border: 0;
+      border-radius: 999px;
+      padding: .7rem 1rem;
+      background: var(--accent);
+      color: #09201a;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .mini-actions {
+      display: flex;
+      gap: .6rem;
+      flex-wrap: wrap;
+      margin-top: .5rem;
+    }
+    .account-row {
+      padding: .9rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .account-row:last-child { border-bottom: 0; }
+    .account-name { font-weight: 700; margin-bottom: .25rem; }
+    .account-email { color: var(--muted); font-size: .92rem; margin-bottom: .6rem; }
+    .feedback { min-height: 1.2rem; color: #ffd69b; margin-top: .6rem; font-size: .92rem; }
     @media (max-width: 640px) {
       .head, .monitor-head { flex-direction: column; align-items: flex-start; }
       .monitor-table { font-size: .85rem; }
@@ -143,6 +189,26 @@
       </div>
     </section>
 
+    <section class="accounts-panel">
+      <h2 class="section-title">Comptes Hub</h2>
+      <p class="section-subtitle">Gestion des comptes administrateurs du Hub. Cette V1 prépare aussi le champ email pour une future réinitialisation par mail.</p>
+      <div class="accounts-grid">
+        <section class="card">
+          <h3 class="section-title">Mon mot de passe</h3>
+          <label class="field-label" for="currentPassword">Mot de passe actuel</label>
+          <input class="field-input" id="currentPassword" type="password" autocomplete="current-password">
+          <label class="field-label" for="newPassword">Nouveau mot de passe</label>
+          <input class="field-input" id="newPassword" type="password" autocomplete="new-password">
+          <button class="primary-btn" type="button" id="btnChangePassword">Mettre à jour</button>
+          <div class="feedback" id="changePasswordFeedback"></div>
+        </section>
+        <section class="card">
+          <h3 class="section-title">Comptes administrateurs</h3>
+          <div id="accountsList"></div>
+        </section>
+      </div>
+    </section>
+
     <section class="grid" id="cards"></section>
   </main>
   <script>
@@ -162,6 +228,67 @@
           <a class="card-link" href="${inst.prefix}">Ouvrir</a>
         </article>
       `).join('');
+    }
+    function setFeedback(id, message, ok = false) {
+      const el = document.getElementById(id);
+      el.textContent = message || '';
+      el.style.color = ok ? '#9be7c5' : '#ffd69b';
+    }
+    async function loadAccounts() {
+      const response = await fetch('{{ prefix }}/api/accounts', { credentials: 'same-origin' });
+      const listEl = document.getElementById('accountsList');
+      if (!response.ok) {
+        listEl.innerHTML = '<p class="section-subtitle">Comptes indisponibles.</p>';
+        return;
+      }
+      const data = await response.json();
+      const accounts = data.accounts || [];
+      listEl.innerHTML = accounts.map((account) => `
+        <div class="account-row">
+          <div class="account-name">${account.username}</div>
+          <div class="account-email">Email : ${account.email || 'non renseigné'}</div>
+          <label class="field-label" for="email-${account.username}">Email</label>
+          <input class="field-input" id="email-${account.username}" value="${account.email || ''}">
+          <label class="field-label" for="reset-${account.username}">Réinitialiser le mot de passe</label>
+          <input class="field-input" id="reset-${account.username}" type="password" placeholder="Nouveau mot de passe">
+          <div class="mini-actions">
+            <button class="secondary-btn" type="button" data-action="save-email" data-username="${account.username}">Enregistrer l’email</button>
+            <button class="secondary-btn" type="button" data-action="reset-password" data-username="${account.username}">Réinitialiser le mot de passe</button>
+          </div>
+          <div class="feedback" id="feedback-${account.username}"></div>
+        </div>
+      `).join('');
+      listEl.querySelectorAll('[data-action="save-email"]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const username = button.dataset.username;
+          const email = document.getElementById(`email-${username}`).value.trim();
+          const response = await fetch(`{{ prefix }}/api/accounts/${encodeURIComponent(username)}/email`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ email }),
+          });
+          const data = await response.json().catch(() => ({}));
+          setFeedback(`feedback-${username}`, response.ok ? 'Email enregistré' : (data.message || 'Erreur'), response.ok);
+        });
+      });
+      listEl.querySelectorAll('[data-action="reset-password"]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const username = button.dataset.username;
+          const newPassword = document.getElementById(`reset-${username}`).value;
+          const response = await fetch(`{{ prefix }}/api/accounts/${encodeURIComponent(username)}/reset-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ new_password: newPassword }),
+          });
+          const data = await response.json().catch(() => ({}));
+          setFeedback(`feedback-${username}`, response.ok ? 'Mot de passe réinitialisé' : (data.message || 'Erreur'), response.ok);
+          if (response.ok) {
+            document.getElementById(`reset-${username}`).value = '';
+          }
+        });
+      });
     }
     function renderMonitor(monitor, instances) {
       const statusEl = document.querySelector('[data-field="cpu-monitor-status"]');
@@ -193,15 +320,34 @@
       buttonEl.textContent = hidden ? 'Masquer le détail' : 'Voir le détail';
     });
     async function load() {
-      const response = await fetch('{{ prefix }}/api/instances', { credentials: 'same-origin' });
-      if (!response.ok) {
+      const [instancesResponse] = await Promise.all([
+        fetch('{{ prefix }}/api/instances', { credentials: 'same-origin' }),
+        loadAccounts(),
+      ]);
+      if (!instancesResponse.ok) {
         document.querySelector('[data-field="cpu-monitor-status"]').textContent = 'Accès refusé';
         return;
       }
-      const data = await response.json();
+      const data = await instancesResponse.json();
       renderMonitor(data.monitor || {}, data.instances || []);
       renderCards(data.instances || []);
     }
+    document.getElementById('btnChangePassword').addEventListener('click', async () => {
+      const current_password = document.getElementById('currentPassword').value;
+      const new_password = document.getElementById('newPassword').value;
+      const response = await fetch('{{ prefix }}/api/accounts/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ current_password, new_password }),
+      });
+      const data = await response.json().catch(() => ({}));
+      setFeedback('changePasswordFeedback', response.ok ? 'Mot de passe mis à jour' : (data.message || 'Erreur'), response.ok);
+      if (response.ok) {
+        document.getElementById('currentPassword').value = '';
+        document.getElementById('newPassword').value = '';
+      }
+    });
     load();
   </script>
 </body>

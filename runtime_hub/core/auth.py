@@ -24,6 +24,11 @@ def load_users():
         return {}
 
 
+def save_users(data):
+    with open(_users_file(), "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+
 def verify_password(username, password):
     users = load_users()
     user = users.get(username)
@@ -40,8 +45,70 @@ def get_user_perms(username):
     return users.get(username, {}).get("permissions", [])
 
 
+def get_user_record(username):
+    return load_users().get(username)
+
+
 def has_perm(perm):
     return perm in get_user_perms(session.get("username", ""))
+
+
+def hash_password(password):
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def list_accounts():
+    users = load_users()
+    accounts = []
+    for username in sorted(users):
+        entry = users.get(username, {})
+        accounts.append(
+            {
+                "username": username,
+                "email": entry.get("email", ""),
+                "permissions": entry.get("permissions", []),
+            }
+        )
+    return accounts
+
+
+def change_own_password(username, current_password, new_password):
+    if not username:
+        return False, "Session invalide"
+    if not current_password or not new_password:
+        return False, "Mot de passe actuel et nouveau requis"
+    if len(new_password) < 8:
+        return False, "Le nouveau mot de passe doit contenir au moins 8 caractères"
+    if not verify_password(username, current_password):
+        return False, "Mot de passe actuel incorrect"
+    users = load_users()
+    if username not in users:
+        return False, "Compte introuvable"
+    users[username]["password_hash"] = hash_password(new_password)
+    save_users(users)
+    return True, ""
+
+
+def update_account_email(target_username, email):
+    users = load_users()
+    if target_username not in users:
+        return False, "Compte introuvable"
+    users[target_username]["email"] = email.strip()
+    save_users(users)
+    return True, ""
+
+
+def reset_account_password(target_username, new_password):
+    if not new_password:
+        return False, "Nouveau mot de passe requis"
+    if len(new_password) < 8:
+        return False, "Le nouveau mot de passe doit contenir au moins 8 caractères"
+    users = load_users()
+    if target_username not in users:
+        return False, "Compte introuvable"
+    users[target_username]["password_hash"] = hash_password(new_password)
+    save_users(users)
+    return True, ""
 
 
 def require_auth(f):
