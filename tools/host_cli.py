@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from shared import cpuplan, hostctl, hostops, updatecore, updatehooks
+from shared import cpuplan, hostctl, hostops, uninstallcore, updatecore, updatehooks
 
 
 def _existing_path(value: str) -> Path:
@@ -76,15 +76,16 @@ def cmd_redeploy_instance(args: argparse.Namespace) -> int:
 
 
 def cmd_uninstall_instance(args: argparse.Namespace) -> int:
-    ok, message = hostops.run_command(
-        hostops.uninstall_instance_cmd(args.main_script, args.instance),
-        timeout=1200,
-    )
-    if not ok and message:
-        print(message, file=sys.stderr)
+    config_file = hostctl.resolve_instance_config(args.instance)
+    if not config_file:
+        print("Configuration d'instance introuvable", file=sys.stderr)
         return 1
-    if message:
-        print(message)
+    ok, result = uninstallcore.run_full_uninstall(config_file, Path(args.main_script).resolve().parent)
+    if not ok:
+        print(result, file=sys.stderr)
+        return 1
+    for line in result:
+        print(line)
     return 0
 
 
