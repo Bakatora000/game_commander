@@ -1325,30 +1325,17 @@ deploy_step_ssl() {
 
 deploy_step_sudoers() {
     hdr "ÉTAPE 11 : Permissions sudo"
-    SUDOERS_FILE="/etc/sudoers.d/game-commander-${INSTANCE_ID}"
-    {
-        echo "# Game Commander — ${GAME_LABEL} (${INSTANCE_ID})"
-        echo "${SYS_USER} ALL=(ALL) NOPASSWD: /usr/bin/systemctl start ${GAME_SERVICE}"
-        echo "${SYS_USER} ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop ${GAME_SERVICE}"
-        echo "${SYS_USER} ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ${GAME_SERVICE}"
-        if [[ "$GAME_ID" == "valheim" ]] && [[ -n "${GC_BEPINEX_PATH:-}" ]]; then
-            BP="$GC_BEPINEX_PATH"
-            echo "${SYS_USER} ALL=(ALL) NOPASSWD: /usr/bin/chown -R ${SYS_USER} ${BP}"
-            echo "${SYS_USER} ALL=(ALL) NOPASSWD: /usr/bin/chmod -R 755 ${BP}"
-            echo "${SYS_USER} ALL=(ALL) NOPASSWD: /usr/bin/find ${BP} -type d"
-            echo "${SYS_USER} ALL=(ALL) NOPASSWD: /bin/rm -rf ${BP}/plugins/*"
-            echo "${SYS_USER} ALL=(ALL) NOPASSWD: /bin/rm -f ${BP}/plugins/*"
-        fi
-    } > "$SUDOERS_FILE"
-
-    chmod 440 "$SUDOERS_FILE"
-    VISUDO_ERR=$(visudo -cf "$SUDOERS_FILE" 2>&1)
-    if [[ $? -eq 0 ]]; then
-        ok "Sudoers : $SUDOERS_FILE"
+    local sudo_out=""
+    if sudo_out="$(python3 "$SCRIPT_DIR/shared/deploysudo.py" write-instance \
+        --sys-user "$SYS_USER" \
+        --game-label "$GAME_LABEL" \
+        --instance-id "$INSTANCE_ID" \
+        --game-service "$GAME_SERVICE" \
+        --bepinex-path "${GC_BEPINEX_PATH:-}" 2>&1)"; then
+        ok "$sudo_out"
     else
         err "Sudoers invalide — supprimé"
-        warn "Erreur visudo : $VISUDO_ERR"
-        rm -f "$SUDOERS_FILE"
+        warn "Erreur visudo : $sudo_out"
         warn "À créer manuellement :"
         echo "    sudo tee /etc/sudoers.d/game-commander-${INSTANCE_ID} > /dev/null << 'EOF'"
         echo "    ${SYS_USER} ALL=(ALL) NOPASSWD: /usr/bin/systemctl start ${GAME_SERVICE}"

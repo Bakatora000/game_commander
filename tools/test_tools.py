@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import cpuplan, deployenv, deploypost, hostctl, hostops, hubsync, instanceenv, redeploycore, uninstallcore, updatecore, updatehooks
+from shared import cpuplan, deployenv, deploypost, deploysudo, hostctl, hostops, hubsync, instanceenv, redeploycore, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -425,6 +425,20 @@ class DeployPostTests(unittest.TestCase):
         self.assertIn("FIREWALL=7777/tcp", lines)
         self.assertIn("FIREWALL=7777/udp", lines)
         self.assertIn("FIREWALL=8888/tcp", lines)
+
+
+class DeploySudoTests(unittest.TestCase):
+
+    def test_render_instance_sudoers_includes_bepinex_rules(self):
+        text = deploysudo.render_instance_sudoers(
+            sys_user="gameserver",
+            game_label="Valheim",
+            instance_id="valheim2",
+            game_service="valheim-server-valheim2",
+            bepinex_path="/home/gameserver/valheim2_server/BepInEx",
+        )
+        self.assertIn("systemctl start valheim-server-valheim2", text)
+        self.assertIn("/bin/rm -rf /home/gameserver/valheim2_server/BepInEx/plugins/*", text)
 
 
 class HostOpsTests(unittest.TestCase):
