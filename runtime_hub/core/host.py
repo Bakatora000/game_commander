@@ -5,6 +5,7 @@ Agrège les statuts d'instances et l'état du monitor CPU.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -12,7 +13,8 @@ from pathlib import Path
 import requests
 from flask import current_app
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
+MAIN_SCRIPT_ENV = os.environ.get("GC_HUB_MAIN_SCRIPT", "/home/vhserver/gc/game_commander.sh")
+ROOT_DIR = Path(MAIN_SCRIPT_ENV).resolve().parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
