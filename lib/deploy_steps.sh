@@ -1139,34 +1139,16 @@ deploy_step_app_files() {
 deploy_step_app_service() {
     hdr "ÉTAPE 8 : Service Game Commander"
     if $DEPLOY_APP; then
-        GC_SECRET=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-        cat > "/etc/systemd/system/${GC_SERVICE}.service" << SVCEOF
-[Unit]
-Description=Game Commander — ${GAME_LABEL}
-After=network.target
-Wants=${GAME_SERVICE}.service
-
-[Service]
-Type=simple
-User=${SYS_USER}
-WorkingDirectory=${APP_DIR}
-Environment="GAME_COMMANDER_SECRET=${GC_SECRET}"
-ExecStart=/usr/bin/python3 ${APP_DIR}/app.py
-Restart=on-failure
-RestartSec=5
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-SVCEOF
-        systemctl daemon-reload
-        systemctl enable "$GC_SERVICE"
-        systemctl restart "$GC_SERVICE"
-        sleep 2
-        service_active "$GC_SERVICE" \
-            && ok "Service $GC_SERVICE actif" \
-            || err "$GC_SERVICE inactif — journalctl -u $GC_SERVICE -n 30"
+        if python3 "$SCRIPT_DIR/shared/appservice.py" install \
+            --service-name "$GC_SERVICE" \
+            --game-label "$GAME_LABEL" \
+            --game-service "$GAME_SERVICE" \
+            --sys-user "$SYS_USER" \
+            --app-dir "$APP_DIR"; then
+            ok "Service $GC_SERVICE actif"
+        else
+            err "$GC_SERVICE inactif — journalctl -u $GC_SERVICE -n 30"
+        fi
     fi
     cpu_monitor_install
 }

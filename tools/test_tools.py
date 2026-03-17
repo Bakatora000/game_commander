@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import cpuplan, deployenv, deploypost, deploysudo, hostctl, hostops, hubsync, instanceenv, redeploycore, uninstallcore, updatecore, updatehooks
+from shared import appservice, cpuplan, deployenv, deploypost, deploysudo, hostctl, hostops, hubsync, instanceenv, redeploycore, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -148,6 +148,22 @@ class NginxInjectTests(unittest.TestCase):
                             "Le bloc doit être injecté dans le serveur SSL, pas après")
         finally:
             os.unlink(conf)
+
+
+class SharedHelpersTests(unittest.TestCase):
+
+    def test_render_gc_service_contains_expected_fields(self):
+        content = appservice.render_gc_service(
+            game_label="Valheim",
+            game_service="valheim-server-test",
+            sys_user="vhserver",
+            app_dir="/tmp/game-commander-test",
+            gc_secret="abc123",
+        )
+        self.assertIn("Description=Game Commander — Valheim", content)
+        self.assertIn("Wants=valheim-server-test.service", content)
+        self.assertIn('Environment="GAME_COMMANDER_SECRET=abc123"', content)
+        self.assertIn("ExecStart=/usr/bin/python3 /tmp/game-commander-test/app.py", content)
 
     def test_inject_no_ssl_fallback(self):
         """Injecte avant location / quand pas de SSL."""
