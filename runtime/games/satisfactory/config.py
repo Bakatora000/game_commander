@@ -72,12 +72,39 @@ def _extract_server_name(payload):
     data = payload.get('data') or {}
     options = data.get('serverOptions') or {}
     return (
-        options.get('serverName')
-        or data.get('serverName')
+        options.get('FG.DSA.ServerName')
         or options.get('ServerName')
+        or options.get('serverName')
+        or data.get('serverName')
         or data.get('ServerName')
         or ''
     )
+
+
+def _extract_active_session_name(payload):
+    data = payload.get('data') or {}
+    game_state = data.get('serverGameState') or data.get('ServerGameState') or {}
+    return (
+        game_state.get('activeSessionName')
+        or game_state.get('ActiveSessionName')
+        or data.get('activeSessionName')
+        or data.get('ActiveSessionName')
+        or ''
+    )
+
+
+def _read_public_server_info():
+    info = {
+        'server_name': '',
+        'active_session_name': '',
+    }
+    payload, err = _api_call('QueryServerState')
+    if not err and payload:
+        info['active_session_name'] = _extract_active_session_name(payload)
+    payload, err = _api_call('GetServerOptions')
+    if not err and payload:
+        info['server_name'] = _extract_server_name(payload)
+    return info
 
 
 def _passwordless_login():
@@ -128,11 +155,13 @@ def get_claim_status():
     try:
         token, err = _passwordless_login()
         if not err:
+            info = _read_public_server_info()
             return {
                 'reachable': True,
                 'claimed': False,
                 'status_label': 'Non revendiqué',
-                'server_name': '',
+                'server_name': info.get('server_name', ''),
+                'active_session_name': info.get('active_session_name', ''),
                 'message': 'Le serveur peut encore être revendiqué.',
             }, None
         lowered = err.lower()
@@ -143,11 +172,13 @@ def get_claim_status():
             or 'privilege' in lowered
             or 'already' in lowered
         ):
+            info = _read_public_server_info()
             return {
                 'reachable': True,
                 'claimed': True,
                 'status_label': 'Revendiqué',
-                'server_name': '',
+                'server_name': info.get('server_name', ''),
+                'active_session_name': info.get('active_session_name', ''),
                 'message': 'Le serveur est déjà revendiqué. Utilise le mot de passe admin pour le gérer.',
             }, None
         return {
@@ -155,6 +186,7 @@ def get_claim_status():
             'claimed': None,
             'status_label': 'Injoignable',
             'server_name': '',
+            'active_session_name': '',
             'message': err,
         }, None
     except Exception as exc:
@@ -163,6 +195,7 @@ def get_claim_status():
             'claimed': None,
             'status_label': 'Injoignable',
             'server_name': '',
+            'active_session_name': '',
             'message': str(exc),
         }, None
 

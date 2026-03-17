@@ -69,6 +69,14 @@
     <span class="panel-title">Serveur revendiqué</span>
   </div>
   <div class="config-fields">
+    <div class="config-row" id="satCurrentServerNameRow" style="display:none">
+      <label class="config-label">Nom actuel du serveur</label>
+      <div class="save-link static" id="satCurrentServerName">—</div>
+    </div>
+    <div class="config-row" id="satCurrentSessionRow" style="display:none">
+      <label class="config-label">Session active</label>
+      <div class="save-link static" id="satCurrentSessionName">—</div>
+    </div>
     <div class="config-row">
       <label class="config-label">Mot de passe admin actuel</label>
       <input class="config-input" type="password" id="satCurrentAdminPassword" placeholder="Mot de passe admin actuel">
@@ -110,9 +118,17 @@ function setSatisfactoryStatus(data) {
   const messageEl = document.getElementById('satisfactoryClaimMessage');
   const claimBtn = document.getElementById('btnSatisfactoryClaim');
   const claimPanel = document.getElementById('satisfactoryClaimPanel');
+  const currentServerNameEl = document.getElementById('satCurrentServerName');
+  const currentServerNameRow = document.getElementById('satCurrentServerNameRow');
+  const currentSessionNameEl = document.getElementById('satCurrentSessionName');
+  const currentSessionRow = document.getElementById('satCurrentSessionRow');
   if (statusEl) statusEl.textContent = data.status_label || 'Inconnu';
   if (messageEl) messageEl.textContent = data.message || '';
   if (claimPanel) claimPanel.style.display = data.claimed === true ? 'none' : '';
+  if (currentServerNameEl) currentServerNameEl.textContent = data.server_name || 'Nom non exposé par l’API';
+  if (currentServerNameRow) currentServerNameRow.style.display = data.claimed === true ? '' : 'none';
+  if (currentSessionNameEl) currentSessionNameEl.textContent = data.active_session_name || 'Aucune session active détectée';
+  if (currentSessionRow) currentSessionRow.style.display = data.claimed === true ? '' : 'none';
   if (claimBtn) claimBtn.disabled = data.claimed === true;
   if (claimBtn && data.claimed === true) {
     claimBtn.title = 'Le serveur est déjà revendiqué';

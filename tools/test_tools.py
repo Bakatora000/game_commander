@@ -540,14 +540,22 @@ class SatisfactoryConfigTests(unittest.TestCase):
         app.config['GAME'] = {'server': {'port': 7777}}
         with app.app_context():
             original = satisfactory_config._passwordless_login
+            original_info = satisfactory_config._read_public_server_info
             try:
                 satisfactory_config._passwordless_login = lambda: ('tok', None)
+                satisfactory_config._read_public_server_info = lambda: {
+                    'server_name': 'TestSatis',
+                    'active_session_name': 'Factory1',
+                }
                 data, err = satisfactory_config.get_claim_status()
             finally:
                 satisfactory_config._passwordless_login = original
+                satisfactory_config._read_public_server_info = original_info
         self.assertIsNone(err)
         self.assertTrue(data['reachable'])
         self.assertFalse(data['claimed'])
+        self.assertEqual(data['server_name'], 'TestSatis')
+        self.assertEqual(data['active_session_name'], 'Factory1')
 
     def test_satisfactory_status_claimed(self):
         app = Flask(__name__)
