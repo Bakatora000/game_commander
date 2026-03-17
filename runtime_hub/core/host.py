@@ -18,7 +18,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from shared import hostctl
+from shared import hostctl, hostops
 
 
 def _manifest_path() -> Path:
@@ -90,32 +90,6 @@ def _instance_entry(instance_name: str) -> dict | None:
 
 def _instance_service(instance_name: str) -> str | None:
     return _load_instance_env(instance_name).get("GAME_SERVICE")
-
-
-def _run_command(cmd: list[str], timeout: int = 300) -> tuple[bool, str]:
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            env={**os.environ, "PYTHONUNBUFFERED": "1"},
-        )
-    except Exception as exc:
-        return False, str(exc)
-    if result.returncode == 0:
-        return True, (result.stdout or "").strip()
-    message = (result.stderr or result.stdout or "").strip()
-    return False, message or f"Commande échouée ({result.returncode})"
-
-
-def _service_action_success_message(action: str, instance_name: str) -> str:
-    labels = {
-        "start": f"Démarrage lancé pour {instance_name}",
-        "stop": f"Arrêt lancé pour {instance_name}",
-        "restart": f"Redémarrage lancé pour {instance_name}",
-    }
-    return labels.get(action, "Action lancée")
 
 
 def _build_instance_card(inst: dict, cpu_monitor: dict, alerts_by_instance: dict, cpu_instances: dict) -> dict:
@@ -200,11 +174,11 @@ def run_instance_service_action(instance_name: str, action: str) -> tuple[bool, 
     service = _instance_service(instance_name)
     if not service:
         return False, "Service introuvable pour cette instance", None
-    ok, message = _run_command(["sudo", "/usr/bin/systemctl", action, service], timeout=120)
+    ok, message = hostops.run_command(hostops.service_action_cmd(service, action), timeout=120)
     payload = get_hub_payload()
     card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
     if ok:
-        return True, _service_action_success_message(action, instance_name), card
+        return True, hostops.service_action_success_message(action, instance_name), card
     return False, message or f"Échec {action}", card
 
 
@@ -215,10 +189,7 @@ def run_instance_update(instance_name: str) -> tuple[bool, str, dict | None]:
     script_path = _main_script_path()
     if not script_path.is_file():
         return False, "Script principal introuvable", None
-    ok, message = _run_command(
-        ["sudo", "/bin/bash", str(script_path), "update", "--instance", instance_name],
-        timeout=900,
-    )
+    ok, message = hostops.run_command(hostops.update_instance_cmd(script_path, instance_name), timeout=900)
     payload = get_hub_payload()
     card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
     if ok:
@@ -236,10 +207,7 @@ def run_instance_redeploy(instance_name: str) -> tuple[bool, str, dict | None]:
     config_file = _instance_config_file(instance_name)
     if not config_file.is_file():
         return False, "deploy_config.env introuvable pour cette instance", None
-    ok, message = _run_command(
-        ["sudo", "/bin/bash", str(script_path), "deploy", "--config", str(config_file)],
-        timeout=1200,
-    )
+    ok, message = hostops.run_command(hostops.redeploy_instance_cmd(script_path, config_file), timeout=1200)
     payload = get_hub_payload()
     card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
     if ok:
@@ -254,13 +222,7 @@ def run_instance_uninstall(instance_name: str) -> tuple[bool, str, dict]:
     script_path = _main_script_path()
     if not script_path.is_file():
         return False, "Script principal introuvable", get_hub_payload()
-    ok, message = _run_command(
-        [
-            "sudo", "/bin/bash", str(script_path),
-            "uninstall", "--instance", instance_name, "--full", "--yes",
-        ],
-        timeout=1200,
-    )
+    ok, message = hostops.run_command(hostops.uninstall_instance_cmd(script_path, instance_name), timeout=1200)
     payload = get_hub_payload()
     if ok:
         return True, f"Instance {instance_name} désinstallée", payload
@@ -271,10 +233,7 @@ def run_rebalance(restart: bool = False) -> tuple[bool, str, dict]:
     script_path = _main_script_path()
     if not script_path.is_file():
         return False, "Script principal introuvable", get_hub_payload()
-    cmd = ["sudo", "/bin/bash", str(script_path), "rebalance"]
-    if restart:
-        cmd.append("--restart")
-    ok, message = _run_command(cmd, timeout=900)
+    ok, message = hostops.run_command(hostops.rebalance_cmd(script_path, restart=restart), timeout=900)
     payload = get_hub_payload()
     if ok:
         label = "Rebalance appliqué" if restart else "Rebalance recalculé"

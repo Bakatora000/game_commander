@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import hostctl
+from shared import hostctl, hostops
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -277,8 +277,40 @@ class HostCtlTests(unittest.TestCase):
             )
             resolved = hostctl.resolve_instance_config("beta", search_roots=[str(root)])
             self.assertEqual(resolved, target.resolve())
-            for b in Path(conf).parent.glob(Path(conf).name + ".bak.*"):
-                b.unlink(missing_ok=True)
+
+
+class HostOpsTests(unittest.TestCase):
+
+    def test_service_action_cmd_validates_action(self):
+        self.assertEqual(
+            hostops.service_action_cmd("minecraft-server-test", "restart"),
+            ["sudo", "/usr/bin/systemctl", "restart", "minecraft-server-test"],
+        )
+        with self.assertRaises(ValueError):
+            hostops.service_action_cmd("svc", "reload")
+
+    def test_instance_command_builders(self):
+        script = "/home/vhserver/gc/game_commander.sh"
+        self.assertEqual(
+            hostops.update_instance_cmd(script, "valheim2"),
+            ["sudo", "/bin/bash", script, "update", "--instance", "valheim2"],
+        )
+        self.assertEqual(
+            hostops.redeploy_instance_cmd(script, "/tmp/deploy_config.env"),
+            ["sudo", "/bin/bash", script, "deploy", "--config", "/tmp/deploy_config.env"],
+        )
+        self.assertEqual(
+            hostops.uninstall_instance_cmd(script, "valheim2"),
+            ["sudo", "/bin/bash", script, "uninstall", "--instance", "valheim2", "--full", "--yes"],
+        )
+        self.assertEqual(
+            hostops.rebalance_cmd(script, restart=False),
+            ["sudo", "/bin/bash", script, "rebalance"],
+        )
+        self.assertEqual(
+            hostops.rebalance_cmd(script, restart=True),
+            ["sudo", "/bin/bash", script, "rebalance", "--restart"],
+        )
 
     def test_inject_missing_file(self):
         """Retourne 1 si le fichier n'existe pas."""
