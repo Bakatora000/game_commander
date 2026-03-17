@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import appfiles, appservice, cpuplan, deploybackups, deploydeps, deployenv, deploynginx, deploypost, deployssl, deploysudo, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
+from shared import appfiles, appservice, cpuplan, deploybackups, deploydeps, deployenv, deploynginx, deploypost, deployssl, deploysudo, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -1371,6 +1371,37 @@ class DeployHelpersTests(unittest.TestCase):
         self.assertFalse(payload["i386_enabled"])
         self.assertIn("lib32gcc-s1", payload["extra_apt_missing"])
         self.assertTrue(payload["enshrouded"]["required"])
+
+    def test_latest_minecraft_server_url_uses_latest_release(self):
+        def fake_fetch(url):
+            if url.endswith("version_manifest_v2.json"):
+                return {
+                    "latest": {"release": "1.21.2"},
+                    "versions": [{"id": "1.21.2", "url": "https://example.invalid/1.21.2.json"}],
+                }
+            if url == "https://example.invalid/1.21.2.json":
+                return {"downloads": {"server": {"url": "https://example.invalid/server.jar"}}}
+            raise AssertionError(url)
+
+        version_id, jar_url = gameinstall.latest_minecraft_server_url(fake_fetch)
+        self.assertEqual(version_id, "1.21.2")
+        self.assertEqual(jar_url, "https://example.invalid/server.jar")
+
+    def test_latest_fabric_server_meta_builds_expected_url(self):
+        def fake_fetch(url):
+            if url.endswith("version_manifest_v2.json"):
+                return {"latest": {"release": "1.21.1"}}
+            if url.endswith("/versions/loader"):
+                return [{"version": "0.16.10"}]
+            if url.endswith("/versions/installer"):
+                return [{"version": "1.0.2"}]
+            raise AssertionError(url)
+
+        meta = gameinstall.latest_fabric_server_meta(fake_fetch)
+        self.assertEqual(meta["minecraft_version"], "1.21.1")
+        self.assertEqual(meta["loader_version"], "0.16.10")
+        self.assertEqual(meta["installer_version"], "1.0.2")
+        self.assertIn("/1.21.1/0.16.10/1.0.2/server/jar", meta["jar_url"])
 
 
 class ConfigGenUsersJsonTests(unittest.TestCase):

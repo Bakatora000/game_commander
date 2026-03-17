@@ -360,72 +360,23 @@ PYEOF
     if [[ "$GAME_ID" == "minecraft-fabric" ]]; then
         hdr "ÉTAPE 4 : Installation Minecraft Fabric"
         install_pkg "default-jre-headless"
-        mkdir -p "$SERVER_DIR"
-        chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
-
-        if [[ -f "$SERVER_DIR/fabric-server-launch.jar" ]]; then
-            ok "Fabric server launcher déjà présent"
+        local mc_out=""
+        if mc_out="$(python3 "$SCRIPT_DIR/shared/gameinstall.py" minecraft \
+            --script-dir "$SCRIPT_DIR" \
+            --server-dir "$SERVER_DIR" \
+            --sys-user "$SYS_USER" \
+            --server-name "$SERVER_NAME" \
+            --server-port "$SERVER_PORT" \
+            --max-players "$MAX_PLAYERS" \
+            --fabric 2>&1)"; then
+            while IFS= read -r _line; do
+                [[ -n "$_line" ]] && ok "$_line"
+            done <<< "$mc_out"
         else
-            info "Téléchargement du serveur Minecraft Fabric..."
-            python3 - "$SERVER_DIR" <<'PYEOF' || die "Échec téléchargement serveur Minecraft Fabric"
-import json
-import sys
-import urllib.request
-from pathlib import Path
-
-server_dir = Path(sys.argv[1])
-out = server_dir / "fabric-server-launch.jar"
-meta_out = server_dir / ".fabric-meta.json"
-
-with urllib.request.urlopen("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json", timeout=20) as r:
-    manifest = json.load(r)
-mc_version = manifest["latest"]["release"]
-
-with urllib.request.urlopen("https://meta.fabricmc.net/v2/versions/loader", timeout=20) as r:
-    loader_version = json.load(r)[0]["version"]
-
-with urllib.request.urlopen("https://meta.fabricmc.net/v2/versions/installer", timeout=20) as r:
-    installer_version = json.load(r)[0]["version"]
-
-jar_url = f"https://meta.fabricmc.net/v2/versions/loader/{mc_version}/{loader_version}/{installer_version}/server/jar"
-with urllib.request.urlopen(jar_url, timeout=60) as r, open(out, "wb") as f:
-    f.write(r.read())
-
-meta = {
-    "minecraft_version": mc_version,
-    "loader_version": loader_version,
-    "installer_version": installer_version,
-    "loader": "fabric",
-}
-meta_out.write_text(json.dumps(meta, indent=2) + "\n")
-print(f"[fabric] launcher téléchargé : {out}")
-print(f"[fabric] meta enregistrée : {meta_out}")
-PYEOF
-            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/fabric-server-launch.jar" "$SERVER_DIR/.fabric-meta.json"
-            ok "Serveur Minecraft Fabric téléchargé"
-        fi
-
-        if [[ ! -f "$SERVER_DIR/eula.txt" ]]; then
-            cat > "$SERVER_DIR/eula.txt" << 'EOF'
-# EULA acceptée automatiquement par Game Commander
-eula=true
-EOF
-            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/eula.txt"
-            ok "eula.txt généré"
-        fi
-
-        mkdir -p "$SERVER_DIR/mods"
-        chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/mods"
-
-        if [[ ! -f "$SERVER_DIR/server.properties" ]]; then
-            python3 "$SCRIPT_DIR/tools/config_gen.py" minecraft-props \
-                --out "$SERVER_DIR/server.properties" \
-                --name "$SERVER_NAME" \
-                --port "$SERVER_PORT" \
-                --max-players "$MAX_PLAYERS" \
-            || die "Échec génération server.properties"
-            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/server.properties"
-            ok "server.properties généré"
+            [[ -n "$mc_out" ]] && while IFS= read -r _line; do
+                [[ -n "$_line" ]] && warn "$_line"
+            done <<< "$mc_out"
+            die "Échec installation serveur Minecraft Fabric"
         fi
         return
     fi
@@ -433,51 +384,22 @@ EOF
     if [[ "$GAME_ID" == "minecraft" ]]; then
         hdr "ÉTAPE 4 : Installation Minecraft Java"
         install_pkg "default-jre-headless"
-        mkdir -p "$SERVER_DIR"
-        chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
-        if [[ -f "$SERVER_DIR/server.jar" ]]; then
-            ok "server.jar déjà présent"
+        local mc_out=""
+        if mc_out="$(python3 "$SCRIPT_DIR/shared/gameinstall.py" minecraft \
+            --script-dir "$SCRIPT_DIR" \
+            --server-dir "$SERVER_DIR" \
+            --sys-user "$SYS_USER" \
+            --server-name "$SERVER_NAME" \
+            --server-port "$SERVER_PORT" \
+            --max-players "$MAX_PLAYERS" 2>&1)"; then
+            while IFS= read -r _line; do
+                [[ -n "$_line" ]] && ok "$_line"
+            done <<< "$mc_out"
         else
-            info "Téléchargement du dernier serveur Minecraft Java vanilla..."
-            python3 - "$SERVER_DIR/server.jar" <<'PYEOF' || die "Échec téléchargement serveur Minecraft"
-import json
-import sys
-import urllib.request
-
-out = sys.argv[1]
-with urllib.request.urlopen("https://launchermeta.mojang.com/mc/game/version_manifest_v2.json", timeout=20) as r:
-    manifest = json.load(r)
-latest_id = manifest["latest"]["release"]
-version_meta_url = next(v["url"] for v in manifest["versions"] if v["id"] == latest_id)
-with urllib.request.urlopen(version_meta_url, timeout=20) as r:
-    version_meta = json.load(r)
-jar_url = version_meta["downloads"]["server"]["url"]
-with urllib.request.urlopen(jar_url, timeout=60) as r, open(out, "wb") as f:
-    f.write(r.read())
-print(f"[minecraft] server.jar téléchargé : {out}")
-PYEOF
-            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/server.jar"
-            ok "Serveur Minecraft Java téléchargé"
-        fi
-
-        if [[ ! -f "$SERVER_DIR/eula.txt" ]]; then
-            cat > "$SERVER_DIR/eula.txt" << 'EOF'
-# EULA acceptée automatiquement par Game Commander
-eula=true
-EOF
-            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/eula.txt"
-            ok "eula.txt généré"
-        fi
-
-        if [[ ! -f "$SERVER_DIR/server.properties" ]]; then
-            python3 "$SCRIPT_DIR/tools/config_gen.py" minecraft-props \
-                --out "$SERVER_DIR/server.properties" \
-                --name "$SERVER_NAME" \
-                --port "$SERVER_PORT" \
-                --max-players "$MAX_PLAYERS" \
-            || die "Échec génération server.properties"
-            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/server.properties"
-            ok "server.properties généré"
+            [[ -n "$mc_out" ]] && while IFS= read -r _line; do
+                [[ -n "$_line" ]] && warn "$_line"
+            done <<< "$mc_out"
+            die "Échec installation serveur Minecraft Java"
         fi
         return
     fi
