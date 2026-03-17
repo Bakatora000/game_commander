@@ -1360,49 +1360,8 @@ deploy_step_sudoers() {
 
 deploy_step_save_config() {
     CONFIG_SAVE="$APP_DIR/deploy_config.env"
-    {
-        echo "# Game Commander — Config sauvegardée le $(date '+%Y-%m-%d %H:%M:%S')"
-        echo "# Redéploiement : sudo bash game_commander.sh deploy --config $CONFIG_SAVE"
-        echo ""
-        echo "GAME_ID=\"${GAME_ID}\""
-        echo "DEPLOY_MODE=\"${DEPLOY_MODE}\""
-        echo "INSTANCE_ID=\"${INSTANCE_ID}\""
-        echo "SYS_USER=\"${SYS_USER}\""
-        echo "SERVER_DIR=\"${SERVER_DIR}\""
-        echo "DATA_DIR=\"${DATA_DIR}\""
-        echo "BACKUP_DIR=\"${BACKUP_DIR}\""
-        echo "APP_DIR=\"${APP_DIR}\""
-        echo "SRC_DIR=\"${SRC_DIR}\""
-        echo "GAME_SERVICE=\"${GAME_SERVICE}\""
-        echo "SERVER_NAME=\"${SERVER_NAME}\""
-        echo "SERVER_PORT=\"${SERVER_PORT}\""
-        [[ -n "${QUERY_PORT:-}" ]] && echo "QUERY_PORT=\"${QUERY_PORT}\""
-        [[ -n "${ECHO_PORT:-}" ]] && echo "ECHO_PORT=\"${ECHO_PORT}\""
-        echo "MAX_PLAYERS=\"${MAX_PLAYERS}\""
-        [[ "$GAME_ID" == "valheim" ]] && {
-            echo "WORLD_NAME=\"${WORLD_NAME}\""
-            echo "CROSSPLAY=${CROSSPLAY}"
-            echo "BEPINEX=${BEPINEX}"
-        }
-        [[ "$GAME_ID" == "soulmask" ]] && {
-            echo "SERVER_ADMIN_PASSWORD=\"\""
-            echo "SERVER_MODE=\"${SERVER_MODE}\""
-            echo "BACKUP_ENABLED=${BACKUP_ENABLED}"
-            echo "SAVING_ENABLED=${SAVING_ENABLED}"
-            echo "BACKUP_INTERVAL=\"${BACKUP_INTERVAL}\""
-        }
-        echo "DOMAIN=\"${DOMAIN}\""
-        echo "URL_PREFIX=\"${URL_PREFIX}\""
-        echo "FLASK_PORT=\"${FLASK_PORT}\""
-        echo "SSL_MODE=\"${SSL_MODE}\""
-        echo "ADMIN_LOGIN=\"${ADMIN_LOGIN}\""
-        echo "# ADMIN_PASSWORD=  <-- ne pas sauvegarder en clair"
-        echo "AUTO_INSTALL_DEPS=true"
-        echo "AUTO_UPDATE_SERVER=false"
-        echo "AUTO_CONFIRM=true"
-    } > "$CONFIG_SAVE"
-    chmod 600 "$CONFIG_SAVE"
-    chown "$SYS_USER:$SYS_USER" "$CONFIG_SAVE"
+    python3 "$SCRIPT_DIR/shared/deploypost.py" save --config "$CONFIG_SAVE" >/dev/null 2>&1 \
+        || die "Échec sauvegarde config : $CONFIG_SAVE"
     ok "Config sauvegardée : $CONFIG_SAVE"
 
     cpu_affinity_apply_all false

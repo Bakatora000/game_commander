@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import cpuplan, deployenv, hostctl, hostops, hubsync, instanceenv, redeploycore, uninstallcore, updatecore, updatehooks
+from shared import cpuplan, deployenv, deploypost, hostctl, hostops, hubsync, instanceenv, redeploycore, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -383,6 +383,27 @@ class RedeployCoreTests(unittest.TestCase):
             ok, message = redeploycore.run_redeploy(cfg, ROOT_DIR / "game_commander.sh")
             self.assertFalse(ok)
             self.assertIn("Config de déploiement incomplète", message)
+
+
+class DeployPostTests(unittest.TestCase):
+
+    def test_render_saved_config_includes_satisfactory_ports(self):
+        env = deployenv.normalize_deploy_env(
+            Path("/tmp/does-not-need-to-exist").with_name("dummy.env")
+        )
+        env.update(
+            {
+                "GAME_ID": "satisfactory",
+                "INSTANCE_ID": "sat1",
+                "SYS_USER": "root",
+                "APP_DIR": "/tmp/game-commander-sat1",
+                "DOMAIN": "gaming.example.com",
+                "URL_PREFIX": "/satisfactory",
+            }
+        )
+        text = deploypost.render_saved_config(env, "/tmp/game-commander-sat1/deploy_config.env")
+        self.assertIn('QUERY_PORT="8888"', text)
+        self.assertIn('GAME_ID="satisfactory"', text)
 
 
 class HostOpsTests(unittest.TestCase):
