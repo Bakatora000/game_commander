@@ -135,7 +135,10 @@ def api_reset_account_password(username):
 @auth.require_auth
 @auth.require_perm("manage_instances")
 def api_instance_service_action(instance_name, action):
-    ok, message, card = host.run_instance_service_action(instance_name, action)
+    try:
+        ok, message, card = host.run_instance_service_action(instance_name, action)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": f"Erreur Hub pendant l'action : {exc}"}), 500
     status = 200 if ok else 400
     return jsonify({"ok": ok, "message": message, "instance": card}), status
 
@@ -144,7 +147,10 @@ def api_instance_service_action(instance_name, action):
 @auth.require_auth
 @auth.require_perm("run_updates")
 def api_instance_update(instance_name):
-    ok, message, card = host.run_instance_update(instance_name)
+    try:
+        ok, message, card = host.run_instance_update(instance_name)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": f"Erreur Hub pendant la mise à jour : {exc}"}), 500
     status = 200 if ok else 400
     return jsonify({"ok": ok, "message": message, "instance": card}), status
 
@@ -153,7 +159,10 @@ def api_instance_update(instance_name):
 @auth.require_auth
 @auth.require_perm("manage_lifecycle")
 def api_instance_redeploy(instance_name):
-    ok, message, card = host.run_instance_redeploy(instance_name)
+    try:
+        ok, message, card = host.run_instance_redeploy(instance_name)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": f"Erreur Hub pendant le redéploiement : {exc}"}), 500
     status = 200 if ok else 400
     return jsonify({"ok": ok, "message": message, "instance": card}), status
 
@@ -162,7 +171,10 @@ def api_instance_redeploy(instance_name):
 @auth.require_auth
 @auth.require_perm("manage_lifecycle")
 def api_instance_uninstall(instance_name):
-    ok, message, payload = host.run_instance_uninstall(instance_name)
+    try:
+        ok, message, payload = host.run_instance_uninstall(instance_name)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": f"Erreur Hub pendant la désinstallation : {exc}"}), 500
     status = 200 if ok else 400
     return jsonify({"ok": ok, "message": message, "payload": payload}), status
 
@@ -173,7 +185,10 @@ def api_instance_uninstall(instance_name):
 def api_rebalance():
     data = request.get_json() or {}
     restart = bool(data.get("restart"))
-    ok, message, payload = host.run_rebalance(restart=restart)
+    try:
+        ok, message, payload = host.run_rebalance(restart=restart)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": f"Erreur Hub pendant le rebalance : {exc}"}), 500
     status = 200 if ok else 400
     return jsonify({"ok": ok, "message": message, "payload": payload}), status
 

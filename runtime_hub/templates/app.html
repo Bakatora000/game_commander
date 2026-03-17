@@ -352,15 +352,31 @@
           const cardButtons = card ? Array.from(card.querySelectorAll('.card-actions button')) : [button];
           cardButtons.forEach((btn) => { btn.disabled = true; });
           setFeedback(`feedback-instance-${instance}`, 'Action en cours…', true);
-          const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'same-origin',
-          });
-          const data = await response.json().catch(() => ({}));
-          setFeedback(`feedback-instance-${instance}`, data.message || (response.ok ? 'Action lancée' : 'Erreur'), response.ok);
-          cardButtons.forEach((btn) => { btn.disabled = false; });
-          setTimeout(load, response.ok ? 1200 : 0);
+          try {
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'same-origin',
+            });
+            const raw = await response.text();
+            let data = {};
+            try {
+              data = raw ? JSON.parse(raw) : {};
+            } catch (_err) {
+              data = {};
+            }
+            const fallback = response.ok
+              ? 'Action lancée'
+              : (raw && !raw.toLowerCase().startsWith('<!doctype') && !raw.toLowerCase().startsWith('<html')
+                ? raw
+                : 'Erreur serveur Hub');
+            setFeedback(`feedback-instance-${instance}`, data.message || fallback, response.ok);
+            setTimeout(load, response.ok ? 1200 : 0);
+          } catch (_err) {
+            setFeedback(`feedback-instance-${instance}`, 'Erreur réseau ou Hub indisponible', false);
+          } finally {
+            cardButtons.forEach((btn) => { btn.disabled = false; });
+          }
         });
       });
     }
