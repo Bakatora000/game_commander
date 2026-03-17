@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from shared import cpuplan, hostctl, hostops, uninstallcore, updatecore, updatehooks
+from shared import cpuplan, hostctl, hostops, hubsync, uninstallcore, updatecore, updatehooks
 
 
 def _existing_path(value: str) -> Path:
@@ -50,15 +50,12 @@ def cmd_update_instance(args: argparse.Namespace) -> int:
         return 1
     for line in hooks:
         print(line)
-    ok, message = hostops.run_command(
-        ["/bin/bash", str(args.main_script), "update", "--instance", args.instance, "--hub-only"],
-        timeout=300,
-    )
-    if not ok and message:
-        print(message, file=sys.stderr)
+    ok, hub = hubsync.sync_hub_service(config_file, Path(args.main_script).resolve().parent)
+    if not ok:
+        print(hub, file=sys.stderr)
         return 1
-    if message:
-        print(message)
+    for line in hub:
+        print(line)
     return 0
 
 

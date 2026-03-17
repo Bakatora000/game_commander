@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import cpuplan, hostctl, hostops, instanceenv, uninstallcore, updatecore, updatehooks
+from shared import cpuplan, hostctl, hostops, hubsync, instanceenv, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -348,6 +348,17 @@ class UninstallCoreTests(unittest.TestCase):
             ok, message = uninstallcore.run_full_uninstall(cfg, d)
             self.assertFalse(ok)
             self.assertIn("Config d'instance incomplète", message)
+
+
+class HubSyncTests(unittest.TestCase):
+
+    def test_sync_hub_service_requires_sys_user(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = Path(d) / "deploy_config.env"
+            cfg.write_text('GAME_ID="valheim"\nINSTANCE_ID="v1"\n', encoding="utf-8")
+            ok, message = hubsync.sync_hub_service(cfg, ROOT_DIR)
+            self.assertFalse(ok)
+            self.assertIn("SYS_USER manquant", message)
 
 
 class HostOpsTests(unittest.TestCase):
