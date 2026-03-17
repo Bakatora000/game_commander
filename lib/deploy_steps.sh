@@ -485,6 +485,23 @@ deploy_step_game_service() {
     CPU_WEIGHT_LINE="CPUWeight=$(cpu_affinity_cpu_weight_for_game "$GAME_ID")"
     [[ -n "$CPU_AFFINITY_LINE" ]] && info "Affinité CPU prévue : ${CPU_AFFINITY_LINE#CPUAffinity=}"
 
+    install_game_service_unit() {
+        local exec_start="$1"
+        local game_out=""
+        if game_out="$(python3 "$SCRIPT_DIR/shared/gameservice.py" install \
+            --game-label "$GAME_LABEL" \
+            --service-name "$GAME_SERVICE" \
+            --sys-user "$SYS_USER" \
+            --server-dir "$SERVER_DIR" \
+            --exec-start "$exec_start" \
+            --cpu-affinity-line "$CPU_AFFINITY_LINE" \
+            --cpu-weight-line "$CPU_WEIGHT_LINE" 2>&1)"; then
+            ok "$game_out"
+        else
+            warn "$game_out"
+        fi
+    }
+
     if [[ "$GAME_ID" == "minecraft" ]]; then
         START_SCRIPT="$SERVER_DIR/start_server.sh"
         cat > "$START_SCRIPT" << STARTEOF
@@ -496,40 +513,7 @@ STARTEOF
         chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
         ok "Script de démarrage : $START_SCRIPT"
 
-        cat > "/etc/systemd/system/${GAME_SERVICE}.service" << SVCEOF
-[Unit]
-Description=${GAME_LABEL} Dedicated Server
-After=network.target
-
-[Service]
-Type=simple
-User=${SYS_USER}
-WorkingDirectory=${SERVER_DIR}
-ExecStart=${START_SCRIPT}
-Restart=on-failure
-RestartSec=10
-${CPU_AFFINITY_LINE}
-${CPU_WEIGHT_LINE}
-SuccessExitStatus=0 130 143
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=${GAME_SERVICE}
-KillSignal=SIGINT
-KillMode=mixed
-TimeoutStopSec=60
-
-[Install]
-WantedBy=multi-user.target
-SVCEOF
-
-        systemctl daemon-reload
-        systemctl enable "$GAME_SERVICE"
-        info "Démarrage de $GAME_SERVICE..."
-        systemctl start "$GAME_SERVICE"
-        sleep 5
-        service_active "$GAME_SERVICE" \
-            && ok "Service $GAME_SERVICE actif" \
-            || warn "$GAME_SERVICE pas encore actif — journalctl -u $GAME_SERVICE -f"
+        install_game_service_unit "$START_SCRIPT"
         return
     fi
 
@@ -544,40 +528,7 @@ STARTEOF
         chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
         ok "Script de démarrage : $START_SCRIPT"
 
-        cat > "/etc/systemd/system/${GAME_SERVICE}.service" << SVCEOF
-[Unit]
-Description=${GAME_LABEL} Dedicated Server
-After=network.target
-
-[Service]
-Type=simple
-User=${SYS_USER}
-WorkingDirectory=${SERVER_DIR}
-ExecStart=${START_SCRIPT}
-Restart=on-failure
-RestartSec=10
-${CPU_AFFINITY_LINE}
-${CPU_WEIGHT_LINE}
-SuccessExitStatus=0 130 143
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=${GAME_SERVICE}
-KillSignal=SIGINT
-KillMode=mixed
-TimeoutStopSec=60
-
-[Install]
-WantedBy=multi-user.target
-SVCEOF
-
-        systemctl daemon-reload
-        systemctl enable "$GAME_SERVICE"
-        info "Démarrage de $GAME_SERVICE..."
-        systemctl start "$GAME_SERVICE"
-        sleep 5
-        service_active "$GAME_SERVICE" \
-            && ok "Service $GAME_SERVICE actif" \
-            || warn "$GAME_SERVICE pas encore actif — journalctl -u $GAME_SERVICE -f"
+        install_game_service_unit "$START_SCRIPT"
         return
     fi
 
@@ -630,40 +581,7 @@ WRAPEOF
         chown "$SYS_USER:$SYS_USER" "$WRAPPER_SCRIPT"
         ok "Wrapper service : $WRAPPER_SCRIPT"
 
-        cat > "/etc/systemd/system/${GAME_SERVICE}.service" << SVCEOF
-[Unit]
-Description=${GAME_LABEL} Dedicated Server
-After=network.target
-
-[Service]
-Type=simple
-User=${SYS_USER}
-WorkingDirectory=${SERVER_DIR}
-ExecStart=${WRAPPER_SCRIPT}
-Restart=on-failure
-RestartSec=10
-${CPU_AFFINITY_LINE}
-${CPU_WEIGHT_LINE}
-SuccessExitStatus=0 130 143
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=${GAME_SERVICE}
-KillSignal=SIGINT
-KillMode=mixed
-TimeoutStopSec=60
-
-[Install]
-WantedBy=multi-user.target
-SVCEOF
-
-        systemctl daemon-reload
-        systemctl enable "$GAME_SERVICE"
-        info "Démarrage de $GAME_SERVICE..."
-        systemctl start "$GAME_SERVICE"
-        sleep 5
-        service_active "$GAME_SERVICE" \
-            && ok "Service $GAME_SERVICE actif" \
-            || warn "$GAME_SERVICE pas encore actif — journalctl -u $GAME_SERVICE -f"
+        install_game_service_unit "$WRAPPER_SCRIPT"
         return
     fi
 
@@ -682,40 +600,7 @@ STARTEOF
         chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
         ok "Script de démarrage : $START_SCRIPT"
 
-        cat > "/etc/systemd/system/${GAME_SERVICE}.service" << SVCEOF
-[Unit]
-Description=${GAME_LABEL} Dedicated Server
-After=network.target
-
-[Service]
-Type=simple
-User=${SYS_USER}
-WorkingDirectory=${SERVER_DIR}
-ExecStart=${START_SCRIPT}
-Restart=on-failure
-RestartSec=10
-${CPU_AFFINITY_LINE}
-${CPU_WEIGHT_LINE}
-SuccessExitStatus=0 130 143
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=${GAME_SERVICE}
-KillSignal=SIGINT
-KillMode=mixed
-TimeoutStopSec=60
-
-[Install]
-WantedBy=multi-user.target
-SVCEOF
-
-        systemctl daemon-reload
-        systemctl enable "$GAME_SERVICE"
-        info "Démarrage de $GAME_SERVICE..."
-        systemctl start "$GAME_SERVICE"
-        sleep 5
-        service_active "$GAME_SERVICE" \
-            && ok "Service $GAME_SERVICE actif" \
-            || warn "$GAME_SERVICE pas encore actif — journalctl -u $GAME_SERVICE -f"
+        install_game_service_unit "$START_SCRIPT"
         return
     fi
 
@@ -788,40 +673,7 @@ STARTEOF
         chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
         ok "Script de démarrage : $START_SCRIPT"
 
-        cat > "/etc/systemd/system/${GAME_SERVICE}.service" << SVCEOF
-[Unit]
-Description=${GAME_LABEL} Dedicated Server
-After=network.target
-
-[Service]
-Type=simple
-User=${SYS_USER}
-WorkingDirectory=${SERVER_DIR}
-ExecStart=${START_SCRIPT}
-Restart=on-failure
-RestartSec=10
-${CPU_AFFINITY_LINE}
-${CPU_WEIGHT_LINE}
-SuccessExitStatus=0 130 143
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=${GAME_SERVICE}
-KillSignal=SIGINT
-KillMode=mixed
-TimeoutStopSec=60
-
-[Install]
-WantedBy=multi-user.target
-SVCEOF
-
-        systemctl daemon-reload
-        systemctl enable "$GAME_SERVICE"
-        info "Démarrage de $GAME_SERVICE..."
-        systemctl start "$GAME_SERVICE"
-        sleep 5
-        service_active "$GAME_SERVICE" \
-            && ok "Service $GAME_SERVICE actif" \
-            || warn "$GAME_SERVICE pas encore actif — journalctl -u $GAME_SERVICE -f"
+        install_game_service_unit "$START_SCRIPT"
         return
     fi
 
@@ -916,40 +768,7 @@ STARTEOF
     chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
     ok "Script de démarrage : $START_SCRIPT"
 
-    cat > "/etc/systemd/system/${GAME_SERVICE}.service" << SVCEOF
-[Unit]
-Description=${GAME_LABEL} Dedicated Server
-After=network.target
-
-[Service]
-Type=simple
-User=${SYS_USER}
-WorkingDirectory=${SERVER_DIR}
-ExecStart=${START_SCRIPT}
-Restart=on-failure
-RestartSec=10
-${CPU_AFFINITY_LINE}
-${CPU_WEIGHT_LINE}
-SuccessExitStatus=0 130 143
-StandardOutput=journal
-StandardError=journal
-SyslogIdentifier=${GAME_SERVICE}
-KillSignal=SIGINT
-KillMode=mixed
-TimeoutStopSec=60
-
-[Install]
-WantedBy=multi-user.target
-SVCEOF
-
-    systemctl daemon-reload
-    systemctl enable "$GAME_SERVICE"
-    info "Démarrage de $GAME_SERVICE..."
-    systemctl start "$GAME_SERVICE"
-    sleep 5
-    service_active "$GAME_SERVICE" \
-        && ok "Service $GAME_SERVICE actif" \
-        || warn "$GAME_SERVICE pas encore actif — journalctl -u $GAME_SERVICE -f"
+    install_game_service_unit "$START_SCRIPT"
 }
 
 deploy_step_backups() {

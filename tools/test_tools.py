@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import appservice, cpuplan, deployenv, deploynginx, deploypost, deploysudo, hostctl, hostops, hubsync, instanceenv, redeploycore, uninstallcore, updatecore, updatehooks
+from shared import appservice, cpuplan, deployenv, deploynginx, deploypost, deploysudo, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -494,6 +494,25 @@ class DeployNginxTests(unittest.TestCase):
         self.assertEqual(calls[2][:3], ["python3", "/repo/tools/nginx_manager.py", "regenerate"])
         self.assertEqual(calls[3], ["nginx", "-t"])
         self.assertEqual(calls[4], ["systemctl", "reload", "nginx"])
+
+
+class GameServiceTests(unittest.TestCase):
+
+    def test_render_game_service_contains_expected_fields(self):
+        content = gameservice.render_game_service(
+            game_label="Minecraft Fabric",
+            service_name="minecraft-fabric-server-test",
+            sys_user="vhserver",
+            server_dir="/tmp/mc",
+            exec_start="/tmp/mc/start_server.sh",
+            cpu_affinity_line="CPUAffinity=2 6",
+            cpu_weight_line="CPUWeight=200",
+        )
+        self.assertIn("Description=Minecraft Fabric Dedicated Server", content)
+        self.assertIn("WorkingDirectory=/tmp/mc", content)
+        self.assertIn("ExecStart=/tmp/mc/start_server.sh", content)
+        self.assertIn("CPUAffinity=2 6", content)
+        self.assertIn("CPUWeight=200", content)
 
 
 class HostOpsTests(unittest.TestCase):
