@@ -563,6 +563,20 @@ class SatisfactoryConfigTests(unittest.TestCase):
         self.assertTrue(data['reachable'])
         self.assertTrue(data['claimed'])
 
+    def test_satisfactory_status_connection_error_is_simplified(self):
+        app = Flask(__name__)
+        app.config['GAME'] = {'server': {'port': 7777}}
+        with app.app_context(), mock.patch.object(
+            satisfactory_config.http,
+            'post',
+            side_effect=satisfactory_config.http.exceptions.ConnectionError('boom'),
+        ):
+            data, err = satisfactory_config.get_claim_status()
+        self.assertIsNone(err)
+        self.assertFalse(data['reachable'])
+        self.assertEqual(data['status_label'], 'Injoignable')
+        self.assertIn('API Satisfactory indisponible', data['message'])
+
     def test_satisfactory_claim_requires_fields(self):
         app = Flask(__name__)
         app.config['GAME'] = {'server': {'port': 7777}}

@@ -22,13 +22,20 @@ def _api_call(function_name, data=None, token=None, timeout=8):
     headers = {'Content-Type': 'application/json'}
     if token:
         headers['Authorization'] = f'Bearer {token}'
-    response = http.post(
-        _api_url(),
-        json={'function': function_name, 'data': data or {}},
-        headers=headers,
-        timeout=timeout,
-        verify=False,
-    )
+    try:
+        response = http.post(
+            _api_url(),
+            json={'function': function_name, 'data': data or {}},
+            headers=headers,
+            timeout=timeout,
+            verify=False,
+        )
+    except http.exceptions.ConnectionError:
+        return None, "API Satisfactory indisponible — serveur arrêté ou démarrage en cours"
+    except http.exceptions.Timeout:
+        return None, "API Satisfactory indisponible — délai de réponse dépassé"
+    except http.exceptions.RequestException:
+        return None, "API Satisfactory indisponible"
     try:
         payload = response.json()
     except ValueError:
