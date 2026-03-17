@@ -1262,6 +1262,7 @@ Environment="GAME_COMMANDER_HUB_SECRET=${hub_secret}"
 Environment="GC_HUB_PORT=${hub_port}"
 Environment="GC_HUB_MANIFEST=${hub_manifest}"
 Environment="GC_HUB_CPU_MONITOR_STATE=${hub_cpu_state}"
+Environment="GC_HUB_MAIN_SCRIPT=${SCRIPT_DIR}/game_commander.sh"
 ExecStart=/usr/bin/python3 ${hub_app_dir}/app.py
 Restart=on-failure
 RestartSec=5
@@ -1273,6 +1274,19 @@ WantedBy=multi-user.target
 SVCEOF
 
     systemctl daemon-reload
+    cat > /etc/sudoers.d/game-commander-hub <<EOF
+# Game Commander — Hub actions
+${SYS_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SCRIPT_DIR}/game_commander.sh update --instance *
+${SYS_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SCRIPT_DIR}/game_commander.sh rebalance
+${SYS_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SCRIPT_DIR}/game_commander.sh rebalance --restart
+EOF
+    chmod 440 /etc/sudoers.d/game-commander-hub
+    if visudo -cf /etc/sudoers.d/game-commander-hub >/dev/null 2>&1; then
+        ok "Sudoers Hub : /etc/sudoers.d/game-commander-hub"
+    else
+        rm -f /etc/sudoers.d/game-commander-hub
+        warn "Sudoers Hub invalide — fichier supprimé"
+    fi
     systemctl enable game-commander-hub >/dev/null 2>&1 || true
     systemctl restart game-commander-hub
     sleep 1

@@ -5,6 +5,8 @@ Agrège les statuts d'instances et l'état du monitor CPU.
 from __future__ import annotations
 
 import json
+import os
+import subprocess
 import time
 from pathlib import Path
 
@@ -18,6 +20,10 @@ def _manifest_path() -> Path:
 
 def _cpu_monitor_path() -> Path:
     return Path(current_app.config["CPU_MONITOR_STATE"])
+
+
+def _main_script_path() -> Path:
+    return Path(current_app.config["MAIN_SCRIPT"])
 
 
 def _load_manifest() -> dict:
@@ -38,6 +44,76 @@ def _load_cpu_monitor() -> dict:
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {}
+
+
+def _instance_app_dir(instance_name: str) -> Path:
+    return Path.home() / f"game-commander-{instance_name}"
+
+
+def _load_instance_env(instance_name: str) -> dict:
+    env_path = _instance_app_dir(instance_name) / "deploy_config.env"
+    if not env_path.is_file():
+        return {}
+    state = {}
+    try:
+        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            state[key] = value.strip().strip('"')
+    except Exception:
+        return {}
+    return state
+
+
+def _instance_entry(instance_name: str) -> dict | None:
+    for item in _load_manifest().get("instances", []):
+        if item.get("name") == instance_name:
+            return item
+    return None
+
+
+def _instance_service(instance_name: str) -> str | None:
+    return _load_instance_env(instance_name).get("GAME_SERVICE")
+
+
+def _run_command(cmd: list[str], timeout: int = 300) -> tuple[bool, str]:
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
+        )
+    except Exception as exc:
+        return False, str(exc)
+    if result.returncode == 0:
+        return True, (result.stdout or "").strip()
+    message = (result.stderr or result.stdout or "").strip()
+    return False, message or f"Commande échouée ({result.returncode})"
+
+
+def _build_instance_card(inst: dict, cpu_monitor: dict, alerts_by_instance: dict, cpu_instances: dict) -> dict:
+    name = inst.get("name", "?")
+    prefix = inst.get("prefix", "/")
+    port = int(inst.get("flask_port") or 0)
+    status = _fetch_instance_hub_status(port, prefix) if port else {}
+    state = int(status.get("state") or 0)
+    players = (status.get("metrics") or {}).get("players") or {"value": 0, "max": 0}
+    return {
+        "name": name,
+        "game": inst.get("game", "?"),
+        "prefix": prefix,
+        "state": state,
+        "players": players,
+        "cpu_alert": alerts_by_instance.get(name),
+        "cpu_monitor": {
+            "updated_at": cpu_monitor.get("updated_at"),
+            "instance": cpu_instances.get(name),
+        } if cpu_instances.get(name) else None,
+    }
 
 
 def _fetch_instance_hub_status(port: int, prefix: str) -> dict:
@@ -81,26 +157,7 @@ def get_hub_payload() -> dict:
     cpu_instances = cpu_monitor.get("instances") or {}
     cards = []
     for inst in sorted(manifest.get("instances", []), key=lambda item: ((item.get("game") or "").lower(), (item.get("name") or "").lower())):
-        name = inst.get("name", "?")
-        prefix = inst.get("prefix", "/")
-        port = int(inst.get("flask_port") or 0)
-        status = _fetch_instance_hub_status(port, prefix) if port else {}
-        state = int(status.get("state") or 0)
-        players = (status.get("metrics") or {}).get("players") or {"value": 0, "max": 0}
-        cards.append(
-            {
-                "name": name,
-                "game": inst.get("game", "?"),
-                "prefix": prefix,
-                "state": state,
-                "players": players,
-                "cpu_alert": alerts_by_instance.get(name),
-                "cpu_monitor": {
-                    "updated_at": cpu_monitor.get("updated_at"),
-                    "instance": cpu_instances.get(name),
-                } if cpu_instances.get(name) else None,
-            }
-        )
+        cards.append(_build_instance_card(inst, cpu_monitor, alerts_by_instance, cpu_instances))
     monitor_status, monitor_meta = _monitor_status(cpu_monitor, cards)
     return {
         "monitor": {
@@ -109,3 +166,53 @@ def get_hub_payload() -> dict:
         },
         "instances": cards,
     }
+
+
+def run_instance_service_action(instance_name: str, action: str) -> tuple[bool, str, dict | None]:
+    if action not in {"start", "stop", "restart"}:
+        return False, "Action service non autorisée", None
+    instance = _instance_entry(instance_name)
+    if not instance:
+        return False, "Instance introuvable", None
+    service = _instance_service(instance_name)
+    if not service:
+        return False, "Service introuvable pour cette instance", None
+    ok, message = _run_command(["sudo", "/usr/bin/systemctl", action, service], timeout=120)
+    payload = get_hub_payload()
+    card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
+    if ok:
+        return True, f"{action.capitalize()} demandé pour {instance_name}", card
+    return False, message or f"Échec {action}", card
+
+
+def run_instance_update(instance_name: str) -> tuple[bool, str, dict | None]:
+    instance = _instance_entry(instance_name)
+    if not instance:
+        return False, "Instance introuvable", None
+    script_path = _main_script_path()
+    if not script_path.is_file():
+        return False, "Script principal introuvable", None
+    ok, message = _run_command(
+        ["sudo", "/bin/bash", str(script_path), "update", "--instance", instance_name],
+        timeout=900,
+    )
+    payload = get_hub_payload()
+    card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
+    if ok:
+        return True, f"Instance {instance_name} mise à jour", card
+    return False, message or "Échec update", card
+
+
+def run_rebalance(restart: bool = False) -> tuple[bool, str, dict]:
+    script_path = _main_script_path()
+    if not script_path.is_file():
+        return False, "Script principal introuvable", get_hub_payload()
+    cmd = ["sudo", "/bin/bash", str(script_path), "rebalance"]
+    if restart:
+        cmd.append("--restart")
+    ok, message = _run_command(cmd, timeout=900)
+    payload = get_hub_payload()
+    if ok:
+        label = "Rebalance appliqué" if restart else "Rebalance recalculé"
+        return True, label, payload
+    return False, message or "Échec rebalance", payload

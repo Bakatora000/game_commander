@@ -26,6 +26,7 @@ if not app.secret_key:
 app.config["PREFIX"] = PREFIX
 app.config["HUB_MANIFEST"] = os.environ.get("GC_HUB_MANIFEST", "/etc/nginx/game-commander-manifest.json")
 app.config["CPU_MONITOR_STATE"] = os.environ.get("GC_HUB_CPU_MONITOR_STATE", "/var/lib/game-commander/cpu-monitor.json")
+app.config["MAIN_SCRIPT"] = os.environ.get("GC_HUB_MAIN_SCRIPT", "/home/vhserver/gc/game_commander.sh")
 
 
 @app.context_processor
@@ -127,6 +128,35 @@ def api_reset_account_password(username):
     if not ok:
         return jsonify({"error": "invalid_request", "message": err}), 400
     return jsonify({"ok": True})
+
+
+@app.route(f"{PREFIX}/api/instances/<instance_name>/<action>", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("manage_instances")
+def api_instance_service_action(instance_name, action):
+    ok, message, card = host.run_instance_service_action(instance_name, action)
+    status = 200 if ok else 400
+    return jsonify({"ok": ok, "message": message, "instance": card}), status
+
+
+@app.route(f"{PREFIX}/api/instances/<instance_name>/update", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("run_updates")
+def api_instance_update(instance_name):
+    ok, message, card = host.run_instance_update(instance_name)
+    status = 200 if ok else 400
+    return jsonify({"ok": ok, "message": message, "instance": card}), status
+
+
+@app.route(f"{PREFIX}/api/rebalance", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("rebalance_cpu")
+def api_rebalance():
+    data = request.get_json() or {}
+    restart = bool(data.get("restart"))
+    ok, message, payload = host.run_rebalance(restart=restart)
+    status = 200 if ok else 400
+    return jsonify({"ok": ok, "message": message, "payload": payload}), status
 
 
 if __name__ == "__main__":

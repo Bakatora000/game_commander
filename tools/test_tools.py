@@ -12,10 +12,12 @@ import io
 import os
 import sys
 import tempfile
+import time
 import types
 import unittest
 import zipfile
 from pathlib import Path
+from unittest import mock
 from flask import Flask
 from werkzeug.datastructures import FileStorage
 
@@ -51,6 +53,7 @@ from runtime.games.satisfactory import config as satisfactory_config
 from runtime.games.valheim import world_modifiers as valheim_world_modifiers
 from runtime.core import server as core_server
 from runtime_hub.core import auth as hub_auth
+from runtime_hub.core import host as hub_host
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -668,6 +671,24 @@ class ServerCpuMonitorTests(unittest.TestCase):
 
 class HubAuthTests(unittest.TestCase):
 
+    def test_view_hub_expands_default_permissions(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "users.json").write_text(json.dumps({
+                "admin": {
+                    "password_hash": hub_auth.hash_password("password123"),
+                    "permissions": ["view_hub"],
+                    "email": "",
+                }
+            }), encoding="utf-8")
+            app = Flask(__name__, root_path=str(root))
+            with app.app_context():
+                perms = hub_auth.get_user_perms("admin")
+                self.assertIn("view_hub", perms)
+                self.assertIn("manage_instances", perms)
+                self.assertIn("run_updates", perms)
+                self.assertIn("rebalance_cpu", perms)
+
     def test_change_own_password_updates_hash(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
@@ -719,6 +740,76 @@ class HubAuthTests(unittest.TestCase):
                 ok, err = hub_auth.reset_account_password("admin", "resetpass1")
                 self.assertTrue(ok, err)
                 self.assertTrue(hub_auth.verify_password("admin", "resetpass1"))
+
+
+class HubHostTests(unittest.TestCase):
+
+    def _make_app(self, root: Path, manifest_path: Path):
+        app = Flask(__name__, root_path=str(root))
+        app.config["HUB_MANIFEST"] = str(manifest_path)
+        app.config["CPU_MONITOR_STATE"] = str(root / "cpu.json")
+        app.config["MAIN_SCRIPT"] = str(root / "game_commander.sh")
+        return app
+
+    def test_run_instance_service_action_uses_systemctl(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
+            }), encoding="utf-8")
+            instance_dir = root / "game-commander-valheim2"
+            instance_dir.mkdir()
+            (instance_dir / "deploy_config.env").write_text('GAME_SERVICE="valheim-server-valheim2"\n', encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            with app.app_context(), \
+                 mock.patch.object(Path, "home", return_value=root), \
+                 mock.patch.object(hub_host, "_run_command", return_value=(True, "")), \
+                 mock.patch.object(hub_host, "get_hub_payload", return_value={"instances": [{"name": "valheim2"}], "monitor": {}}):
+                ok, message, card = hub_host.run_instance_service_action("valheim2", "restart")
+            self.assertTrue(ok)
+            self.assertIn("Restart", message)
+            self.assertEqual(card["name"], "valheim2")
+
+    def test_run_instance_update_uses_main_script(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
+            }), encoding="utf-8")
+            script_path = root / "game_commander.sh"
+            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            with app.app_context(), \
+                 mock.patch.object(hub_host, "_run_command", return_value=(True, "")) as run_mock, \
+                 mock.patch.object(hub_host, "get_hub_payload", return_value={"instances": [{"name": "valheim2"}], "monitor": {}}):
+                ok, message, card = hub_host.run_instance_update("valheim2")
+            self.assertTrue(ok)
+            self.assertIn("mise à jour", message)
+            self.assertEqual(card["name"], "valheim2")
+            cmd = run_mock.call_args.args[0]
+            self.assertEqual(cmd[:4], ["sudo", "/bin/bash", str(script_path), "update"])
+            self.assertEqual(cmd[-2:], ["--instance", "valheim2"])
+
+    def test_get_hub_payload_reads_cpu_monitor_state(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
+            }), encoding="utf-8")
+            (root / "cpu.json").write_text(json.dumps({
+                "updated_at": time.time(),
+                "instances": {
+                    "valheim2": {"affinity": "4 5", "planned_affinity": "6 7", "cpu_percent": 12.5}
+                }
+            }), encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            with app.app_context(), mock.patch.object(hub_host, "_fetch_instance_hub_status", return_value={"state": 20, "metrics": {"players": {"value": 1, "max": 10}}}):
+                payload = hub_host.get_hub_payload()
+            self.assertEqual(payload["monitor"]["status"], "Stable")
+            self.assertEqual(payload["instances"][0]["cpu_monitor"]["instance"]["affinity"], "4 5")
 
 
 class ConfigGenUsersJsonTests(unittest.TestCase):

@@ -12,6 +12,14 @@ import bcrypt
 from flask import current_app, jsonify, redirect, request, session
 
 
+DEFAULT_VIEW_HUB_PERMISSIONS = {
+    "view_hub",
+    "manage_instances",
+    "run_updates",
+    "rebalance_cpu",
+}
+
+
 def _users_file():
     return os.path.join(current_app.root_path, "users.json")
 
@@ -42,7 +50,10 @@ def verify_password(username, password):
 
 def get_user_perms(username):
     users = load_users()
-    return users.get(username, {}).get("permissions", [])
+    perms = set(users.get(username, {}).get("permissions", []))
+    if "view_hub" in perms:
+        perms |= DEFAULT_VIEW_HUB_PERMISSIONS
+    return sorted(perms)
 
 
 def get_user_record(username):

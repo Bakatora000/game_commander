@@ -105,6 +105,18 @@
       text-decoration: none;
       font-weight: 700;
     }
+    .card-actions {
+      display: flex;
+      gap: .6rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+    .action-feedback {
+      min-height: 1.2rem;
+      margin-top: .7rem;
+      color: #ffd69b;
+      font-size: .92rem;
+    }
     .section-title { margin: 0 0 .5rem; font-size: 1.15rem; }
     .section-subtitle { margin: 0; color: var(--muted); line-height: 1.5; }
     .field-label { display: block; margin: 0 0 .35rem; color: var(--muted); font-size: .92rem; }
@@ -178,9 +190,14 @@
           <div class="monitor-label">Monitor CPU</div>
           <div class="monitor-status" data-field="cpu-monitor-status">Chargement…</div>
         </div>
-        <button class="monitor-toggle" type="button" data-action="toggle-cpu-monitor" hidden>Voir le détail</button>
+        <div class="inline-actions">
+          <button class="monitor-toggle" type="button" data-action="rebalance">Rebalance</button>
+          <button class="monitor-toggle" type="button" data-action="rebalance-restart">Rebalance + restart</button>
+          <button class="monitor-toggle" type="button" data-action="toggle-cpu-monitor" hidden>Voir le détail</button>
+        </div>
       </div>
       <div class="monitor-meta" data-field="cpu-monitor-meta"></div>
+      <div class="feedback" id="rebalanceFeedback"></div>
       <div class="monitor-details" data-field="cpu-monitor-details" hidden>
         <table class="monitor-table">
           <thead>
@@ -230,7 +247,7 @@
     function renderCards(instances) {
       const cardsEl = document.getElementById('cards');
       cardsEl.innerHTML = instances.map((inst) => `
-        <article class="card">
+        <article class="card" id="card-${inst.name}">
           <div class="card-meta">${inst.game}</div>
           <h2>${inst.name}</h2>
           <dl class="card-stats">
@@ -239,8 +256,34 @@
           </dl>
           <p class="card-alert ${inst.cpu_alert?.message ? 'is-visible' : ''}" ${inst.cpu_alert?.message ? '' : 'hidden'}>${inst.cpu_alert?.message || ''}</p>
           <a class="card-link" href="${inst.prefix}">Ouvrir</a>
+          <div class="card-actions">
+            <button class="secondary-btn" type="button" data-action="instance-start" data-instance="${inst.name}">Démarrer</button>
+            <button class="secondary-btn" type="button" data-action="instance-stop" data-instance="${inst.name}">Arrêter</button>
+            <button class="secondary-btn" type="button" data-action="instance-restart" data-instance="${inst.name}">Redémarrer</button>
+            <button class="secondary-btn" type="button" data-action="instance-update" data-instance="${inst.name}">Mettre à jour</button>
+          </div>
+          <div class="action-feedback" id="feedback-instance-${inst.name}"></div>
         </article>
       `).join('');
+      cardsEl.querySelectorAll('[data-action^="instance-"]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const instance = button.dataset.instance;
+          const action = button.dataset.action.replace('instance-', '');
+          const endpoint = action === 'update'
+            ? `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/update`
+            : `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/${action}`;
+          button.disabled = true;
+          const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+          });
+          const data = await response.json().catch(() => ({}));
+          setFeedback(`feedback-instance-${instance}`, data.message || (response.ok ? 'Action lancée' : 'Erreur'), response.ok);
+          button.disabled = false;
+          setTimeout(load, response.ok ? 1200 : 0);
+        });
+      });
     }
     function setFeedback(id, message, ok = false) {
       const el = document.getElementById(id);
@@ -346,6 +389,24 @@
       detailsEl.hidden = !hidden;
       buttonEl.textContent = hidden ? 'Masquer le détail' : 'Voir le détail';
     });
+    async function runRebalance(restart = false) {
+      const button = document.querySelector(`[data-action="${restart ? 'rebalance-restart' : 'rebalance'}"]`);
+      button.disabled = true;
+      const response = await fetch('{{ prefix }}/api/rebalance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ restart }),
+      });
+      const data = await response.json().catch(() => ({}));
+      setFeedback('rebalanceFeedback', data.message || (response.ok ? 'Rebalance lancé' : 'Erreur'), response.ok);
+      button.disabled = false;
+      if (response.ok) {
+        setTimeout(load, 1500);
+      }
+    }
+    document.querySelector('[data-action="rebalance"]').addEventListener('click', () => runRebalance(false));
+    document.querySelector('[data-action="rebalance-restart"]').addEventListener('click', () => runRebalance(true));
     document.getElementById('btnToggleChangePassword').addEventListener('click', () => {
       const panel = document.getElementById('changePasswordPanel');
       const hidden = panel.hidden;
