@@ -50,8 +50,12 @@ def _instance_app_dir(instance_name: str) -> Path:
     return Path.home() / f"game-commander-{instance_name}"
 
 
+def _instance_config_file(instance_name: str) -> Path:
+    return _instance_app_dir(instance_name) / "deploy_config.env"
+
+
 def _load_instance_env(instance_name: str) -> dict:
-    env_path = _instance_app_dir(instance_name) / "deploy_config.env"
+    env_path = _instance_config_file(instance_name)
     if not env_path.is_file():
         return {}
     state = {}
@@ -210,6 +214,47 @@ def run_instance_update(instance_name: str) -> tuple[bool, str, dict | None]:
     if ok:
         return True, f"Instance {instance_name} mise à jour", card
     return False, message or "Échec update", card
+
+
+def run_instance_redeploy(instance_name: str) -> tuple[bool, str, dict | None]:
+    instance = _instance_entry(instance_name)
+    if not instance:
+        return False, "Instance introuvable", None
+    script_path = _main_script_path()
+    if not script_path.is_file():
+        return False, "Script principal introuvable", None
+    config_file = _instance_config_file(instance_name)
+    if not config_file.is_file():
+        return False, "deploy_config.env introuvable pour cette instance", None
+    ok, message = _run_command(
+        ["sudo", "/bin/bash", str(script_path), "deploy", "--config", str(config_file)],
+        timeout=1200,
+    )
+    payload = get_hub_payload()
+    card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
+    if ok:
+        return True, f"Instance {instance_name} redéployée", card
+    return False, message or "Échec redéploiement", card
+
+
+def run_instance_uninstall(instance_name: str) -> tuple[bool, str, dict]:
+    instance = _instance_entry(instance_name)
+    if not instance:
+        return False, "Instance introuvable", get_hub_payload()
+    script_path = _main_script_path()
+    if not script_path.is_file():
+        return False, "Script principal introuvable", get_hub_payload()
+    ok, message = _run_command(
+        [
+            "sudo", "/bin/bash", str(script_path),
+            "uninstall", "--instance", instance_name, "--full", "--yes",
+        ],
+        timeout=1200,
+    )
+    payload = get_hub_payload()
+    if ok:
+        return True, f"Instance {instance_name} désinstallée", payload
+    return False, message or "Échec désinstallation", payload
 
 
 def run_rebalance(restart: bool = False) -> tuple[bool, str, dict]:

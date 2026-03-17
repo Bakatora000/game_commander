@@ -1277,6 +1277,8 @@ SVCEOF
     cat > /etc/sudoers.d/game-commander-hub <<EOF
 # Game Commander — Hub actions
 ${SYS_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SCRIPT_DIR}/game_commander.sh update --instance *
+${SYS_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SCRIPT_DIR}/game_commander.sh deploy --config *
+${SYS_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SCRIPT_DIR}/game_commander.sh uninstall --instance * --full --yes
 ${SYS_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SCRIPT_DIR}/game_commander.sh rebalance
 ${SYS_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SCRIPT_DIR}/game_commander.sh rebalance --restart
 EOF

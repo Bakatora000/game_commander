@@ -148,6 +148,24 @@ def api_instance_update(instance_name):
     return jsonify({"ok": ok, "message": message, "instance": card}), status
 
 
+@app.route(f"{PREFIX}/api/instances/<instance_name>/redeploy", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("manage_lifecycle")
+def api_instance_redeploy(instance_name):
+    ok, message, card = host.run_instance_redeploy(instance_name)
+    status = 200 if ok else 400
+    return jsonify({"ok": ok, "message": message, "instance": card}), status
+
+
+@app.route(f"{PREFIX}/api/instances/<instance_name>/uninstall", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("manage_lifecycle")
+def api_instance_uninstall(instance_name):
+    ok, message, payload = host.run_instance_uninstall(instance_name)
+    status = 200 if ok else 400
+    return jsonify({"ok": ok, "message": message, "payload": payload}), status
+
+
 @app.route(f"{PREFIX}/api/rebalance", methods=["POST"])
 @auth.require_auth
 @auth.require_perm("rebalance_cpu")

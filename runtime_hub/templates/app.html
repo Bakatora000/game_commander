@@ -111,6 +111,9 @@
       flex-wrap: wrap;
       margin-top: 1rem;
     }
+    .card-actions.lifecycle-actions {
+      margin-top: .6rem;
+    }
     .action-feedback {
       min-height: 1.2rem;
       margin-top: .7rem;
@@ -141,6 +144,10 @@
     .secondary-btn.is-compact {
       padding: .48rem .72rem;
       font-size: .9rem;
+    }
+    .secondary-btn.is-danger {
+      border-color: rgba(255, 110, 110, .35);
+      color: #ffd2d2;
     }
     .primary-btn {
       border: 0;
@@ -298,6 +305,24 @@
               >${action.label}</button>
             `).join('')}
           </div>
+          <div class="card-actions lifecycle-actions">
+            <button
+              class="secondary-btn is-compact"
+              type="button"
+              data-action="instance-redeploy"
+              data-instance="${inst.name}"
+              data-label="Redéployer"
+              data-confirm="Redéployer ${inst.name} depuis sa configuration sauvegardée ?"
+            >Redéployer</button>
+            <button
+              class="secondary-btn is-compact is-danger"
+              type="button"
+              data-action="instance-uninstall"
+              data-instance="${inst.name}"
+              data-label="Désinstaller"
+              data-confirm="Désinstaller complètement ${inst.name} ?"
+            >Désinstaller</button>
+          </div>
           <div class="action-feedback" id="feedback-instance-${inst.name}"></div>
         </article>
       `).join('');
@@ -310,9 +335,19 @@
           if (!window.confirm(confirmMessage)) {
             return;
           }
-          const endpoint = action === 'update'
-            ? `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/update`
-            : `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/${action}`;
+          if (action === 'uninstall') {
+            const typed = window.prompt(`Confirme la désinstallation de ${instance} en retapant son identifiant :`, '');
+            if (typed !== instance) {
+              setFeedback(`feedback-instance-${instance}`, 'Désinstallation annulée', false);
+              return;
+            }
+          }
+          const endpointByAction = {
+            update: `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/update`,
+            redeploy: `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/redeploy`,
+            uninstall: `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/uninstall`,
+          };
+          const endpoint = endpointByAction[action] || `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/${action}`;
           const card = button.closest('.card');
           const cardButtons = card ? Array.from(card.querySelectorAll('.card-actions button')) : [button];
           cardButtons.forEach((btn) => { btn.disabled = true; });

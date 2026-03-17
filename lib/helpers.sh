@@ -19,6 +19,7 @@ die()  { err "$*"; exit 1; }
 
 # Exécution avec support dry-run (utilisé par uninstall)
 DRY_RUN=false
+ASSUME_YES=false
 run() { $DRY_RUN && echo -e "${DIM}    [dry-run] $*${RESET}" || "$@"; }
 
 gc_read() {
@@ -32,6 +33,7 @@ gc_read() {
 
 ask_yn() {
     local prompt="$1"
+    $ASSUME_YES && return 0
     echo -en "  ${YELLOW}?  ${prompt} (o/n) : ${RESET}"
     gc_read _ans
     [[ "$_ans" == "o" || "$_ans" == "O" || "$_ans" == "oui" ]]

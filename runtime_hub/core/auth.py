@@ -15,6 +15,7 @@ from flask import current_app, jsonify, redirect, request, session
 DEFAULT_VIEW_HUB_PERMISSIONS = {
     "view_hub",
     "manage_instances",
+    "manage_lifecycle",
     "run_updates",
     "rebalance_cpu",
 }

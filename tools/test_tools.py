@@ -725,6 +725,7 @@ class HubAuthTests(unittest.TestCase):
                 perms = hub_auth.get_user_perms("admin")
                 self.assertIn("view_hub", perms)
                 self.assertIn("manage_instances", perms)
+                self.assertIn("manage_lifecycle", perms)
                 self.assertIn("run_updates", perms)
                 self.assertIn("rebalance_cpu", perms)
 
@@ -830,6 +831,56 @@ class HubHostTests(unittest.TestCase):
             cmd = run_mock.call_args.args[0]
             self.assertEqual(cmd[:4], ["sudo", "/bin/bash", str(script_path), "update"])
             self.assertEqual(cmd[-2:], ["--instance", "valheim2"])
+
+    def test_run_instance_redeploy_uses_saved_config(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
+            }), encoding="utf-8")
+            script_path = root / "game_commander.sh"
+            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            instance_dir = root / "game-commander-valheim2"
+            instance_dir.mkdir()
+            config_path = instance_dir / "deploy_config.env"
+            config_path.write_text('GAME_SERVICE="valheim-server-valheim2"\n', encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            with app.app_context(), \
+                 mock.patch.object(Path, "home", return_value=root), \
+                 mock.patch.object(hub_host, "_run_command", return_value=(True, "")) as run_mock, \
+                 mock.patch.object(hub_host, "get_hub_payload", return_value={"instances": [{"name": "valheim2"}], "monitor": {}}):
+                ok, message, card = hub_host.run_instance_redeploy("valheim2")
+            self.assertTrue(ok)
+            self.assertIn("redéployée", message)
+            self.assertEqual(card["name"], "valheim2")
+            cmd = run_mock.call_args.args[0]
+            self.assertEqual(cmd[:4], ["sudo", "/bin/bash", str(script_path), "deploy"])
+            self.assertEqual(cmd[4], "--config")
+            self.assertEqual(cmd[5], str(config_path))
+
+    def test_run_instance_uninstall_uses_noninteractive_flags(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
+            }), encoding="utf-8")
+            script_path = root / "game_commander.sh"
+            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            with app.app_context(), \
+                 mock.patch.object(hub_host, "_run_command", return_value=(True, "")) as run_mock, \
+                 mock.patch.object(hub_host, "get_hub_payload", return_value={"instances": [], "monitor": {}}):
+                ok, message, payload = hub_host.run_instance_uninstall("valheim2")
+            self.assertTrue(ok)
+            self.assertIn("désinstallée", message)
+            self.assertEqual(payload["instances"], [])
+            cmd = run_mock.call_args.args[0]
+            self.assertEqual(
+                cmd,
+                ["sudo", "/bin/bash", str(script_path), "uninstall", "--instance", "valheim2", "--full", "--yes"],
+            )
 
     def test_get_hub_payload_reads_cpu_monitor_state(self):
         with tempfile.TemporaryDirectory() as d:
