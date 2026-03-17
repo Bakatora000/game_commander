@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import hostctl, hostops
+from shared import cpuplan, hostctl, hostops
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -337,6 +337,17 @@ class HostCliTests(unittest.TestCase):
             rc = host_cli.main(["resolve-config", "--root", str(root), "--instance", "satisfactory"])
             self.assertEqual(rc, 0)
             self.assertEqual(stdout.getvalue().strip(), str(target.resolve()))
+
+    def test_rebalance_runs_cpuplan_directly(self):
+        with mock.patch.object(cpuplan, "detect_core_groups", return_value=["0 4", "1 5"]), \
+             mock.patch.object(cpuplan, "collect_managed_instances", return_value=[{"instance_id": "valheim2", "game_id": "valheim", "service": "valheim-server-valheim2"}]), \
+             mock.patch.object(cpuplan, "plan_instances", return_value=[{"instance_id": "valheim2", "game_id": "valheim", "service": "valheim-server-valheim2", "cpus": "0 4", "weight": 2}]), \
+             mock.patch.object(cpuplan, "apply_plan", return_value=["CPU valheim2 (valheim) -> 0 4 [poids 200]"]), \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            from tools import host_cli
+            rc = host_cli.main(["rebalance", "--main-script", str(ROOT_DIR / "game_commander.sh")])
+            self.assertEqual(rc, 0)
+            self.assertIn("Répartition CPU recalculée", stdout.getvalue())
 
     def test_inject_missing_file(self):
         """Retourne 1 si le fichier n'existe pas."""

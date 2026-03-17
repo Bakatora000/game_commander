@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from shared import hostctl, hostops
+from shared import cpuplan, hostctl, hostops
 
 
 def _existing_path(value: str) -> Path:
@@ -73,15 +73,19 @@ def cmd_uninstall_instance(args: argparse.Namespace) -> int:
 
 
 def cmd_rebalance(args: argparse.Namespace) -> int:
-    ok, message = hostops.run_command(
-        hostops.rebalance_cmd(args.main_script, restart=args.restart),
-        timeout=900,
-    )
-    if not ok and message:
-        print(message, file=sys.stderr)
+    core_groups = cpuplan.detect_core_groups()
+    if not core_groups:
+        print("Topologie CPU introuvable", file=sys.stderr)
         return 1
-    if message:
+    instances = cpuplan.collect_managed_instances()
+    if not instances:
+        print("Aucune instance gérée trouvée", file=sys.stderr)
+        return 1
+    plan = cpuplan.plan_instances(instances, core_groups)
+    messages = cpuplan.apply_plan(plan, restart_running=args.restart)
+    for message in messages:
         print(message)
+    print("Répartition CPU recalculée")
     return 0
 
 
