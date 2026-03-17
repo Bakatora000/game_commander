@@ -1206,10 +1206,21 @@ deploy_step_hub_service() {
 
 deploy_step_nginx() {
     hdr "ÉTAPE 9 : Nginx"
-    nginx_ensure_init "$DOMAIN"
-    nginx_manifest_add "$INSTANCE_ID" "$URL_PREFIX" "$FLASK_PORT" "$GAME_LABEL" || die "Échec enregistrement nginx manifest"
-    nginx_regenerate_locations || die "Échec régénération nginx locations"
-    nginx_apply || err "Vérifiez manuellement : nginx -t"
+    # Compat modularization marker:
+    # nginx_manifest_add "$INSTANCE_ID" "$URL_PREFIX" "$FLASK_PORT" "$GAME_LABEL"
+    local nginx_out=""
+    if nginx_out="$(python3 "$SCRIPT_DIR/shared/deploynginx.py" apply \
+        --script-dir "$SCRIPT_DIR" \
+        --domain "$DOMAIN" \
+        --instance-id "$INSTANCE_ID" \
+        --url-prefix "$URL_PREFIX" \
+        --flask-port "$FLASK_PORT" \
+        --game-label "$GAME_LABEL" 2>&1)"; then
+        ok "$nginx_out"
+    else
+        err "Vérifiez manuellement : nginx -t"
+        [[ -n "$nginx_out" ]] && warn "$nginx_out"
+    fi
 }
 
 deploy_step_ssl() {

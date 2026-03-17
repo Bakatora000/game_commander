@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import appservice, cpuplan, deployenv, deploypost, deploysudo, hostctl, hostops, hubsync, instanceenv, redeploycore, uninstallcore, updatecore, updatehooks
+from shared import appservice, cpuplan, deployenv, deploynginx, deploypost, deploysudo, hostctl, hostops, hubsync, instanceenv, redeploycore, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -466,6 +466,34 @@ class DeploySudoTests(unittest.TestCase):
         )
         self.assertIn("systemctl start valheim-server-valheim2", text)
         self.assertIn("/bin/rm -rf /home/gameserver/valheim2_server/BepInEx/plugins/*", text)
+
+
+class DeployNginxTests(unittest.TestCase):
+
+    def test_run_deploy_nginx_calls_expected_sequence(self):
+        calls = []
+
+        def fake_run(args):
+            calls.append(args)
+            return mock.Mock(returncode=0, stdout="", stderr="")
+
+        with mock.patch.object(deploynginx, "_run", side_effect=fake_run):
+            ok, message = deploynginx.run_deploy_nginx(
+                script_dir="/repo",
+                domain="gaming.example.com",
+                instance_id="valheim2",
+                url_prefix="/valheim2",
+                flask_port="5002",
+                game_label="Valheim",
+            )
+
+        self.assertTrue(ok)
+        self.assertEqual(message, "Nginx reloadé")
+        self.assertEqual(calls[0][:3], ["python3", "/repo/tools/nginx_manager.py", "init"])
+        self.assertEqual(calls[1][:3], ["python3", "/repo/tools/nginx_manager.py", "manifest-add"])
+        self.assertEqual(calls[2][:3], ["python3", "/repo/tools/nginx_manager.py", "regenerate"])
+        self.assertEqual(calls[3], ["nginx", "-t"])
+        self.assertEqual(calls[4], ["systemctl", "reload", "nginx"])
 
 
 class HostOpsTests(unittest.TestCase):
