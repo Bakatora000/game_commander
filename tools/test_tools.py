@@ -2615,7 +2615,7 @@ server {
     def _make_init_args(self, domain, manifest, loc_file, hub_file, backup_dir):
         return make_args(
             domain=domain, manifest=manifest,
-            loc_file=loc_file, hub_file=hub_file, backup_dir=backup_dir,
+            loc_file=loc_file, hub_file=hub_file, hub_port=5090, backup_dir=backup_dir,
         )
 
     def _make_manifest_add_args(self, manifest, instance_id, prefix, port, game):
@@ -2631,7 +2631,7 @@ server {
         return make_args(manifest=manifest, instance_id=instance_id)
 
     def _make_regenerate_args(self, manifest, out, hub_file):
-        return make_args(manifest=manifest, out=out, hub_file=hub_file)
+        return make_args(manifest=manifest, out=out, hub_file=hub_file, hub_port=5090)
 
     # ── manifest-add / manifest-remove / manifest-check ──────────────────────
 
@@ -2720,21 +2720,13 @@ server {
             self.assertEqual(rc, 0)
             content = Path(loc_file).read_text()
             hub = Path(hub_file).read_text()
-            self.assertIn("location = /commander {", content)
-            self.assertIn(f"root {os.path.dirname(hub_file)};", content)
-            self.assertIn(f"try_files /{os.path.basename(hub_file)} =404;", content)
+            self.assertIn("location /commander {", content)
+            self.assertIn("proxy_pass         http://127.0.0.1:5090", content)
             self.assertIn("location /valheim8 {", content)
             self.assertIn("location /ens1 {", content)
             self.assertIn("proxy_pass         http://127.0.0.1:5002", content)
             self.assertIn("proxy_pass         http://127.0.0.1:5003", content)
-            self.assertIn("Game Commander Hub", hub)
-            self.assertIn('href="/valheim8"', hub)
-            self.assertIn('href="/ens1"', hub)
-            self.assertIn('data-field="status"', hub)
-            self.assertIn('data-field="players"', hub)
-            self.assertIn('data-field="cpu-alert"', hub)
-            self.assertIn('data-field="cpu-monitor-status"', hub)
-            self.assertIn('data-action="toggle-cpu-monitor"', hub)
+            self.assertIn("served by Flask", hub)
 
     def test_regenerate_empty_manifest_produces_header_only(self):
         with tempfile.TemporaryDirectory() as d:
@@ -2746,9 +2738,9 @@ server {
             self.assertEqual(rc, 0)
             content = Path(loc_file).read_text()
             self.assertIn("NE PAS ÉDITER MANUELLEMENT", content)
-            self.assertIn("location = /commander {", content)
+            self.assertIn("location /commander {", content)
             self.assertNotIn("location /valheim8 {", content)
-            self.assertIn("Aucune instance Game Commander disponible.", Path(hub_file).read_text())
+            self.assertIn("served by Flask", Path(hub_file).read_text())
 
     # ── init ─────────────────────────────────────────────────────────────────
 

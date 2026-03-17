@@ -6,6 +6,7 @@ GC_NGINX_MANIFEST="/etc/nginx/game-commander-manifest.json"
 GC_NGINX_LOC_FILE="/etc/nginx/game-commander-locations.conf"
 GC_NGINX_HUB_FILE="/etc/nginx/game-commander-hub.html"
 GC_NGINX_BACKUP_DIR="/etc/nginx/backups"
+GC_NGINX_HUB_PORT="${GC_NGINX_HUB_PORT:-5090}"
 
 # ── nginx_ensure_init ─────────────────────────────────────────────────────────
 # Migration one-shot idempotente : crée le manifest + le fichier locations,
@@ -19,6 +20,7 @@ nginx_ensure_init() {
         --manifest   "$GC_NGINX_MANIFEST" \
         --loc-file   "$GC_NGINX_LOC_FILE" \
         --hub-file   "$GC_NGINX_HUB_FILE" \
+        --hub-port   "$GC_NGINX_HUB_PORT" \
         --backup-dir "$GC_NGINX_BACKUP_DIR" \
     || { err "nginx_ensure_init échoué pour $domain"; return 1; }
 }
@@ -65,6 +67,7 @@ nginx_regenerate_locations() {
         --manifest "$GC_NGINX_MANIFEST" \
         --out      "$GC_NGINX_LOC_FILE" \
         --hub-file "$GC_NGINX_HUB_FILE" \
+        --hub-port "$GC_NGINX_HUB_PORT" \
     || { err "nginx_regenerate_locations échoué"; return 1; }
 }
 

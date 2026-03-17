@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Game Commander Hub</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #18212a;
+      --text: #eef4f8;
+      --muted: #9cb1c0;
+      --accent: #4fc3a1;
+      --border: rgba(255,255,255,.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-family: system-ui, sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(79,195,161,.14), transparent 35%),
+        linear-gradient(180deg, #0c1116, var(--bg));
+      color: var(--text);
+    }
+    .panel {
+      width: min(420px, calc(100vw - 32px));
+      padding: 24px;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+      background: linear-gradient(180deg, #18212a, #21303d);
+      box-shadow: 0 18px 50px rgba(0,0,0,.18);
+    }
+    h1 { margin: 0 0 .5rem; font-size: 1.8rem; }
+    p { margin: 0 0 1rem; color: var(--muted); line-height: 1.5; }
+    label { display: block; margin: 0 0 .35rem; color: var(--muted); font-size: .92rem; }
+    input {
+      width: 100%;
+      padding: .85rem .95rem;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.04);
+      color: var(--text);
+      margin-bottom: .9rem;
+    }
+    button {
+      width: 100%;
+      border: 0;
+      padding: .85rem 1rem;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #09201a;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .error { min-height: 1.3rem; margin-top: .8rem; color: #ffd69b; }
+  </style>
+</head>
+<body>
+  <main class="panel">
+    <h1>Game Commander Hub</h1>
+    <p>Administration hôte séparée des Commanders d’instance.</p>
+    <form id="loginForm">
+      <label for="username">Utilisateur</label>
+      <input id="username" name="username" autocomplete="username">
+      <label for="password">Mot de passe</label>
+      <input id="password" name="password" type="password" autocomplete="current-password">
+      <button type="submit">Connexion</button>
+      <div id="error" class="error"></div>
+    </form>
+  </main>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const username = document.getElementById('username').value.trim();
+      const password = document.getElementById('password').value;
+      const errorEl = document.getElementById('error');
+      errorEl.textContent = '';
+      const response = await fetch('{{ prefix }}/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ username, password }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        errorEl.textContent = data.message || 'Connexion impossible';
+        return;
+      }
+      window.location.href = data.redirect || '{{ prefix }}/app';
+    });
+  </script>
+</body>
+</html>

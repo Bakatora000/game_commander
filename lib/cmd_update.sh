@@ -62,6 +62,7 @@ update_process_config() {
     GAME_ID="${GAME_ID:-}"
     INSTANCE_ID="${INSTANCE_ID:-}"
     SYS_USER="${SYS_USER:-gameserver}"
+    HOME_DIR="$(eval echo "~$SYS_USER")"
     APP_DIR="${APP_DIR:-}"
     SERVER_DIR="${SERVER_DIR:-}"
     DATA_DIR="${DATA_DIR:-$SERVER_DIR}"
@@ -129,6 +130,7 @@ update_process_config() {
     deploy_step_backups
     cpu_affinity_apply_all false
     cpu_monitor_install
+    deploy_step_hub_service
 
     systemctl restart "$GC_SERVICE"
     if service_active "$GC_SERVICE"; then

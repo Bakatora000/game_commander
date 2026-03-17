@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Game Commander Hub</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #18212a;
+      --panel-2: #21303d;
+      --text: #eef4f8;
+      --muted: #9cb1c0;
+      --accent: #4fc3a1;
+      --border: rgba(255,255,255,.08);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background:
+        radial-gradient(circle at top, rgba(79,195,161,.14), transparent 35%),
+        linear-gradient(180deg, #0c1116, var(--bg));
+      color: var(--text);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 20px 64px; }
+    .head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 1rem;
+      margin-bottom: 28px;
+    }
+    h1 { margin: 0 0 .4rem; font-size: clamp(2rem, 4vw, 3rem); line-height: 1; }
+    .subtitle { margin: 0; color: var(--muted); line-height: 1.5; max-width: 62ch; }
+    .logout {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 112px;
+      padding: .7rem 1rem;
+      border-radius: 999px;
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 700;
+    }
+    .monitor-panel, .card {
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      box-shadow: 0 18px 50px rgba(0, 0, 0, .18);
+    }
+    .monitor-panel { padding: 18px; margin-bottom: 24px; }
+    .monitor-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+    .monitor-label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; margin-bottom: .35rem; }
+    .monitor-status { font-size: 1.05rem; font-weight: 700; }
+    .monitor-meta { margin-top: .55rem; color: var(--muted); font-size: .92rem; }
+    .monitor-toggle {
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      border-radius: 999px;
+      padding: .6rem .9rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .monitor-details { margin-top: 1rem; }
+    .monitor-table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+    .monitor-table th, .monitor-table td { text-align: left; padding: .7rem .5rem; border-bottom: 1px solid var(--border); }
+    .monitor-table tbody tr.is-alert td { color: #ffd69b; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .card { padding: 18px; }
+    .card-meta { color: var(--accent); font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; margin-bottom: .7rem; }
+    .card h2 { margin: 0 0 .5rem; font-size: 1.25rem; }
+    .card-stats { display: grid; gap: .55rem; margin: 0 0 1rem; }
+    .card-stats div { display: flex; justify-content: space-between; gap: 1rem; color: var(--muted); font-size: .92rem; }
+    .card-stats dt, .card-stats dd { margin: 0; }
+    .card-stats dd { color: var(--text); font-weight: 600; }
+    .card-alert {
+      display: none;
+      margin: 0 0 1rem;
+      padding: .65rem .8rem;
+      border-radius: 12px;
+      background: rgba(255, 187, 92, .12);
+      border: 1px solid rgba(255, 187, 92, .28);
+      color: #ffd69b;
+      font-size: .9rem;
+      line-height: 1.4;
+    }
+    .card-alert.is-visible { display: block; }
+    .card-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 112px;
+      padding: .7rem 1rem;
+      border-radius: 999px;
+      background: var(--accent);
+      color: #09201a;
+      text-decoration: none;
+      font-weight: 700;
+    }
+    @media (max-width: 640px) {
+      .head, .monitor-head { flex-direction: column; align-items: flex-start; }
+      .monitor-table { font-size: .85rem; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="head">
+      <div>
+        <h1>Game Commander Hub</h1>
+        <p class="subtitle">Administration hôte séparée des Commanders d’instance. Cette vue est réservée aux administrateurs du serveur Linux.</p>
+      </div>
+      <a class="logout" href="{{ prefix }}/logout">Déconnexion</a>
+    </section>
+
+    <section class="monitor-panel">
+      <div class="monitor-head">
+        <div>
+          <div class="monitor-label">Monitor CPU</div>
+          <div class="monitor-status" data-field="cpu-monitor-status">Chargement…</div>
+        </div>
+        <button class="monitor-toggle" type="button" data-action="toggle-cpu-monitor" hidden>Voir le détail</button>
+      </div>
+      <div class="monitor-meta" data-field="cpu-monitor-meta"></div>
+      <div class="monitor-details" data-field="cpu-monitor-details" hidden>
+        <table class="monitor-table">
+          <thead>
+            <tr>
+              <th>Instance</th>
+              <th>Actuelle</th>
+              <th>Planifiée</th>
+              <th>CPU</th>
+            </tr>
+          </thead>
+          <tbody data-field="cpu-monitor-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="grid" id="cards"></section>
+  </main>
+  <script>
+    const STATE_LABELS = { 0: 'Hors ligne', 10: 'Démarrage', 20: 'En ligne', 30: 'Arrêt', 40: 'Busy' };
+    function formatAgeText(meta) { return meta || ''; }
+    function renderCards(instances) {
+      const cardsEl = document.getElementById('cards');
+      cardsEl.innerHTML = instances.map((inst) => `
+        <article class="card">
+          <div class="card-meta">${inst.game}</div>
+          <h2>${inst.name}</h2>
+          <dl class="card-stats">
+            <div><dt>Statut</dt><dd>${STATE_LABELS[Number(inst.state || 0)] || `État ${inst.state || 0}`}</dd></div>
+            <div><dt>Joueurs</dt><dd>${Number(inst.players?.value || 0)} / ${Number(inst.players?.max || 0)}</dd></div>
+          </dl>
+          <p class="card-alert ${inst.cpu_alert?.message ? 'is-visible' : ''}" ${inst.cpu_alert?.message ? '' : 'hidden'}>${inst.cpu_alert?.message || ''}</p>
+          <a class="card-link" href="${inst.prefix}">Ouvrir</a>
+        </article>
+      `).join('');
+    }
+    function renderMonitor(monitor, instances) {
+      const statusEl = document.querySelector('[data-field="cpu-monitor-status"]');
+      const metaEl = document.querySelector('[data-field="cpu-monitor-meta"]');
+      const detailsEl = document.querySelector('[data-field="cpu-monitor-details"]');
+      const bodyEl = document.querySelector('[data-field="cpu-monitor-body"]');
+      const toggleBtn = document.querySelector('[data-action="toggle-cpu-monitor"]');
+      statusEl.textContent = monitor?.status || 'Monitor indisponible';
+      metaEl.textContent = formatAgeText(monitor?.meta);
+      const monitored = instances.filter(inst => inst.cpu_monitor?.instance);
+      if (!monitored.length) {
+        bodyEl.innerHTML = '';
+        detailsEl.hidden = true;
+        toggleBtn.hidden = true;
+        return;
+      }
+      bodyEl.innerHTML = monitored.map((inst) => {
+        const info = inst.cpu_monitor.instance;
+        const cls = inst.cpu_alert?.message ? ' class="is-alert"' : '';
+        return `<tr${cls}><td>${inst.name} <span style="color:var(--muted)">(${inst.game})</span></td><td>${info.affinity || '—'}</td><td>${info.planned_affinity || '—'}</td><td>${Number(info.cpu_percent || 0).toFixed(1)}%</td></tr>`;
+      }).join('');
+      toggleBtn.hidden = false;
+    }
+    document.querySelector('[data-action="toggle-cpu-monitor"]').addEventListener('click', () => {
+      const detailsEl = document.querySelector('[data-field="cpu-monitor-details"]');
+      const buttonEl = document.querySelector('[data-action="toggle-cpu-monitor"]');
+      const hidden = detailsEl.hidden;
+      detailsEl.hidden = !hidden;
+      buttonEl.textContent = hidden ? 'Masquer le détail' : 'Voir le détail';
+    });
+    async function load() {
+      const response = await fetch('{{ prefix }}/api/instances', { credentials: 'same-origin' });
+      if (!response.ok) {
+        document.querySelector('[data-field="cpu-monitor-status"]').textContent = 'Accès refusé';
+        return;
+      }
+      const data = await response.json();
+      renderMonitor(data.monitor || {}, data.instances || []);
+      renderCards(data.instances || []);
+    }
+    load();
+  </script>
+</body>
+</html>

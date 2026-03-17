@@ -1171,6 +1171,116 @@ SVCEOF
     cpu_monitor_install
 }
 
+deploy_hub_admin_hash() {
+    local hub_users_file="$1"
+    local source_users_file="$2"
+    local hash=""
+
+    if [[ -n "${ADMIN_PASSWORD:-}" ]]; then
+        hash=$(python3 -c \
+            "import bcrypt,sys; print(bcrypt.hashpw(sys.argv[1].encode(), bcrypt.gensalt()).decode())" \
+            "$ADMIN_PASSWORD") || return 1
+        printf '%s\n' "$hash"
+        return 0
+    fi
+
+    if [[ -f "$source_users_file" ]]; then
+        hash="$(python3 - "$source_users_file" "$ADMIN_LOGIN" <<'PYEOF'
+import json
+import sys
+from pathlib import Path
+
+users = json.loads(Path(sys.argv[1]).read_text())
+user = users.get(sys.argv[2], {})
+print(user.get("password_hash", ""))
+PYEOF
+)"
+        if [[ -n "$hash" ]]; then
+            printf '%s\n' "$hash"
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+deploy_step_hub_service() {
+    hdr "ÉTAPE 8B : Hub Admin"
+
+    local hub_app_dir hub_users_file hub_secret hub_port hub_manifest hub_cpu_state runtime_hub_src app_users_file admin_hash
+    hub_app_dir="${HOME_DIR}/game-commander-hub"
+    hub_users_file="${hub_app_dir}/users.json"
+    hub_port="${GC_NGINX_HUB_PORT:-5090}"
+    hub_manifest="${GC_NGINX_MANIFEST:-/etc/nginx/game-commander-manifest.json}"
+    hub_cpu_state="${GC_CPU_MONITOR_STATE:-/var/lib/game-commander/cpu-monitor.json}"
+    app_users_file="${APP_DIR}/users.json"
+    runtime_hub_src="${SRC_DIR}/runtime_hub"
+
+    [[ -d "$runtime_hub_src" ]] || {
+        warn "Sources runtime_hub introuvables — Hub Admin ignoré"
+        return 0
+    }
+
+    mkdir -p "$hub_app_dir"
+    rsync -a --delete --exclude='__pycache__' --exclude='*.pyc' --exclude='users.json' \
+          "$runtime_hub_src/" "$hub_app_dir/"
+    chown -R "$SYS_USER:$SYS_USER" "$hub_app_dir"
+    ok "Hub Admin synchronisé dans $hub_app_dir"
+
+    if [[ ! -f "$hub_users_file" ]]; then
+        admin_hash="$(deploy_hub_admin_hash "$hub_users_file" "$app_users_file")" || admin_hash=""
+        if [[ -n "$admin_hash" ]]; then
+            cat > "$hub_users_file" <<EOF
+{
+  "${ADMIN_LOGIN}": {
+    "password_hash": "${admin_hash}",
+    "permissions": ["view_hub"]
+  }
+}
+EOF
+            chmod 600 "$hub_users_file"
+            chown "$SYS_USER:$SYS_USER" "$hub_users_file"
+            ok "Hub users.json créé — admin : $ADMIN_LOGIN"
+        else
+            warn "Hub users.json non créé — mot de passe admin indisponible"
+        fi
+    else
+        ok "Hub users.json existant conservé"
+    fi
+
+    hub_secret="$(python3 -c "import secrets; print(secrets.token_hex(32))")"
+    cat > /etc/systemd/system/game-commander-hub.service <<SVCEOF
+[Unit]
+Description=Game Commander — Hub Admin
+After=network.target
+
+[Service]
+Type=simple
+User=${SYS_USER}
+WorkingDirectory=${hub_app_dir}
+Environment="GAME_COMMANDER_HUB_SECRET=${hub_secret}"
+Environment="GC_HUB_PORT=${hub_port}"
+Environment="GC_HUB_MANIFEST=${hub_manifest}"
+Environment="GC_HUB_CPU_MONITOR_STATE=${hub_cpu_state}"
+ExecStart=/usr/bin/python3 ${hub_app_dir}/app.py
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+SVCEOF
+
+    systemctl daemon-reload
+    systemctl enable game-commander-hub >/dev/null 2>&1 || true
+    systemctl restart game-commander-hub
+    sleep 1
+    service_active game-commander-hub \
+        && ok "Service game-commander-hub actif" \
+        || warn "game-commander-hub inactif — journalctl -u game-commander-hub -n 30"
+}
+
 deploy_step_nginx() {
     hdr "ÉTAPE 9 : Nginx"
     nginx_ensure_init "$DOMAIN"

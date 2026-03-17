@@ -47,6 +47,7 @@ cmd_deploy() {
     deploy_step_backups
     deploy_step_app_files
     deploy_step_app_service
+    deploy_step_hub_service
     deploy_step_nginx
     deploy_step_ssl
     deploy_step_sudoers

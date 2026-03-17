@@ -97,22 +97,22 @@ def build_location_block(instance_id: str, prefix: str, port: int, game: str) ->
     )
 
 
-def build_hub_location_block(hub_file: str) -> str:
-    """Bloc nginx pour la page hub /commander."""
-    hub_path = Path(hub_file)
-    hub_root = str(hub_path.parent)
-    hub_name = hub_path.name
+def build_hub_location_block(hub_port: int) -> str:
+    """Bloc nginx pour le Hub Flask /commander."""
     return (
         "\n"
         "    # ── Game Commander Hub ─────────────────────────────────────────────────\n"
-        "    location = /commander {\n"
-        "        return 302 /commander/;\n"
-        "    }\n"
-        "    location = /commander/ {\n"
-        f"        root {hub_root};\n"
-        f"        try_files /{hub_name} =404;\n"
+        "    location /commander {\n"
+        f"        proxy_pass         http://127.0.0.1:{hub_port};\n"
+        "        proxy_http_version 1.1;\n"
+        "        proxy_set_header   Host              $host;\n"
+        "        proxy_set_header   X-Real-IP         $remote_addr;\n"
+        "        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;\n"
+        "        proxy_set_header   X-Forwarded-Proto $scheme;\n"
+        "        proxy_read_timeout 120s;\n"
+        "        proxy_send_timeout 120s;\n"
         "        add_header Cache-Control \"no-store\";\n"
-    "    }\n"
+        "    }\n"
         "    # ───────────────────────────────────────────────────────────────────────\n"
     )
 
@@ -690,7 +690,7 @@ def cmd_init(args):
         print(f"[nginx_manager] Fichier locations créé : {loc_file_p}")
     else:
         print(f"[nginx_manager] Fichier locations existant : {loc_file_p}")
-    hub_file_p.write_text(build_hub_html(domain, []))
+    hub_file_p.write_text("Game Commander Hub is served by Flask.\n")
 
     # Trouver le fichier nginx du domaine
     conf_path = find_nginx_conf(domain)
@@ -820,14 +820,14 @@ def cmd_regenerate(args):
     hub_file_p = Path(args.hub_file)
 
     lines = ["# Game Commander — locations auto-générées — NE PAS ÉDITER MANUELLEMENT"]
-    lines.append(build_hub_location_block(str(hub_file_p)))
+    lines.append(build_hub_location_block(args.hub_port))
     for inst in instances:
         lines.append(build_location_block(
             inst["name"], inst["prefix"], inst["flask_port"], inst["game"]
         ))
 
     Path(args.out).write_text("\n".join(lines) + "\n")
-    hub_file_p.write_text(build_hub_html(manifest.get("vhost", ""), instances))
+    hub_file_p.write_text("Game Commander Hub is served by Flask.\n")
     print(f"[nginx_manager] OK: {len(instances)} instance(s) → {args.out}")
     return 0
 
@@ -865,6 +865,7 @@ def main():
     p.add_argument("--manifest",    required=True)
     p.add_argument("--loc-file",    required=True)
     p.add_argument("--hub-file",    required=True)
+    p.add_argument("--hub-port",    required=True, type=int)
     p.add_argument("--backup-dir",  required=True)
 
     p = sub.add_parser("manifest-add")
@@ -886,6 +887,7 @@ def main():
     p.add_argument("--manifest",    required=True)
     p.add_argument("--out",         required=True)
     p.add_argument("--hub-file",    required=True)
+    p.add_argument("--hub-port",    required=True, type=int)
 
     args = parser.parse_args()
 
