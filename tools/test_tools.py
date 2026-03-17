@@ -1181,6 +1181,7 @@ class HubHostTests(unittest.TestCase):
         app.config["CPU_MONITOR_STATE"] = str(root / "cpu.json")
         app.config["MAIN_SCRIPT"] = str(root / "game_commander.sh")
         app.config["HOST_CLI"] = str(root / "host_cli.py")
+        app.config["ACTION_LOG_DIR"] = str(root / "action-logs")
         return app
 
     def test_run_instance_service_action_uses_systemctl(self):
@@ -1300,6 +1301,19 @@ class HubHostTests(unittest.TestCase):
                 payload = hub_host.get_hub_payload()
             self.assertEqual(payload["monitor"]["status"], "Stable")
             self.assertEqual(payload["instances"][0]["cpu_monitor"]["instance"]["affinity"], "4 5")
+
+    def test_instance_console_reads_last_lines(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({"instances": []}), encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            log_dir = root / "action-logs"
+            log_dir.mkdir()
+            (log_dir / "valheim2.log").write_text("line1\nline2\nline3\n", encoding="utf-8")
+            with app.app_context():
+                lines = hub_host.get_instance_console("valheim2", max_lines=2)
+            self.assertEqual(lines, ["line2", "line3"])
 
 
 class ConfigGenUsersJsonTests(unittest.TestCase):

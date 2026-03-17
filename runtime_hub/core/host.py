@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 import requests
@@ -35,6 +36,36 @@ def _main_script_path() -> Path:
 
 def _host_cli_path() -> Path:
     return Path(current_app.config["HOST_CLI"])
+
+
+def _action_log_dir() -> Path:
+    return Path(current_app.config.get("ACTION_LOG_DIR") or (Path(current_app.root_path).parent / "action-logs"))
+
+
+def _instance_log_path(instance_name: str) -> Path:
+    safe_name = "".join(ch for ch in instance_name if ch.isalnum() or ch in {"-", "_", "."}) or "unknown"
+    return _action_log_dir() / f"{safe_name}.log"
+
+
+def _append_action_log(instance_name: str, action: str, ok: bool, message: str) -> None:
+    log_dir = _action_log_dir()
+    log_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    status = "OK" if ok else "ERR"
+    content = (message or "").strip() or "(aucun détail)"
+    with _instance_log_path(instance_name).open("a", encoding="utf-8") as fh:
+        fh.write(f"[{timestamp}] {status} {action}\n")
+        for line in content.splitlines():
+            fh.write(f"  {line}\n")
+        fh.write("\n")
+
+
+def get_instance_console(instance_name: str, max_lines: int = 120) -> list[str]:
+    path = _instance_log_path(instance_name)
+    if not path.is_file():
+        return []
+    lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    return lines[-max_lines:]
 
 
 def _load_manifest() -> dict:
@@ -173,6 +204,7 @@ def run_instance_service_action(instance_name: str, action: str) -> tuple[bool, 
         ["sudo", "/usr/bin/python3", str(host_cli), "service-action", "--service", service, "--action", action],
         timeout=120,
     )
+    _append_action_log(instance_name, action, ok, message or hostops.service_action_success_message(action, instance_name))
     payload = get_hub_payload()
     card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
     if ok:
@@ -194,6 +226,7 @@ def run_instance_update(instance_name: str) -> tuple[bool, str, dict | None]:
         ["sudo", "/usr/bin/python3", str(host_cli), "update-instance", "--main-script", str(script_path), "--instance", instance_name, "--skip-hub-sync"],
         timeout=900,
     )
+    _append_action_log(instance_name, "update", ok, message or f"Instance {instance_name} mise à jour")
     payload = get_hub_payload()
     card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
     if ok:
@@ -218,6 +251,7 @@ def run_instance_redeploy(instance_name: str) -> tuple[bool, str, dict | None]:
         ["sudo", "/usr/bin/python3", str(host_cli), "redeploy-instance", "--main-script", str(script_path), "--config", str(config_file)],
         timeout=1200,
     )
+    _append_action_log(instance_name, "redeploy", ok, message or f"Instance {instance_name} redéployée")
     payload = get_hub_payload()
     card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
     if ok:
@@ -239,6 +273,7 @@ def run_instance_uninstall(instance_name: str) -> tuple[bool, str, dict]:
         ["sudo", "/usr/bin/python3", str(host_cli), "uninstall-instance", "--main-script", str(script_path), "--instance", instance_name],
         timeout=1200,
     )
+    _append_action_log(instance_name, "uninstall", ok, message or f"Instance {instance_name} désinstallée")
     payload = get_hub_payload()
     if ok:
         return True, f"Instance {instance_name} désinstallée", payload

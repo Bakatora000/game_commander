@@ -114,6 +114,23 @@
     .card-actions.lifecycle-actions {
       margin-top: .6rem;
     }
+    .console-panel {
+      margin-top: .8rem;
+      padding: .8rem;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: rgba(0, 0, 0, .18);
+    }
+    .console-output {
+      margin: 0;
+      max-height: 220px;
+      overflow: auto;
+      white-space: pre-wrap;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: .83rem;
+      line-height: 1.45;
+      color: #d5e3ec;
+    }
     .action-feedback {
       min-height: 1.2rem;
       margin-top: .7rem;
@@ -322,6 +339,15 @@
               data-label="Désinstaller"
               data-confirm="Désinstaller complètement ${inst.name} ?"
             >Désinstaller</button>
+            <button
+              class="secondary-btn is-compact"
+              type="button"
+              data-action="toggle-console"
+              data-instance="${inst.name}"
+            >Console</button>
+          </div>
+          <div class="console-panel" id="console-panel-${inst.name}" hidden>
+            <pre class="console-output" id="console-output-${inst.name}">Chargement…</pre>
           </div>
           <div class="action-feedback" id="feedback-instance-${inst.name}"></div>
         </article>
@@ -376,6 +402,30 @@
             setFeedback(`feedback-instance-${instance}`, 'Erreur réseau ou Hub indisponible', false);
           } finally {
             cardButtons.forEach((btn) => { btn.disabled = false; });
+          }
+        });
+      });
+      cardsEl.querySelectorAll('[data-action="toggle-console"]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const instance = button.dataset.instance;
+          const panel = document.getElementById(`console-panel-${instance}`);
+          const output = document.getElementById(`console-output-${instance}`);
+          const willShow = panel.hasAttribute('hidden');
+          if (!willShow) {
+            panel.setAttribute('hidden', '');
+            return;
+          }
+          panel.removeAttribute('hidden');
+          output.textContent = 'Chargement…';
+          try {
+            const response = await fetch(`{{ prefix }}/api/instances/${encodeURIComponent(instance)}/console`, {
+              credentials: 'same-origin',
+            });
+            const data = await response.json().catch(() => ({}));
+            const lines = Array.isArray(data.lines) ? data.lines : [];
+            output.textContent = lines.length ? lines.join('\n') : 'Aucune trace pour cette instance.';
+          } catch (_err) {
+            output.textContent = 'Impossible de charger la console.';
           }
         });
       });
