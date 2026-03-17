@@ -494,7 +494,9 @@ html, body {
 .search-card.deprecated { opacity: .5; }
 .mod-icon { width: 40px; height: 40px; object-fit: cover; flex-shrink: 0; border: 1px solid var(--color-border); }
 .search-card-info { flex: 1; min-width: 0; }
-.search-card-name { font-size: .9rem; color: var(--color-text); }
+.search-card-name { display: flex; align-items: baseline; gap: 1rem; font-size: .9rem; color: var(--color-text); min-width: 0; }
+.search-card-title { min-width: 0; }
+.search-card-inline-meta { margin-left: auto; margin-top: 0; white-space: nowrap; flex-shrink: 0; }
 .search-card-desc { font-size: .8rem; color: var(--color-muted); margin-top: .15rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .badge-deprecated { font-size: .6rem; background: var(--color-warning); color: #000; padding: .1rem .3rem; margin-left: .4rem; }
 .btn-install { flex-shrink: 0; }

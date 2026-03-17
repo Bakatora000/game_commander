@@ -623,6 +623,7 @@ def api_update_status():
 if GAME_ID == 'valheim':
     try:
         import games.valheim.admins as _va
+        import games.valheim.valheimplus as _vp
         import games.valheim.world_modifiers as _wm
         import games.valheim.worlds as _vw
         @app.route(f'{PREFIX}/api/world_modifiers', methods=['GET'])
@@ -639,6 +640,19 @@ if GAME_ID == 'valheim':
             ok, err = _wm.write_modifiers(request.get_json() or {})
             return jsonify({'ok': True, 'warning': err}) if ok \
                 else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/valheimplus-config', methods=['GET'])
+        @auth.require_auth
+        def api_valheimplus_get():
+            data, err = _vp.read_config()
+            return jsonify(data) if not err else (jsonify({'error': err}), 404)
+
+        @app.route(f'{PREFIX}/api/valheimplus-config', methods=['POST'])
+        @auth.require_auth
+        @auth.require_perm('manage_config')
+        def api_valheimplus_save():
+            ok, err = _vp.write_config(request.get_json() or {})
+            return jsonify({'ok': True}) if ok else (jsonify({'error': err}), 400)
 
         @app.route(f'{PREFIX}/api/worlds', methods=['GET'])
         @auth.require_auth

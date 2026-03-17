@@ -129,6 +129,15 @@
   </div>
   <div id="configFields" class="config-fields"></div>
 </div>
+
+<div class="panel config-panel" id="valheimPlusPanel" style="display:none">
+  <div class="panel-header">
+    <span class="panel-title">ValheimPlus</span>
+    <button class="btn-primary btn-sm" id="btnSaveValheimPlus" data-requires-perm="manage_config">Enregistrer</button>
+  </div>
+  <div class="backups-meta" id="valheimPlusMeta"></div>
+  <div id="valheimPlusFields" class="config-fields"></div>
+</div>
 {% endblock %}
 
 {% block saves_backups_panel %}{% endblock %}
@@ -246,11 +255,15 @@ async function searchMods() {
   results.forEach(m => {
     const card = document.createElement('div');
     card.className = `search-card${m.deprecated ? ' deprecated' : ''}`;
+    const updated = formatModDate(m.last_updated);
     card.innerHTML = `
       ${m.icon_url ? `<img src="${m.icon_url}" class="mod-icon" alt="">` : ''}
       <div class="search-card-info">
-        <div class="search-card-name">${m.namespace ? m.namespace+'-' : ''}${m.name}
-          ${m.deprecated ? '<span class="badge-deprecated">obsolète</span>' : ''}
+        <div class="search-card-name">
+          <span class="search-card-title">${m.namespace ? m.namespace+'-' : ''}${m.name}
+            ${m.deprecated ? '<span class="badge-deprecated">obsolète</span>' : ''}
+          </span>
+          ${updated ? `<span class="search-card-desc search-card-inline-meta">${updated}</span>` : ''}
         </div>
         <div class="search-card-desc">${m.description || ''}</div>
       </div>
@@ -263,6 +276,13 @@ async function searchMods() {
   el.querySelectorAll('.btn-install').forEach(btn => {
     btn.addEventListener('click', () => installMod(btn.dataset.ns, btn.dataset.name, btn.dataset.ver, btn));
   });
+}
+
+function formatModDate(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('fr-FR');
 }
 
 async function installMod(ns, name, version, btn) {
@@ -308,6 +328,7 @@ const CONFIG_SCHEMA = [
    type:'select', options:['warning','message','info']},
 ];
 let configData = {};
+let valheimPlusData = {sections: []};
 
 async function loadConfig() {
   const r = await fetch(`${PREFIX}/api/config`).catch(()=>null);
@@ -365,6 +386,84 @@ document.getElementById('btnSaveConfig')?.addEventListener('click', async () => 
     method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)
   }).catch(()=>null);
   await handleConfigSaveResponse(r);
+});
+
+async function loadValheimPlusConfig() {
+  const r = await fetch(`${PREFIX}/api/valheimplus-config`).catch(() => null);
+  const panel = document.getElementById('valheimPlusPanel');
+  const fields = document.getElementById('valheimPlusFields');
+  const meta = document.getElementById('valheimPlusMeta');
+  if (!panel || !fields) return;
+  if (!r?.ok) {
+    panel.style.display = 'none';
+    fields.innerHTML = '';
+    if (meta) meta.textContent = '';
+    valheimPlusData = {sections: []};
+    return;
+  }
+  const d = await r.json();
+  valheimPlusData = d || {sections: []};
+  panel.style.display = '';
+  if (meta) meta.textContent = d.path || '';
+  renderValheimPlusFields();
+}
+
+function renderValheimPlusFields() {
+  const el = document.getElementById('valheimPlusFields');
+  if (!el) return;
+  el.innerHTML = '';
+  (valheimPlusData.sections || []).forEach((section, sectionIdx) => {
+    const hdr = document.createElement('div');
+    hdr.className = 'config-section-header';
+    hdr.textContent = section.name;
+    el.appendChild(hdr);
+    (section.fields || []).forEach((field, fieldIdx) => {
+      const row = document.createElement('div');
+      row.className = 'config-row';
+      const label = document.createElement('label');
+      label.className = 'config-label';
+      label.textContent = field.key;
+      const inputId = `vp_${sectionIdx}_${fieldIdx}`;
+      let input;
+      if (field.type === 'select' && Array.isArray(field.options)) {
+        input = document.createElement('select');
+        input.className = 'config-input';
+        input.id = inputId;
+        field.options.forEach(opt => {
+          const option = document.createElement('option');
+          option.value = opt;
+          option.textContent = opt;
+          if (opt === field.value) option.selected = true;
+          input.appendChild(option);
+        });
+      } else {
+        input = document.createElement('input');
+        input.className = 'config-input';
+        input.type = 'text';
+        input.id = inputId;
+        input.value = field.value || '';
+      }
+      row.appendChild(label);
+      row.appendChild(input);
+      el.appendChild(row);
+    });
+  });
+}
+
+document.getElementById('btnSaveValheimPlus')?.addEventListener('click', async () => {
+  const payload = {};
+  (valheimPlusData.sections || []).forEach((section, sectionIdx) => {
+    payload[section.name] = {};
+    (section.fields || []).forEach((field, fieldIdx) => {
+      payload[section.name][field.key] = document.getElementById(`vp_${sectionIdx}_${fieldIdx}`)?.value || '';
+    });
+  });
+  const r = await fetch(`${PREFIX}/api/valheimplus-config`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  }).catch(() => null);
+  await handleConfigSaveResponse(r, 'Configuration ValheimPlus sauvegardée');
 });
 
 // ── MISE À JOUR SERVEUR ───────────────────────────────────────────────────────
@@ -786,6 +885,7 @@ document.addEventListener('DOMContentLoaded', () => {
       else loadValheimWorlds();
       loadWorldModifiers();
       loadConfig();
+      loadValheimPlusConfig();
     });
   });
   document.querySelectorAll('.nav-btn[data-tab="users"]').forEach(b => {

@@ -33,6 +33,7 @@ from runtime.games.minecraft import console as minecraft_console
 from runtime.games.minecraft import players as minecraft_players
 from runtime.games.minecraft_fabric import mods as minecraft_fabric_mods
 from runtime.games.valheim import mods as valheim_mods
+from runtime.games.valheim import valheimplus as valheim_valheimplus
 from runtime.core import saves as core_saves
 from runtime.games.valheim import worlds as valheim_worlds
 from runtime.games.valheim import admins as valheim_admins
@@ -2309,6 +2310,61 @@ class ValheimModsTests(unittest.TestCase):
 
             self.assertTrue(ok, msg)
             self.assertFalse(target.exists())
+
+
+class ValheimPlusConfigTests(unittest.TestCase):
+
+    def _app(self, bepinex_path):
+        app = Flask(__name__)
+        app.config["GAME"] = {
+            "mods": {
+                "bepinex_path": bepinex_path,
+            }
+        }
+        return app
+
+    def test_read_config_finds_valheim_plus_cfg(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = Path(tmpdir, "config")
+            config_dir.mkdir(parents=True)
+            cfg = config_dir / "valheim_plus.cfg"
+            cfg.write_text(
+                "[Server]\n"
+                "enabled = true\n"
+                "maxPlayers = 10\n",
+                encoding="utf-8",
+            )
+            app = self._app(tmpdir)
+            with app.app_context():
+                data, err = valheim_valheimplus.read_config()
+            self.assertIsNone(err)
+            self.assertEqual(Path(data["path"]).name, "valheim_plus.cfg")
+            self.assertEqual(data["sections"][0]["name"], "Server")
+            self.assertEqual(data["sections"][0]["fields"][0]["type"], "select")
+
+    def test_write_config_updates_existing_values(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = Path(tmpdir, "config")
+            config_dir.mkdir(parents=True)
+            cfg = config_dir / "valheim_plus.cfg"
+            cfg.write_text(
+                "[Server]\n"
+                "enabled = true\n"
+                "maxPlayers = 10\n",
+                encoding="utf-8",
+            )
+            app = self._app(tmpdir)
+            with app.app_context():
+                ok, err = valheim_valheimplus.write_config({
+                    "Server": {
+                        "enabled": "false",
+                        "maxPlayers": "20",
+                    }
+                })
+            self.assertTrue(ok, err)
+            content = cfg.read_text(encoding="utf-8")
+            self.assertIn("enabled = false", content)
+            self.assertIn("maxPlayers = 20", content)
 
 
 # ══════════════════════════════════════════════════════════════════════════════

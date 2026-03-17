@@ -119,6 +119,7 @@ def search_mods(query):
             'namespace':   pkg.get('owner'),
             'description': latest.get('description', '')[:120],
             'version':     latest.get('version_number'),
+            'last_updated': latest.get('date_created') or latest.get('date_updated') or '',
             'downloads':   pkg.get('package_url'),
             'icon_url':    latest.get('icon'),
             'deprecated':  pkg.get('is_deprecated', False),
