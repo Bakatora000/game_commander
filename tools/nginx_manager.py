@@ -132,6 +132,7 @@ def build_hub_html(vhost: str, instances: list[dict]) -> str:
           <div><dt>Statut</dt><dd data-field="status">Chargement…</dd></div>
           <div><dt>Joueurs</dt><dd data-field="players">—</dd></div>
         </dl>
+        <p class="card-alert" data-field="cpu-alert" hidden></p>
         <a class="card-link" href="{prefix}">Ouvrir</a>
       </article>""".rstrip()
         )
@@ -237,6 +238,20 @@ def build_hub_html(vhost: str, instances: list[dict]) -> str:
       text-decoration: none;
       font-weight: 700;
     }}
+    .card-alert {{
+      display: none;
+      margin: 0 0 1rem;
+      padding: .65rem .8rem;
+      border-radius: 12px;
+      background: rgba(255, 187, 92, .12);
+      border: 1px solid rgba(255, 187, 92, .28);
+      color: #ffd69b;
+      font-size: .9rem;
+      line-height: 1.4;
+    }}
+    .card-alert.is-visible {{
+      display: block;
+    }}
     .empty {{ color: var(--muted); margin-top: 24px; }}
   </style>
 </head>
@@ -257,6 +272,7 @@ def build_hub_html(vhost: str, instances: list[dict]) -> str:
       const prefix = card.dataset.prefix;
       const statusEl = card.querySelector('[data-field="status"]');
       const playersEl = card.querySelector('[data-field="players"]');
+      const alertEl = card.querySelector('[data-field="cpu-alert"]');
       try {{
         const r = await fetch(`${{prefix}}/api/hub-status`, {{ credentials: 'same-origin' }});
         if (!r.ok) throw new Error(`status_${{r.status}}`);
@@ -269,9 +285,22 @@ def build_hub_html(vhost: str, instances: list[dict]) -> str:
         }} else {{
           playersEl.textContent = '—';
         }}
+        const cpuAlert = data?.cpu_alert;
+        if (cpuAlert?.message) {{
+          alertEl.textContent = cpuAlert.message;
+          alertEl.hidden = false;
+          alertEl.classList.add('is-visible');
+        }} else {{
+          alertEl.textContent = '';
+          alertEl.hidden = true;
+          alertEl.classList.remove('is-visible');
+        }}
       }} catch (e) {{
         statusEl.textContent = 'Indisponible';
         playersEl.textContent = '—';
+        alertEl.textContent = '';
+        alertEl.hidden = true;
+        alertEl.classList.remove('is-visible');
       }}
     }}
     document.querySelectorAll('.card[data-prefix]').forEach(loadCard);

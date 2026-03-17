@@ -2,14 +2,51 @@
 core/server.py — Contrôle du serveur via psutil + systemd.
 Le binaire et le service sont lus depuis game.json.
 """
+import json
+import os
+import re
 import subprocess, time
 import importlib
+from pathlib import Path
 import psutil
 from flask import current_app
 
 
 def _game():
     return current_app.config['GAME']
+
+def _app_dir() -> Path:
+    return Path(current_app.root_path)
+
+def _server_dir() -> Path:
+    return Path(_game()["server"]["install_dir"])
+
+def _deploy_cfg_path() -> Path:
+    candidates = [
+        _app_dir() / "deploy_config.env",
+        _server_dir().parent / "deploy_config.env",
+    ]
+    for path in candidates:
+        if path.is_file():
+            return path
+    return candidates[0]
+
+def _deploy_cfg_value(key: str, default: str = "") -> str:
+    path = _deploy_cfg_path()
+    if not path.is_file():
+        return default
+    pattern = re.compile(rf'^{re.escape(key)}="?(.*?)"?$')
+    for line in path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        m = pattern.match(line.strip())
+        if m:
+            return m.group(1)
+    return default
+
+def _instance_id() -> str:
+    return _deploy_cfg_value("INSTANCE_ID").strip()
+
+def _cpu_monitor_state_path() -> Path:
+    return Path(os.environ.get("GAME_COMMANDER_CPU_MONITOR_STATE", "/var/lib/game-commander/cpu-monitor.json"))
 
 def _get_process():
     """
@@ -139,6 +176,20 @@ def get_status():
         }
     except (psutil.NoSuchProcess, psutil.AccessDenied):
         return {'state': 0, 'uptime': '0:00:00:00', 'metrics': {}}
+
+def get_cpu_monitor_alert():
+    instance_id = _instance_id()
+    if not instance_id:
+        return None
+    path = _cpu_monitor_state_path()
+    if not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    alert = (data.get("alerts_by_instance") or {}).get(instance_id)
+    return alert if isinstance(alert, dict) else None
 
 def _service_state():
     service = _game()['server']['service']

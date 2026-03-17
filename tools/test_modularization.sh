@@ -40,6 +40,7 @@ test_entrypoint_is_thin() {
 
     grep -q 'source "\$SCRIPT_DIR/lib/helpers.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cpu_affinity.sh"' "$file" || return 1
+    grep -q 'source "\$SCRIPT_DIR/lib/cpu_monitor.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/nginx.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_status.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_deploy.sh"' "$file" || return 1
@@ -173,6 +174,13 @@ test_cpu_affinity_module_present() {
     grep -q 'cpu_affinity_apply_all()' "$file" || return 1
 }
 
+test_cpu_monitor_module_present() {
+    local file="$ROOT_DIR/lib/cpu_monitor.sh"
+
+    grep -q 'cpu_monitor_state_file()' "$file" || return 1
+    grep -q 'cpu_monitor_install()' "$file" || return 1
+}
+
 test_rebalance_command_present() {
     local file="$ROOT_DIR/lib/cmd_rebalance.sh"
 
@@ -302,6 +310,7 @@ main() {
     run_test "Interactive prompt helper falls back to stdin" test_gc_read_falls_back_to_stdin
     run_test "Update command refreshes installed app runtime" test_update_module_present
     run_test "CPU affinity helper module present" test_cpu_affinity_module_present
+    run_test "CPU monitor module present" test_cpu_monitor_module_present
     run_test "CPU rebalance command present" test_rebalance_command_present
     run_test "Nginx shell wrappers call python manager" test_nginx_wrappers_call_python_manager
     run_test "Helpers support dry-run and shared-dir detection" test_helpers_dry_run_and_shared_detection

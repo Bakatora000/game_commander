@@ -49,6 +49,7 @@ from runtime.games.terraria import worlds as terraria_worlds
 from runtime.games.terraria import players as terraria_players
 from runtime.games.satisfactory import config as satisfactory_config
 from runtime.games.valheim import world_modifiers as valheim_world_modifiers
+from runtime.core import server as core_server
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -592,6 +593,36 @@ class SatisfactoryConfigTests(unittest.TestCase):
                 satisfactory_config._api_call = orig_call
         self.assertIsNone(err)
         self.assertIn('supprimé', data['message'])
+
+
+class ServerCpuMonitorTests(unittest.TestCase):
+
+    def test_get_cpu_monitor_alert_reads_instance_alert(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "deploy_config.env").write_text('INSTANCE_ID="alpha"\n', encoding="utf-8")
+            state_file = root / "cpu-monitor.json"
+            state_file.write_text(
+                json.dumps({
+                    "alerts_by_instance": {
+                        "alpha": {"message": "Déséquilibre CPU durable"},
+                    }
+                }),
+                encoding="utf-8",
+            )
+            app = Flask(__name__, root_path=str(root))
+            app.config["GAME"] = {"server": {"install_dir": str(root / "server")}}
+            previous = os.environ.get("GAME_COMMANDER_CPU_MONITOR_STATE")
+            os.environ["GAME_COMMANDER_CPU_MONITOR_STATE"] = str(state_file)
+            try:
+                with app.app_context():
+                    alert = core_server.get_cpu_monitor_alert()
+            finally:
+                if previous is None:
+                    os.environ.pop("GAME_COMMANDER_CPU_MONITOR_STATE", None)
+                else:
+                    os.environ["GAME_COMMANDER_CPU_MONITOR_STATE"] = previous
+        self.assertEqual(alert["message"], "Déséquilibre CPU durable")
 
     def test_steamcmd_section(self):
         data = self._gen_valheim()
@@ -2670,6 +2701,7 @@ server {
             self.assertIn('href="/ens1"', hub)
             self.assertIn('data-field="status"', hub)
             self.assertIn('data-field="players"', hub)
+            self.assertIn('data-field="cpu-alert"', hub)
 
     def test_regenerate_empty_manifest_produces_header_only(self):
         with tempfile.TemporaryDirectory() as d:

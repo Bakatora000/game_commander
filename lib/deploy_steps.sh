@@ -1168,6 +1168,7 @@ SVCEOF
             && ok "Service $GC_SERVICE actif" \
             || err "$GC_SERVICE inactif — journalctl -u $GC_SERVICE -n 30"
     fi
+    cpu_monitor_install
 }
 
 deploy_step_nginx() {
