@@ -2,7 +2,11 @@
 # Répartition CPU par cœur physique pour les instances Game Commander.
 
 cpu_affinity_scan_roots() {
-    printf '%s\n' ${GC_DEPLOY_SCAN_ROOTS:-/home /opt /root}
+    if [[ -n "${GC_DEPLOY_SCAN_ROOTS:-}" ]]; then
+        tr ' ' '\n' <<< "${GC_DEPLOY_SCAN_ROOTS}" | sed '/^$/d'
+    else
+        printf '%s\n' /home /opt /root
+    fi
 }
 
 cpu_affinity_sysfs_root() {
