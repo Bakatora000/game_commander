@@ -141,6 +141,12 @@
       flex-wrap: wrap;
       margin-top: .5rem;
     }
+    .inline-actions {
+      display: flex;
+      gap: .6rem;
+      flex-wrap: wrap;
+      margin-top: .9rem;
+    }
     .account-row {
       padding: .9rem 0;
       border-bottom: 1px solid var(--border);
@@ -148,6 +154,7 @@
     .account-row:last-child { border-bottom: 0; }
     .account-name { font-weight: 700; margin-bottom: .25rem; }
     .account-email { color: var(--muted); font-size: .92rem; margin-bottom: .6rem; }
+    .account-details { margin-top: .9rem; }
     .feedback { min-height: 1.2rem; color: #ffd69b; margin-top: .6rem; font-size: .92rem; }
     @media (max-width: 640px) {
       .head, .monitor-head { flex-direction: column; align-items: flex-start; }
@@ -194,12 +201,18 @@
       <p class="section-subtitle">Gestion des comptes administrateurs du Hub. Cette V1 prépare aussi le champ email pour une future réinitialisation par mail.</p>
       <div class="accounts-grid">
         <section class="card">
-          <h3 class="section-title">Mon mot de passe</h3>
-          <label class="field-label" for="currentPassword">Mot de passe actuel</label>
-          <input class="field-input" id="currentPassword" type="password" autocomplete="current-password">
-          <label class="field-label" for="newPassword">Nouveau mot de passe</label>
-          <input class="field-input" id="newPassword" type="password" autocomplete="new-password">
-          <button class="primary-btn" type="button" id="btnChangePassword">Mettre à jour</button>
+          <h3 class="section-title">Mon compte</h3>
+          <p class="section-subtitle">Change ton mot de passe seulement quand nécessaire.</p>
+          <div class="inline-actions">
+            <button class="primary-btn" type="button" id="btnToggleChangePassword">Changer mon mot de passe</button>
+          </div>
+          <div id="changePasswordPanel" hidden>
+            <label class="field-label" for="currentPassword">Mot de passe actuel</label>
+            <input class="field-input" id="currentPassword" type="password" autocomplete="current-password">
+            <label class="field-label" for="newPassword">Nouveau mot de passe</label>
+            <input class="field-input" id="newPassword" type="password" autocomplete="new-password">
+            <button class="primary-btn" type="button" id="btnChangePassword">Mettre à jour</button>
+          </div>
           <div class="feedback" id="changePasswordFeedback"></div>
         </section>
         <section class="card">
@@ -247,17 +260,31 @@
         <div class="account-row">
           <div class="account-name">${account.username}</div>
           <div class="account-email">Email : ${account.email || 'non renseigné'}</div>
-          <label class="field-label" for="email-${account.username}">Email</label>
-          <input class="field-input" id="email-${account.username}" value="${account.email || ''}">
-          <label class="field-label" for="reset-${account.username}">Réinitialiser le mot de passe</label>
-          <input class="field-input" id="reset-${account.username}" type="password" placeholder="Nouveau mot de passe">
           <div class="mini-actions">
-            <button class="secondary-btn" type="button" data-action="save-email" data-username="${account.username}">Enregistrer l’email</button>
-            <button class="secondary-btn" type="button" data-action="reset-password" data-username="${account.username}">Réinitialiser le mot de passe</button>
+            <button class="secondary-btn" type="button" data-action="toggle-details" data-username="${account.username}">Détails</button>
           </div>
-          <div class="feedback" id="feedback-${account.username}"></div>
+          <div class="account-details" id="details-${account.username}" hidden>
+            <label class="field-label" for="email-${account.username}">Email</label>
+            <input class="field-input" id="email-${account.username}" value="${account.email || ''}">
+            <label class="field-label" for="reset-${account.username}">Réinitialiser le mot de passe</label>
+            <input class="field-input" id="reset-${account.username}" type="password" placeholder="Nouveau mot de passe">
+            <div class="mini-actions">
+              <button class="secondary-btn" type="button" data-action="save-email" data-username="${account.username}">Enregistrer l’email</button>
+              <button class="secondary-btn" type="button" data-action="reset-password" data-username="${account.username}">Réinitialiser le mot de passe</button>
+            </div>
+            <div class="feedback" id="feedback-${account.username}"></div>
+          </div>
         </div>
       `).join('');
+      listEl.querySelectorAll('[data-action="toggle-details"]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const username = button.dataset.username;
+          const detailsEl = document.getElementById(`details-${username}`);
+          const hidden = detailsEl.hidden;
+          detailsEl.hidden = !hidden;
+          button.textContent = hidden ? 'Masquer' : 'Détails';
+        });
+      });
       listEl.querySelectorAll('[data-action="save-email"]').forEach((button) => {
         button.addEventListener('click', async () => {
           const username = button.dataset.username;
@@ -318,6 +345,12 @@
       const hidden = detailsEl.hidden;
       detailsEl.hidden = !hidden;
       buttonEl.textContent = hidden ? 'Masquer le détail' : 'Voir le détail';
+    });
+    document.getElementById('btnToggleChangePassword').addEventListener('click', () => {
+      const panel = document.getElementById('changePasswordPanel');
+      const hidden = panel.hidden;
+      panel.hidden = !hidden;
+      document.getElementById('btnToggleChangePassword').textContent = hidden ? 'Masquer' : 'Changer mon mot de passe';
     });
     async function load() {
       const [instancesResponse] = await Promise.all([
