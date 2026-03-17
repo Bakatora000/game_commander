@@ -138,6 +138,10 @@
       font-weight: 700;
       cursor: pointer;
     }
+    .secondary-btn.is-compact {
+      padding: .48rem .72rem;
+      font-size: .9rem;
+    }
     .primary-btn {
       border: 0;
       border-radius: 999px;
@@ -146,6 +150,12 @@
       color: #09201a;
       font-weight: 700;
       cursor: pointer;
+    }
+    .secondary-btn:disabled,
+    .primary-btn:disabled,
+    .monitor-toggle:disabled {
+      opacity: .6;
+      cursor: wait;
     }
     .mini-actions {
       display: flex;
@@ -244,6 +254,25 @@
   <script>
     const STATE_LABELS = { 0: 'Hors ligne', 10: 'Démarrage', 20: 'En ligne', 30: 'Arrêt', 40: 'Busy' };
     function formatAgeText(meta) { return meta || ''; }
+    function getInstanceActions(inst) {
+      const state = Number(inst.state || 0);
+      if (state === 20) {
+        return [
+          { key: 'restart', label: 'Redémarrer', confirm: `Redémarrer ${inst.name} ?` },
+          { key: 'stop', label: 'Arrêter', confirm: `Arrêter ${inst.name} ?` },
+          { key: 'update', label: 'Mettre à jour', confirm: `Mettre à jour ${inst.name} ?` },
+        ];
+      }
+      if (state === 0) {
+        return [
+          { key: 'start', label: 'Démarrer', confirm: `Démarrer ${inst.name} ?` },
+          { key: 'update', label: 'Mettre à jour', confirm: `Mettre à jour ${inst.name} ?` },
+        ];
+      }
+      return [
+        { key: 'update', label: 'Mettre à jour', confirm: `Mettre à jour ${inst.name} ?` },
+      ];
+    }
     function renderCards(instances) {
       const cardsEl = document.getElementById('cards');
       cardsEl.innerHTML = instances.map((inst) => `
@@ -257,10 +286,16 @@
           <p class="card-alert ${inst.cpu_alert?.message ? 'is-visible' : ''}" ${inst.cpu_alert?.message ? '' : 'hidden'}>${inst.cpu_alert?.message || ''}</p>
           <a class="card-link" href="${inst.prefix}">Ouvrir</a>
           <div class="card-actions">
-            <button class="secondary-btn" type="button" data-action="instance-start" data-instance="${inst.name}">Démarrer</button>
-            <button class="secondary-btn" type="button" data-action="instance-stop" data-instance="${inst.name}">Arrêter</button>
-            <button class="secondary-btn" type="button" data-action="instance-restart" data-instance="${inst.name}">Redémarrer</button>
-            <button class="secondary-btn" type="button" data-action="instance-update" data-instance="${inst.name}">Mettre à jour</button>
+            ${getInstanceActions(inst).map((action) => `
+              <button
+                class="secondary-btn is-compact"
+                type="button"
+                data-action="instance-${action.key}"
+                data-instance="${inst.name}"
+                data-label="${action.label}"
+                data-confirm="${action.confirm}"
+              >${action.label}</button>
+            `).join('')}
           </div>
           <div class="action-feedback" id="feedback-instance-${inst.name}"></div>
         </article>
@@ -269,10 +304,19 @@
         button.addEventListener('click', async () => {
           const instance = button.dataset.instance;
           const action = button.dataset.action.replace('instance-', '');
+          const label = button.dataset.label || 'Action';
+          const confirmMessage = button.dataset.confirm || `Confirmer ${label.toLowerCase()} ?`;
+          if (!window.confirm(confirmMessage)) {
+            return;
+          }
           const endpoint = action === 'update'
             ? `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/update`
             : `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/${action}`;
-          button.disabled = true;
+          const card = button.closest('.card');
+          const cardButtons = card ? Array.from(card.querySelectorAll('.card-actions button')) : [button];
+          cardButtons.forEach((btn) => { btn.disabled = true; });
+          button.textContent = `${label}…`;
+          setFeedback(`feedback-instance-${instance}`, `${label} en cours…`, true);
           const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -280,7 +324,8 @@
           });
           const data = await response.json().catch(() => ({}));
           setFeedback(`feedback-instance-${instance}`, data.message || (response.ok ? 'Action lancée' : 'Erreur'), response.ok);
-          button.disabled = false;
+          cardButtons.forEach((btn) => { btn.disabled = false; });
+          button.textContent = label;
           setTimeout(load, response.ok ? 1200 : 0);
         });
       });
