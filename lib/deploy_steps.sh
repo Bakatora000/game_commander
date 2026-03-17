@@ -1,6 +1,44 @@
 # ── lib/deploy_steps.sh ──────────────────────────────────────────────────────
 # Étapes 3 à 12 du déploiement Game Commander
 
+deploy_run_steamcmd() {
+    local platform="$1"
+    shift
+    local install_dir="$1"
+    shift
+    local app_id="$1"
+    shift
+
+    sudo -u "$SYS_USER" "$STEAMCMD_PATH" \
+        +@sSteamCmdForcePlatformType "$platform" \
+        +force_install_dir "$install_dir" \
+        +login anonymous \
+        +app_update "$app_id" validate \
+        +quit 2>&1 | awk '
+            /Please use force_install_dir before logon!/ { next }
+            /^ *Update state .*progress:/ {
+                line = $0
+                sub(/^.*progress: /, "", line)
+                printf "\r  →  SteamCMD : %s", line
+                fflush()
+                in_progress = 1
+                next
+            }
+            {
+                if (in_progress) {
+                    printf "\n"
+                    in_progress = 0
+                }
+                print
+            }
+            END {
+                if (in_progress) {
+                    printf "\n"
+                }
+            }
+        '
+}
+
 deploy_step_dependencies() {
     hdr "ÉTAPE 3 : Dépendances"
 
@@ -132,12 +170,7 @@ deploy_step_game_install() {
         if $DO_INSTALL; then
             info "Téléchargement $GAME_LABEL via SteamCMD (AppID $STEAM_APPID)..."
             info "Cela peut prendre plusieurs minutes..."
-            sudo -u "$SYS_USER" "$STEAMCMD_PATH" \
-                +@sSteamCmdForcePlatformType linux \
-                +login anonymous \
-                +force_install_dir "$SERVER_DIR" \
-                +app_update "$STEAM_APPID" validate \
-                +quit || die "Échec SteamCMD."
+            deploy_run_steamcmd "linux" "$SERVER_DIR" "$STEAM_APPID" || die "Échec SteamCMD."
             ok "$GAME_LABEL téléchargé"
         fi
 
@@ -403,12 +436,7 @@ EOF
         info "Cela peut prendre plusieurs minutes..."
         _platform="linux"
         [[ "$GAME_ID" == "enshrouded" ]] && _platform="windows"
-        sudo -u "$SYS_USER" "$STEAMCMD_PATH" \
-            +@sSteamCmdForcePlatformType "$_platform" \
-            +login anonymous \
-            +force_install_dir "$SERVER_DIR" \
-            +app_update "$STEAM_APPID" validate \
-            +quit || die "Échec SteamCMD."
+        deploy_run_steamcmd "$_platform" "$SERVER_DIR" "$STEAM_APPID" || die "Échec SteamCMD."
         ok "$GAME_LABEL téléchargé"
     fi
 
