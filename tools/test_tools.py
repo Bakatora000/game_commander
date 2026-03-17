@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import appfiles, appservice, cpuplan, deploybackups, deployenv, deploynginx, deploypost, deploysudo, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
+from shared import appfiles, appservice, cpuplan, deploybackups, deployenv, deploynginx, deploypost, deployssl, deploysudo, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -1345,6 +1345,11 @@ class DeployHelpersTests(unittest.TestCase):
             root = Path(d)
             (root / "app.py").write_text("print('ok')\n", encoding="utf-8")
             self.assertEqual(appfiles.resolve_runtime_src_dir(root), root)
+
+    def test_apply_ssl_existing_is_noop(self):
+        ok, messages = deployssl.apply_ssl("existing", "gaming.example.com")
+        self.assertTrue(ok)
+        self.assertEqual(messages, ["SSL existant — non modifié"])
 
 
 class ConfigGenUsersJsonTests(unittest.TestCase):

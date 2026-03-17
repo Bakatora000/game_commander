@@ -919,18 +919,22 @@ deploy_step_nginx() {
 
 deploy_step_ssl() {
     hdr "ÉTAPE 10 : SSL"
-    case "$SSL_MODE" in
-        certbot)
-            cmd_exists certbot \
-                && { certbot --nginx -d "$DOMAIN" --non-interactive --agree-tos \
-                        --register-unsafely-without-email 2>/dev/null \
-                     && ok "Certificat SSL obtenu" \
-                     || warn "Certbot échoué — $DOMAIN doit pointer sur ce serveur"; } \
-                || warn "Certbot non disponible"
-            ;;
-        existing) ok "SSL existant — non modifié" ;;
-        none) warn "HTTP uniquement" ;;
-    esac
+    local ssl_out=""
+    if ssl_out="$(python3 "$SCRIPT_DIR/shared/deployssl.py" apply \
+        --ssl-mode "$SSL_MODE" \
+        --domain "$DOMAIN" 2>&1)"; then
+        while IFS= read -r _line; do
+            [[ -z "$_line" ]] && continue
+            if [[ "$_line" == "HTTP uniquement" ]]; then
+                warn "$_line"
+            else
+                ok "$_line"
+            fi
+        done <<< "$ssl_out"
+    else
+        [[ -n "$ssl_out" ]] && warn "$ssl_out"
+        warn "Gestion SSL en erreur"
+    fi
 }
 
 deploy_step_sudoers() {
