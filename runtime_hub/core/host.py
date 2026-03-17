@@ -18,7 +18,7 @@ ROOT_DIR = Path(MAIN_SCRIPT_ENV).resolve().parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from shared import hostctl, hostops
+from shared import hostctl, hostops, instanceenv
 
 
 def _manifest_path() -> Path:
@@ -70,19 +70,7 @@ def _instance_config_file(instance_name: str) -> Path:
 
 def _load_instance_env(instance_name: str) -> dict:
     env_path = _instance_config_file(instance_name)
-    if not env_path.is_file():
-        return {}
-    state = {}
-    try:
-        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            state[key] = value.strip().strip('"')
-    except Exception:
-        return {}
-    return state
+    return instanceenv.parse_env_file(env_path)
 
 
 def _instance_entry(instance_name: str) -> dict | None:

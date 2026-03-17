@@ -14,25 +14,14 @@ import os
 import sys
 from pathlib import Path
 
+from . import instanceenv
+
 DEFAULT_SEARCH_ROOTS = ("/home", "/opt", "/root")
 DEFAULT_MAX_DEPTH = 5
 
 
 def parse_env_file(path: str | Path) -> dict[str, str]:
-    env_path = Path(path)
-    state: dict[str, str] = {}
-    if not env_path.is_file():
-        return state
-    try:
-        for raw_line in env_path.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            state[key] = value.strip().strip('"')
-    except Exception:
-        return {}
-    return state
+    return instanceenv.parse_env_file(path)
 
 
 def _walk_candidate_files(root: str | Path, max_depth: int = DEFAULT_MAX_DEPTH):
@@ -75,17 +64,7 @@ def discover_instance_records(
 ) -> list[dict[str, str]]:
     records: list[dict[str, str]] = []
     for cfg in discover_instance_configs(search_roots=search_roots, max_depth=max_depth):
-        env = parse_env_file(cfg)
-        records.append(
-            {
-                "config": str(cfg),
-                "instance_id": env.get("INSTANCE_ID", ""),
-                "game_id": env.get("GAME_ID", ""),
-                "app_dir": env.get("APP_DIR", ""),
-                "server_dir": env.get("SERVER_DIR", ""),
-                "game_service": env.get("GAME_SERVICE", ""),
-            }
-        )
+        records.append(instanceenv.load_instance_record(cfg))
     return records
 
 
@@ -164,4 +143,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

@@ -6,7 +6,7 @@ import os
 import subprocess
 from pathlib import Path
 
-from . import hostctl
+from . import hostctl, instanceenv
 
 HEAVY_GAMES = {"soulmask", "enshrouded"}
 SYSTEMD_DIR = Path("/etc/systemd/system")
@@ -63,14 +63,13 @@ def collect_managed_instances() -> list[dict[str, str]]:
     records = hostctl.discover_instance_records()
     managed: list[dict[str, str]] = []
     for record in records:
-        env = hostctl.parse_env_file(record["config"])
-        if env.get("DEPLOY_MODE", "managed") != "managed":
+        if record.get("deploy_mode", "managed") != "managed":
             continue
         managed.append(
             {
                 "instance_id": record["instance_id"],
                 "game_id": record["game_id"],
-                "service": env.get("GAME_SERVICE") or f'{record["game_id"]}-server-{record["instance_id"]}',
+                "service": record.get("game_service") or instanceenv.default_game_service(record["game_id"], record["instance_id"]),
             }
         )
     return managed
@@ -158,4 +157,3 @@ def apply_plan(plan: list[dict[str, str | int]], restart_running: bool = False) 
     if changed:
         subprocess.run(["systemctl", "daemon-reload"], check=False)
     return messages
-

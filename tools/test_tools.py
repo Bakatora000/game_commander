@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import cpuplan, hostctl, hostops
+from shared import cpuplan, hostctl, hostops, instanceenv
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -277,6 +277,27 @@ class HostCtlTests(unittest.TestCase):
             )
             resolved = hostctl.resolve_instance_config("beta", search_roots=[str(root)])
             self.assertEqual(resolved, target.resolve())
+
+
+class InstanceEnvTests(unittest.TestCase):
+
+    def test_default_game_service_uses_game_prefix(self):
+        self.assertEqual(instanceenv.default_game_service("valheim", "valheim2"), "valheim-server-valheim2")
+        self.assertEqual(instanceenv.default_game_service("minecraft-fabric", "fabric"), "minecraft-fabric-server-fabric")
+
+    def test_load_instance_record_applies_defaults(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = Path(d) / "deploy_config.env"
+            cfg.write_text(
+                'INSTANCE_ID="enshrouded2"\n'
+                'GAME_ID="enshrouded"\n'
+                'APP_DIR="/home/vhserver/game-commander-enshrouded2"\n',
+                encoding="utf-8",
+            )
+            record = instanceenv.load_instance_record(cfg)
+            self.assertEqual(record["game_label"], "Enshrouded")
+            self.assertEqual(record["game_binary"], "enshrouded_server.exe")
+            self.assertEqual(record["game_service"], "enshrouded-server-enshrouded2")
 
 
 class HostOpsTests(unittest.TestCase):
