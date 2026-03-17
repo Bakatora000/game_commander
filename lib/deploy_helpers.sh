@@ -189,8 +189,7 @@ set_game_defaults() {
 deploy_load_config_file() {
     if $CONFIG_MODE; then
         [[ -f "$CONFIG_FILE_DEPLOY" ]] || die "Fichier de config introuvable : $CONFIG_FILE_DEPLOY"
-        # shellcheck source=/dev/null
-        source "$CONFIG_FILE_DEPLOY"
+        source <(python3 "$SCRIPT_DIR/shared/deployenv.py" exports --config "$CONFIG_FILE_DEPLOY")
         info "Config chargée depuis : $CONFIG_FILE_DEPLOY"
     fi
 }

@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import cpuplan, hostctl, hostops, hubsync, instanceenv, uninstallcore, updatecore, updatehooks
+from shared import cpuplan, deployenv, hostctl, hostops, hubsync, instanceenv, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -359,6 +359,19 @@ class HubSyncTests(unittest.TestCase):
             ok, message = hubsync.sync_hub_service(cfg, ROOT_DIR)
             self.assertFalse(ok)
             self.assertIn("SYS_USER manquant", message)
+
+
+class DeployEnvTests(unittest.TestCase):
+
+    def test_normalize_deploy_env_applies_game_defaults(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = Path(d) / "deploy_config.env"
+            cfg.write_text('GAME_ID="satisfactory"\nINSTANCE_ID="sat1"\n', encoding="utf-8")
+            env = deployenv.normalize_deploy_env(cfg)
+            self.assertEqual(env["SERVER_PORT"], "7777")
+            self.assertEqual(env["QUERY_PORT"], "8888")
+            self.assertEqual(env["URL_PREFIX"], "/satisfactory")
+            self.assertEqual(env["FLASK_PORT"], "5007")
 
 
 class HostOpsTests(unittest.TestCase):
