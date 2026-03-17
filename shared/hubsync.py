@@ -2,6 +2,7 @@
 """Native Hub Admin sync helpers."""
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import pwd
@@ -120,8 +121,7 @@ def _write_hub_sudoers(repo_root: Path, sys_user: str) -> None:
     subprocess.run(["visudo", "-cf", str(sudoers_file)], check=True, capture_output=True, text=True)
 
 
-def sync_hub_service(config_file: str | Path, repo_root: str | Path) -> tuple[bool, list[str] | str]:
-    env = instanceenv.parse_env_file(config_file)
+def _sync_hub_from_env(env: dict[str, str], repo_root: str | Path) -> tuple[bool, list[str] | str]:
     sys_user = env.get("SYS_USER", "").strip()
     if not sys_user:
         return False, "SYS_USER manquant pour la synchro Hub"
@@ -158,3 +158,79 @@ def sync_hub_service(config_file: str | Path, repo_root: str | Path) -> tuple[bo
     subprocess.run(["systemctl", "enable", "game-commander-hub"], check=False, capture_output=True, text=True)
     subprocess.run(["systemctl", "restart", "game-commander-hub"], check=True)
     return True, [f"Hub Admin synchronisé : {hub_app_dir}", "Service game-commander-hub redémarré"]
+
+
+def sync_hub_service(config_file: str | Path, repo_root: str | Path) -> tuple[bool, list[str] | str]:
+    return _sync_hub_from_env(instanceenv.parse_env_file(config_file), repo_root)
+
+
+def sync_hub_service_from_values(
+    *,
+    sys_user: str,
+    app_dir: str,
+    admin_login: str,
+    admin_password: str = "",
+    repo_root: str | Path,
+) -> tuple[bool, list[str] | str]:
+    env = {
+        "SYS_USER": sys_user,
+        "APP_DIR": app_dir,
+        "ADMIN_LOGIN": admin_login,
+        "ADMIN_PASSWORD": admin_password,
+    }
+    return _sync_hub_from_env(env, repo_root)
+
+
+def _cmd_sync_from_config(args: argparse.Namespace) -> int:
+    ok, result = sync_hub_service(args.config, args.repo_root)
+    if not ok:
+        print(result)
+        return 1
+    for line in result:
+        print(line)
+    return 0
+
+
+def _cmd_sync_from_values(args: argparse.Namespace) -> int:
+    ok, result = sync_hub_service_from_values(
+        sys_user=args.sys_user,
+        app_dir=args.app_dir,
+        admin_login=args.admin_login,
+        admin_password=args.admin_password,
+        repo_root=args.repo_root,
+    )
+    if not ok:
+        print(result)
+        return 1
+    for line in result:
+        print(line)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Game Commander Hub sync helper")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    sync_cfg = sub.add_parser("sync-config")
+    sync_cfg.add_argument("--config", required=True)
+    sync_cfg.add_argument("--repo-root", required=True)
+    sync_cfg.set_defaults(func=_cmd_sync_from_config)
+
+    sync_values = sub.add_parser("sync-values")
+    sync_values.add_argument("--sys-user", required=True)
+    sync_values.add_argument("--app-dir", required=True)
+    sync_values.add_argument("--admin-login", required=True)
+    sync_values.add_argument("--admin-password", default="")
+    sync_values.add_argument("--repo-root", required=True)
+    sync_values.set_defaults(func=_cmd_sync_from_values)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

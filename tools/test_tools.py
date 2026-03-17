@@ -360,6 +360,17 @@ class HubSyncTests(unittest.TestCase):
             self.assertFalse(ok)
             self.assertIn("SYS_USER manquant", message)
 
+    def test_sync_hub_service_from_values_requires_sys_user(self):
+        ok, message = hubsync.sync_hub_service_from_values(
+            sys_user="",
+            app_dir="/tmp/gc-test",
+            admin_login="admin",
+            admin_password="secret123",
+            repo_root=ROOT_DIR,
+        )
+        self.assertFalse(ok)
+        self.assertIn("SYS_USER manquant", message)
+
 
 class DeployEnvTests(unittest.TestCase):
 
