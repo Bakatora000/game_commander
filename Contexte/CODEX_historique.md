@@ -727,24 +727,57 @@ Décision prise :
 
 Après la stabilisation actuelle, la prochaine cible retenue n'est plus `Terraria TShock` mais `Satisfactory`.
 
-## Satisfactory — V1 en cours
+## Satisfactory — baseline produit validée
 
-Premier socle ajouté :
+Premier socle validé en réel :
 - `deploy` / `update` connaissent maintenant `satisfactory`
 - AppID SteamCMD : `1690800`
 - binaire attendu : `FactoryServer.sh`
-- ports exposés dans le produit :
-  - `7777` en `TCP+UDP`
-  - `8888` en `TCP` pour l'admin/API
 - les données d'instance sont isolées dans `DATA_DIR` via `HOME` / `XDG_CONFIG_HOME`
 - le `save manager` pointe sur :
   - `.config/Epic/FactoryGame/Saved/SaveGames`
 - les backups prennent ce dossier `SaveGames` complet
 
-Périmètre volontairement limité pour cette V1 :
-- pas encore de panneau de config natif Satisfactory
+Points produit validés ensuite :
+- le serveur doit être lancé avec :
+  - port jeu
+  - `ReliablePort`
+- le port fiable est indispensable au join ; le simple claim ne suffit pas à valider la connectivité
+- le produit rappelle maintenant explicitement les ports à ouvrir à la fin du déploiement
+- le claim et l'administration passent par l'API HTTPS native du serveur
+- les actions suivantes sont validées dans le Commander :
+  - statut du claim
+  - revendiquer le serveur
+  - changer le mot de passe admin
+  - définir/supprimer le mot de passe joueur
+  - renommer le serveur
+- le panneau `Serveur revendiqué` expose maintenant aussi :
+  - nom actuel du serveur quand l'API l'expose
+  - session active si disponible
+  - bouton de lecture authentifiée des infos serveur via mot de passe admin
+
+Limites restantes :
 - pas encore de suivi joueurs
-- objectif immédiat : disposer d'un serveur déployable avec console, fichiers et sauvegardes
+- pas encore de panneau gameplay avancé
+- le nom du serveur n'est pas forcément lisible sans authentification admin
+
+## Hub Admin — séparation des rôles
+
+Le hub `/commander` n'est plus une simple page statique nginx :
+- c'est maintenant un Flask séparé, distinct des Commanders d'instance
+- auth dédiée avec son propre `users.json`
+- cible : admin hôte, pas admin jeu
+
+Premier périmètre validé :
+- vue lecture seule globale
+- monitor CPU et détail de répartition
+- gestion des comptes Hub
+- premières actions d'exploitation :
+  - `start`
+  - `stop`
+  - `restart`
+  - `update --instance`
+  - `rebalance`
 
 ## Note locale testsoul
 

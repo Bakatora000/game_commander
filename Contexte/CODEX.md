@@ -231,13 +231,18 @@ Roadmap status update:
 - Terraria has now largely caught up to the baseline standard expected for vanilla support
 - Enshrouded remains the next best candidate for deeper product work (roles, bans, possible world-slot switching abstraction)
 - A later dedicated `terraria-tshock` variant remains a valid product path, but it is deferred
-- `Satisfactory` is now started in V1:
+- `Satisfactory` now has a validated first usable product baseline:
   - managed deploy
   - systemd service
   - Commander runtime
   - save/file manager on `SaveGames`
   - backups isolated per instance
-  - connection info with `7777/TCP+UDP` and `8888/TCP`
+  - claim/admin actions via the native HTTPS API
+  - connection info with game port and reliable port
+- `/commander` is no longer only a landing page:
+  - it is now a dedicated Hub Admin Flask app
+  - auth is separate from per-instance Commanders
+  - first host actions are exposed there (`start/stop/restart`, `update --instance`, `rebalance`)
 
 ## Adding a New Game
 

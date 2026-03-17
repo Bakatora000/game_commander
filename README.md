@@ -305,7 +305,16 @@ La documentation de contexte du projet repose désormais sur :
 | Minecraft Fabric | ✅ Fabric | ✅ Modrinth | `server.properties` |
 | Terraria | ✅ serveur officiel | — | `serverconfig.txt` |
 | Soulmask | ✅ 3017300 | — | `soulmask_server.json` |
-| Satisfactory | ✅ 1690800 | — | — |
+| Satisfactory | ✅ 1690800 | — | API HTTPS native |
+
+Note Hub Admin :
+- `/commander` est désormais une interface d'administration hôte distincte des Commanders d'instance
+- authentification séparée
+- vue globale des instances
+- premières actions d'exploitation disponibles :
+  - `start / stop / restart`
+  - `update` d'une instance
+  - `rebalance` CPU
 
 Note Minecraft Java :
 - le serveur téléchargé automatiquement peut être plus récent que ton client Java local
@@ -336,6 +345,18 @@ Note Soulmask :
 - un bug de launcher a été corrigé : le wrapper Game Commander appelle maintenant `WSServer.sh` avec un jeu d'arguments propre, au lieu d'empiler des flags dupliqués sur `StartServer.sh`
 - la charge CPU au repos reste à surveiller plus tard en condition réelle avec joueur connecté
 - en validation réelle, Soulmask a aussi montré des phases de démarrage et d'arrêt sensiblement plus lentes que les autres jeux déjà supportés ; il faut laisser quelques minutes avant de juger la charge CPU juste après un `start` ou `restart`
+
+Note Satisfactory :
+- le support actuel couvre maintenant :
+  - déploiement
+  - service systemd
+  - console/fichiers/sauvegardes
+  - claim du serveur
+  - changement du mot de passe admin
+  - définition/suppression du mot de passe joueur
+  - renommage du serveur
+- la connexion dépend du port jeu et du `ReliablePort`
+- le Commander affiche l'état du claim et peut relire les infos serveur via le mot de passe admin actuel
 
 ### Politique actuelle de sauvegarde
 
