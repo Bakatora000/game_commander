@@ -549,9 +549,12 @@ class SaveManagerTests(unittest.TestCase):
     def tearDown(self):
         self.tmpdir.cleanup()
 
-    def _write_deploy_config(self):
+    def _write_deploy_config(self, instance_id=None):
+        lines = ['BACKUP_DIR="%s"' % (self.root / "backups")]
+        if instance_id:
+            lines.append('INSTANCE_ID="%s"' % instance_id)
         (self.root / "deploy_config.env").write_text(
-            'BACKUP_DIR="%s"\n' % (self.root / "backups"),
+            "\n".join(lines) + "\n",
             encoding="utf-8",
         )
 
@@ -664,6 +667,29 @@ class SaveManagerTests(unittest.TestCase):
         self.assertIsNone(err)
         self.assertEqual(len(data["entries"]), 1)
         self.assertEqual(data["entries"][0]["label"], "14/03/2026 22:33:46")
+
+    def test_list_backups_uses_instance_subdirectory_when_instance_id_is_set(self):
+        self._write_deploy_config(instance_id="valheim2")
+        backup_root = self.root / "backups"
+        backup_root.mkdir()
+        (backup_root / "MondeAncien_20260314_223346.zip").write_text("x")
+        instance_dir = backup_root / "valheim2"
+        instance_dir.mkdir()
+        (instance_dir / "Monde2_20260314_223500.zip").write_text("y")
+        self.app.config["GAME"] = {
+            "id": "valheim",
+            "server": {
+                "install_dir": str(self.root / "server"),
+                "data_dir": str(self.root / "data"),
+                "world_name": "Monde2",
+            }
+        }
+        with self.app.app_context():
+            data, err = core_saves.list_backups()
+        self.assertIsNone(err)
+        self.assertEqual(str(instance_dir), data["backup_dir"])
+        self.assertEqual(len(data["entries"]), 1)
+        self.assertEqual(data["entries"][0]["name"], "Monde2_20260314_223500.zip")
 
     def test_list_backups_hides_safety_backups(self):
         self._write_deploy_config()

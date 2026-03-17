@@ -858,12 +858,14 @@ SVCEOF
 
 deploy_step_backups() {
     hdr "ÉTAPE 6 : Sauvegardes automatiques"
+    local effective_backup_dir="$BACKUP_DIR"
+    [[ -n "${INSTANCE_ID:-}" && "$(basename "$effective_backup_dir")" != "$INSTANCE_ID" ]] && effective_backup_dir="${effective_backup_dir}/${INSTANCE_ID}"
 
     mkdir -p "$APP_DIR"
     chown "$SYS_USER:$SYS_USER" "$APP_DIR"
 
-    mkdir -p "$BACKUP_DIR"
-    chown "$SYS_USER:$SYS_USER" "$BACKUP_DIR"
+    mkdir -p "$effective_backup_dir"
+    chown "$SYS_USER:$SYS_USER" "$effective_backup_dir"
 
     case "$GAME_ID" in
         valheim)
@@ -898,7 +900,7 @@ zip -j "$ARC" "${FILES[@]}" -q \
     || { echo "[$(date)] ERROR: zip échoué" >&2; exit 1; }
 find "$BACKUP_DIR" -name "${WORLD_NAME}_*.zip" -mtime +${RETENTION} -delete
 BKPEOF
-        sed -i "s|__BACKUP_DIR__|${BACKUP_DIR}|g; s|__WORLD_DIR__|${WORLD_DIR}|g; s|__WORLD_NAME__|${WORLD_NAME}|g" "$BACKUP_SCRIPT"
+        sed -i "s|__BACKUP_DIR__|${effective_backup_dir}|g; s|__WORLD_DIR__|${WORLD_DIR}|g; s|__WORLD_NAME__|${WORLD_NAME}|g" "$BACKUP_SCRIPT"
     elif [[ "$GAME_ID" == "minecraft" || "$GAME_ID" == "minecraft-fabric" ]]; then
         cat > "$BACKUP_SCRIPT" << 'BKPEOF'
 #!/usr/bin/env bash
@@ -922,7 +924,7 @@ done
   || { echo "[$(date)] ERROR" >&2; exit 1; }
 find "$BACKUP_DIR" -name "${PREFIX}_save_*.zip" -mtime +${RETENTION} -delete
 BKPEOF
-        sed -i "s|__BACKUP_DIR__|${BACKUP_DIR}|g; s|__SERVER_DIR__|${SERVER_DIR}|g; s|__WORLD_DIR__|${WORLD_DIR}|g; s|__GAME_ID__|${GAME_ID}|g" "$BACKUP_SCRIPT"
+        sed -i "s|__BACKUP_DIR__|${effective_backup_dir}|g; s|__SERVER_DIR__|${SERVER_DIR}|g; s|__WORLD_DIR__|${WORLD_DIR}|g; s|__GAME_ID__|${GAME_ID}|g" "$BACKUP_SCRIPT"
     else
         cat > "$BACKUP_SCRIPT" << 'BKPEOF'
 #!/usr/bin/env bash
@@ -944,7 +946,7 @@ ROOT_NAME="$(basename "$WORLD_DIR")"
     || { echo "[$(date)] ERROR" >&2; exit 1; }
 find "$BACKUP_DIR" -name "${PREFIX}_save_*.zip" -mtime +${RETENTION} -delete
 BKPEOF
-        sed -i "s|__BACKUP_DIR__|${BACKUP_DIR}|g; s|__WORLD_DIR__|${WORLD_DIR}|g; s|__GAME_ID__|${GAME_ID}|g" "$BACKUP_SCRIPT"
+        sed -i "s|__BACKUP_DIR__|${effective_backup_dir}|g; s|__WORLD_DIR__|${WORLD_DIR}|g; s|__GAME_ID__|${GAME_ID}|g" "$BACKUP_SCRIPT"
     fi
 
     chmod +x "$BACKUP_SCRIPT"

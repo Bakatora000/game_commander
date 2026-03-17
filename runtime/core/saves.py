@@ -59,11 +59,17 @@ def _deploy_cfg_value(key: str, default: str = "") -> str:
     return default
 
 
+def _instance_id() -> str:
+    return _deploy_cfg_value("INSTANCE_ID").strip()
+
+
 def _backup_dir() -> Path:
     path = _deploy_cfg_value("BACKUP_DIR")
-    if path:
-        return Path(path)
-    return _server_dir().parent / "gamebackups"
+    backup_root = Path(path) if path else (_server_dir().parent / "gamebackups")
+    instance_id = _instance_id()
+    if instance_id and backup_root.name != instance_id:
+        return backup_root / instance_id
+    return backup_root
 
 
 def _backup_script_path() -> Path:
