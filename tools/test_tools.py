@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import appservice, cpuplan, deployenv, deploynginx, deploypost, deploysudo, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, uninstallcore, updatecore, updatehooks
+from shared import appservice, cpuplan, deployenv, deploynginx, deploypost, deploysudo, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -513,6 +513,18 @@ class GameServiceTests(unittest.TestCase):
         self.assertIn("ExecStart=/tmp/mc/start_server.sh", content)
         self.assertIn("CPUAffinity=2 6", content)
         self.assertIn("CPUWeight=200", content)
+
+
+class StartScriptsTests(unittest.TestCase):
+
+    def test_render_minecraft_start_script_uses_vanilla_jar(self):
+        content = startscripts.render_minecraft_start_script(server_dir="/srv/minecraft", jar_name="server.jar")
+        self.assertIn('cd "/srv/minecraft"', content)
+        self.assertIn("exec /usr/bin/java -Xms1G -Xmx2G -jar server.jar nogui", content)
+
+    def test_render_minecraft_start_script_uses_fabric_jar(self):
+        content = startscripts.render_minecraft_start_script(server_dir="/srv/fabric", jar_name="fabric-server-launch.jar")
+        self.assertIn("fabric-server-launch.jar", content)
 
 
 class HostOpsTests(unittest.TestCase):

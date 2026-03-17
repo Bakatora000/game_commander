@@ -504,13 +504,11 @@ deploy_step_game_service() {
 
     if [[ "$GAME_ID" == "minecraft" ]]; then
         START_SCRIPT="$SERVER_DIR/start_server.sh"
-        cat > "$START_SCRIPT" << STARTEOF
-#!/usr/bin/env bash
-cd "${SERVER_DIR}"
-exec /usr/bin/java -Xms1G -Xmx2G -jar server.jar nogui
-STARTEOF
-        chmod +x "$START_SCRIPT"
-        chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
+        python3 "$SCRIPT_DIR/shared/startscripts.py" minecraft \
+            --out "$START_SCRIPT" \
+            --server-dir "$SERVER_DIR" \
+            --sys-user "$SYS_USER" \
+        || die "Échec génération start_server.sh Minecraft"
         ok "Script de démarrage : $START_SCRIPT"
 
         install_game_service_unit "$START_SCRIPT"
@@ -519,13 +517,12 @@ STARTEOF
 
     if [[ "$GAME_ID" == "minecraft-fabric" ]]; then
         START_SCRIPT="$SERVER_DIR/start_server.sh"
-        cat > "$START_SCRIPT" << STARTEOF
-#!/usr/bin/env bash
-cd "${SERVER_DIR}"
-exec /usr/bin/java -Xms1G -Xmx2G -jar fabric-server-launch.jar nogui
-STARTEOF
-        chmod +x "$START_SCRIPT"
-        chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
+        python3 "$SCRIPT_DIR/shared/startscripts.py" minecraft \
+            --out "$START_SCRIPT" \
+            --server-dir "$SERVER_DIR" \
+            --sys-user "$SYS_USER" \
+            --fabric \
+        || die "Échec génération start_server.sh Minecraft Fabric"
         ok "Script de démarrage : $START_SCRIPT"
 
         install_game_service_unit "$START_SCRIPT"
