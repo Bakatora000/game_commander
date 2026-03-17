@@ -50,6 +50,7 @@ update_game_meta() {
 
 update_process_config() {
     local cfg="$1"
+    local hooks_only="${2:-false}"
     unset GAME_ID INSTANCE_ID SYS_USER SERVER_DIR DATA_DIR BACKUP_DIR APP_DIR SRC_DIR \
           WORLD_NAME SERVER_NAME SERVER_PASSWORD SERVER_ADMIN_PASSWORD SERVER_PORT QUERY_PORT ECHO_PORT \
           MAX_PLAYERS SERVER_MODE BACKUP_ENABLED SAVING_ENABLED BACKUP_INTERVAL CROSSPLAY BEPINEX DOMAIN \
@@ -81,48 +82,49 @@ update_process_config() {
 
     update_game_meta
 
-    local runtime_src
-    runtime_src=$(deploy_runtime_src_dir "$SRC_DIR") || die "Sources runtime introuvables dans $SRC_DIR"
-
     info "Mise à jour de ${INSTANCE_ID} (${GAME_ID})"
+    if [[ "$hooks_only" != "true" ]]; then
+        local runtime_src
+        runtime_src=$(deploy_runtime_src_dir "$SRC_DIR") || die "Sources runtime introuvables dans $SRC_DIR"
 
-    rsync -a --delete --exclude='__pycache__' --exclude='*.pyc' \
-              --exclude='metrics.log' --exclude='users.json' --exclude='game.json' \
-              --exclude='deploy_config.env' \
-              "$runtime_src/" "$APP_DIR/"
-    chown -R "$SYS_USER:$SYS_USER" "$APP_DIR"
-    ok "Runtime synchronisé"
+        rsync -a --delete --exclude='__pycache__' --exclude='*.pyc' \
+                  --exclude='metrics.log' --exclude='users.json' --exclude='game.json' \
+                  --exclude='deploy_config.env' \
+                  "$runtime_src/" "$APP_DIR/"
+        chown -R "$SYS_USER:$SYS_USER" "$APP_DIR"
+        ok "Runtime synchronisé"
 
-    local gc_bepinex_path=""
-    if [[ "$GAME_ID" == "valheim" && "${BEPINEX:-false}" == "true" ]]; then
-        gc_bepinex_path="${SERVER_DIR}/BepInEx"
+        local gc_bepinex_path=""
+        if [[ "$GAME_ID" == "valheim" && "${BEPINEX:-false}" == "true" ]]; then
+            gc_bepinex_path="${SERVER_DIR}/BepInEx"
+        fi
+
+        local -a game_json_extra_args=()
+        [[ -n "${QUERY_PORT:-}" ]] && game_json_extra_args+=(--query-port "$QUERY_PORT")
+        [[ -n "${ECHO_PORT:-}" ]] && game_json_extra_args+=(--echo-port "$ECHO_PORT")
+
+        python3 "$SCRIPT_DIR/tools/config_gen.py" game-json \
+            --out           "$APP_DIR/game.json" \
+            --game-id       "$GAME_ID" \
+            --game-label    "$GAME_LABEL" \
+            --game-binary   "$GAME_BINARY" \
+            --game-service  "$GAME_SERVICE" \
+            --server-dir    "$SERVER_DIR" \
+            --data-dir      "${DATA_DIR:-$SERVER_DIR}" \
+            --world-name    "${WORLD_NAME:-}" \
+            --max-players   "${MAX_PLAYERS:-20}" \
+            --port          "$SERVER_PORT" \
+            "${game_json_extra_args[@]}" \
+            --url-prefix    "$URL_PREFIX" \
+            --flask-port    "$FLASK_PORT" \
+            --admin-user    "$ADMIN_LOGIN" \
+            --bepinex-path  "${gc_bepinex_path:-}" \
+            --steam-appid   "${STEAM_APPID:-}" \
+            --steamcmd-path "${STEAMCMD_PATH:-}" \
+        || die "Échec régénération game.json pour ${INSTANCE_ID}"
+        chown "$SYS_USER:$SYS_USER" "$APP_DIR/game.json"
+        ok "game.json régénéré"
     fi
-
-    local -a game_json_extra_args=()
-    [[ -n "${QUERY_PORT:-}" ]] && game_json_extra_args+=(--query-port "$QUERY_PORT")
-    [[ -n "${ECHO_PORT:-}" ]] && game_json_extra_args+=(--echo-port "$ECHO_PORT")
-
-    python3 "$SCRIPT_DIR/tools/config_gen.py" game-json \
-        --out           "$APP_DIR/game.json" \
-        --game-id       "$GAME_ID" \
-        --game-label    "$GAME_LABEL" \
-        --game-binary   "$GAME_BINARY" \
-        --game-service  "$GAME_SERVICE" \
-        --server-dir    "$SERVER_DIR" \
-        --data-dir      "${DATA_DIR:-$SERVER_DIR}" \
-        --world-name    "${WORLD_NAME:-}" \
-        --max-players   "${MAX_PLAYERS:-20}" \
-        --port          "$SERVER_PORT" \
-        "${game_json_extra_args[@]}" \
-        --url-prefix    "$URL_PREFIX" \
-        --flask-port    "$FLASK_PORT" \
-        --admin-user    "$ADMIN_LOGIN" \
-        --bepinex-path  "${gc_bepinex_path:-}" \
-        --steam-appid   "${STEAM_APPID:-}" \
-        --steamcmd-path "${STEAMCMD_PATH:-}" \
-    || die "Échec régénération game.json pour ${INSTANCE_ID}"
-    chown "$SYS_USER:$SYS_USER" "$APP_DIR/game.json"
-    ok "game.json régénéré"
 
     SKIP_BACKUP_TEST=true
     deploy_step_backups
@@ -142,6 +144,7 @@ cmd_update() {
     [[ $EUID -eq 0 ]] || die "Lancez en root : sudo bash $0 update"
 
     local target_instance="" update_all=false
+    local hooks_only=false
     local -a args=("$@")
     local i
     for ((i=0; i<${#args[@]}; i++)); do
@@ -152,6 +155,9 @@ cmd_update() {
                 ;;
             --all)
                 update_all=true
+                ;;
+            --hooks-only)
+                hooks_only=true
                 ;;
         esac
     done
@@ -173,7 +179,7 @@ cmd_update() {
             fi
         done
         [[ ${#selected[@]} -gt 0 ]] || die "Instance introuvable : ${target_instance}"
-    else
+    elif ! $hooks_only; then
         echo ""
         local idx=1 cfg iid gid
         echo -e "  ${CYAN}[0]${RESET} Quit"
@@ -197,11 +203,13 @@ cmd_update() {
         else
             die "Choix invalide."
         fi
+    else
+        die "--hooks-only exige --instance"
     fi
 
     local cfg
     for cfg in "${selected[@]}"; do
         sep
-        update_process_config "$cfg"
+        update_process_config "$cfg" "$hooks_only"
     done
 }

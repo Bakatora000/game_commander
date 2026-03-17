@@ -10,7 +10,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from shared import cpuplan, hostctl, hostops
+from shared import cpuplan, hostctl, hostops, updatecore
 
 
 def _existing_path(value: str) -> Path:
@@ -34,8 +34,18 @@ def cmd_service_action(args: argparse.Namespace) -> int:
 
 
 def cmd_update_instance(args: argparse.Namespace) -> int:
+    config_file = hostctl.resolve_instance_config(args.instance)
+    if not config_file:
+        print("Configuration d'instance introuvable", file=sys.stderr)
+        return 1
+    ok, result = updatecore.run_core_update(config_file, Path(args.main_script).resolve().parent)
+    if not ok:
+        print(result, file=sys.stderr)
+        return 1
+    for line in result:
+        print(line)
     ok, message = hostops.run_command(
-        hostops.update_instance_cmd(args.main_script, args.instance),
+        ["/bin/bash", str(args.main_script), "update", "--instance", args.instance, "--hooks-only"],
         timeout=900,
     )
     if not ok and message:

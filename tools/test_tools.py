@@ -29,7 +29,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import cpuplan, hostctl, hostops, instanceenv
+from shared import cpuplan, hostctl, hostops, instanceenv, updatecore
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -298,6 +298,34 @@ class InstanceEnvTests(unittest.TestCase):
             self.assertEqual(record["game_label"], "Enshrouded")
             self.assertEqual(record["game_binary"], "enshrouded_server.exe")
             self.assertEqual(record["game_service"], "enshrouded-server-enshrouded2")
+
+
+class UpdateCoreTests(unittest.TestCase):
+
+    def test_runtime_src_dir_prefers_runtime_subdir(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            runtime = root / "runtime"
+            runtime.mkdir()
+            (runtime / "app.py").write_text("", encoding="utf-8")
+            self.assertEqual(updatecore.runtime_src_dir(root), runtime)
+
+    def test_run_core_update_requires_existing_app_dir(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "runtime").mkdir()
+            (root / "runtime" / "app.py").write_text("", encoding="utf-8")
+            cfg = root / "deploy_config.env"
+            cfg.write_text(
+                'INSTANCE_ID="valheim2"\n'
+                'GAME_ID="valheim"\n'
+                'APP_DIR="/tmp/does-not-exist-gc"\n'
+                'SYS_USER="root"\n',
+                encoding="utf-8",
+            )
+            ok, message = updatecore.run_core_update(cfg, root)
+            self.assertFalse(ok)
+            self.assertIn("APP_DIR introuvable", message)
 
 
 class HostOpsTests(unittest.TestCase):
