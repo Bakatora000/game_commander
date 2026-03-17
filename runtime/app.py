@@ -863,6 +863,16 @@ if GAME_ID == 'satisfactory':
                 payload.get('client_password', ''),
             )
             return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/satisfactory/server-info', methods=['POST'])
+        @auth.require_auth
+        @auth.require_perm('manage_config')
+        def api_satisfactory_server_info():
+            payload = request.get_json() or {}
+            data, err = _sc.get_admin_server_info(
+                payload.get('current_admin_password', ''),
+            )
+            return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
     except ImportError as e:
         print(f'[WARN] config Satisfactory non chargé: {e}')
 

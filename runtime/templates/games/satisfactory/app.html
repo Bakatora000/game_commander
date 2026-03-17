@@ -79,7 +79,10 @@
     </div>
     <div class="config-row">
       <label class="config-label">Mot de passe admin actuel</label>
-      <input class="config-input" type="password" id="satCurrentAdminPassword" placeholder="Mot de passe admin actuel">
+      <div class="config-inline-actions">
+        <input class="config-input" type="password" id="satCurrentAdminPassword" placeholder="Mot de passe admin actuel">
+        <button class="btn-primary btn-sm" id="btnSatisfactoryRefreshInfo" data-requires-perm="manage_config">Lire les infos serveur</button>
+      </div>
     </div>
     <div class="config-row">
       <label class="config-label">Renommer le serveur</label>
@@ -136,6 +139,15 @@ function setSatisfactoryStatus(data) {
   } else if (claimBtn) {
     claimBtn.title = '';
     claimBtn.classList.remove('btn-disabled');
+  }
+}
+
+function applySatisfactoryServerInfo(data) {
+  const currentServerNameEl = document.getElementById('satCurrentServerName');
+  const currentSessionNameEl = document.getElementById('satCurrentSessionName');
+  if (currentServerNameEl && data.server_name) currentServerNameEl.textContent = data.server_name;
+  if (currentSessionNameEl && typeof data.active_session_name === 'string') {
+    currentSessionNameEl.textContent = data.active_session_name || 'Aucune session active détectée';
   }
 }
 
@@ -200,6 +212,22 @@ document.getElementById('btnSatisfactoryClientPassword')?.addEventListener('clic
     current_admin_password: currentAdminPassword,
     client_password: clientPassword,
   }, 'Mot de passe joueur mis à jour');
+});
+
+document.getElementById('btnSatisfactoryRefreshInfo')?.addEventListener('click', async () => {
+  const currentAdminPassword = document.getElementById('satCurrentAdminPassword')?.value || '';
+  const r = await fetch(`${PREFIX}/api/satisfactory/server-info`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ current_admin_password: currentAdminPassword }),
+  }).catch(() => null);
+  const data = await r?.json().catch(() => ({})) || {};
+  if (!r?.ok) {
+    showToast(data.error || 'Erreur Satisfactory', 'error');
+    return;
+  }
+  applySatisfactoryServerInfo(data);
+  showToast(data.message || 'Infos serveur rechargées', 'success');
 });
 </script>
 {% endblock %}

@@ -107,6 +107,24 @@ def _read_public_server_info():
     return info
 
 
+def _read_admin_server_info(password):
+    token, err = _admin_session(password)
+    if err:
+        return None, err
+    info = {
+        'server_name': '',
+        'active_session_name': '',
+    }
+    payload, err = _api_call('QueryServerState', token=token)
+    if not err and payload:
+        info['active_session_name'] = _extract_active_session_name(payload)
+        info['server_name'] = _extract_server_name(payload) or info['server_name']
+    payload, err = _api_call('GetServerOptions', token=token)
+    if not err and payload:
+        info['server_name'] = _extract_server_name(payload) or info['server_name']
+    return info, None
+
+
 def _passwordless_login():
     payload, err = _api_call('PasswordlessLogin', {'MinimumPrivilegeLevel': 'InitialAdmin'})
     if err:
@@ -258,4 +276,15 @@ def set_client_password(current_admin_password, client_password):
         return None, err
     return {
         'message': 'Mot de passe joueur mis à jour' if client_password else 'Mot de passe joueur supprimé',
+    }, None
+
+
+def get_admin_server_info(current_admin_password):
+    info, err = _read_admin_server_info(current_admin_password)
+    if err:
+        return None, err
+    return {
+        'server_name': info.get('server_name', ''),
+        'active_session_name': info.get('active_session_name', ''),
+        'message': 'Infos serveur rechargées',
     }, None

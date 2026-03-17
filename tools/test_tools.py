@@ -629,6 +629,23 @@ class SatisfactoryConfigTests(unittest.TestCase):
         self.assertIsNone(err)
         self.assertIn('supprimé', data['message'])
 
+    def test_satisfactory_get_admin_server_info(self):
+        app = Flask(__name__)
+        app.config['GAME'] = {'server': {'port': 7777}}
+        with app.app_context():
+            orig_reader = satisfactory_config._read_admin_server_info
+            try:
+                satisfactory_config._read_admin_server_info = lambda password: (
+                    {'server_name': 'TestSatis', 'active_session_name': 'Factory1'},
+                    None,
+                )
+                data, err = satisfactory_config.get_admin_server_info('secret123')
+            finally:
+                satisfactory_config._read_admin_server_info = orig_reader
+        self.assertIsNone(err)
+        self.assertEqual(data['server_name'], 'TestSatis')
+        self.assertEqual(data['active_session_name'], 'Factory1')
+
 
 class ServerCpuMonitorTests(unittest.TestCase):
 
