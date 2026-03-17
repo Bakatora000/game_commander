@@ -2,6 +2,21 @@
 
 {% block fonts %}family=Rajdhani:wght@400;500;600&family=Inter:wght@400;500;600{% endblock %}
 {% block sidebar_logo %}🏭{% endblock %}
+{% block extra_head %}
+<style>
+  .config-inline-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: .6rem;
+    align-items: center;
+  }
+  @media (max-width: 720px) {
+    .config-inline-actions {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+{% endblock %}
 
 {% block dashboard_extra %}
 <div class="panel">
@@ -9,14 +24,166 @@
     <span class="panel-title">Serveur Satisfactory</span>
   </div>
   <p class="config-note">
-    Version initiale du Commander Satisfactory : console, fichiers et sauvegardes sont disponibles.
-    La configuration avancée et le suivi des joueurs viendront ensuite.
+    Le claim et les mots de passe natifs passent par l’API HTTPS du serveur Satisfactory.
+    Si le serveur n’est pas encore revendiqué, tu peux le faire ici sans repasser par le client du jeu.
   </p>
+</div>
+{% endblock %}
+
+{% block config_tab %}
+<div class="panel config-panel" id="satisfactoryClaimPanel">
+  <div class="panel-header">
+    <span class="panel-title">Administration Satisfactory</span>
+  </div>
+  <div class="config-fields">
+    <div class="config-row">
+      <label class="config-label">État du serveur<span class="config-help">Statut du claim Satisfactory</span></label>
+      <div>
+        <div id="satisfactoryClaimStatus" class="save-link static">Chargement…</div>
+        <div id="satisfactoryClaimMessage" class="backups-meta"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel config-panel">
+  <div class="panel-header">
+    <span class="panel-title">Revendiquer le serveur</span>
+    <button class="btn-primary btn-sm" id="btnSatisfactoryClaim" data-requires-perm="manage_config">Revendiquer</button>
+  </div>
+  <div class="config-fields">
+    <div class="config-row">
+      <label class="config-label">Nom du serveur</label>
+      <input class="config-input" type="text" id="satClaimServerName" placeholder="Mon serveur Satisfactory">
+    </div>
+    <div class="config-row">
+      <label class="config-label">Mot de passe admin</label>
+      <input class="config-input" type="password" id="satClaimAdminPassword" placeholder="Mot de passe admin">
+    </div>
+  </div>
+  <p class="config-note">À utiliser seulement tant que le serveur n’est pas encore revendiqué.</p>
+</div>
+
+<div class="panel config-panel">
+  <div class="panel-header">
+    <span class="panel-title">Serveur revendiqué</span>
+  </div>
+  <div class="config-fields">
+    <div class="config-row">
+      <label class="config-label">Mot de passe admin actuel</label>
+      <input class="config-input" type="password" id="satCurrentAdminPassword" placeholder="Mot de passe admin actuel">
+    </div>
+    <div class="config-row">
+      <label class="config-label">Renommer le serveur</label>
+      <div class="config-inline-actions">
+        <input class="config-input" type="text" id="satServerName" placeholder="Nouveau nom du serveur">
+        <button class="btn-primary btn-sm" id="btnSatisfactoryRename" data-requires-perm="manage_config">Renommer</button>
+      </div>
+    </div>
+    <div class="config-row">
+      <label class="config-label">Nouveau mot de passe admin</label>
+      <div class="config-inline-actions">
+        <input class="config-input" type="password" id="satNewAdminPassword" placeholder="Nouveau mot de passe admin">
+        <button class="btn-primary btn-sm" id="btnSatisfactoryAdminPassword" data-requires-perm="manage_config">Mettre à jour</button>
+      </div>
+    </div>
+    <div class="config-row">
+      <label class="config-label">Mot de passe joueur</label>
+      <div class="config-inline-actions">
+        <input class="config-input" type="password" id="satClientPassword" placeholder="Vide = pas de mot de passe joueur">
+        <button class="btn-primary btn-sm" id="btnSatisfactoryClientPassword" data-requires-perm="manage_config">Appliquer</button>
+      </div>
+    </div>
+  </div>
+  <p class="config-note">Le mot de passe admin actuel est requis pour les opérations sur un serveur déjà revendiqué.</p>
 </div>
 {% endblock %}
 
 {% block game_scripts %}
 <script>
-// V1 Satisfactory : pas encore de panneau spécifique.
+async function loadConfig() {
+  await loadSatisfactoryStatus();
+}
+
+function setSatisfactoryStatus(data) {
+  const statusEl = document.getElementById('satisfactoryClaimStatus');
+  const messageEl = document.getElementById('satisfactoryClaimMessage');
+  const claimBtn = document.getElementById('btnSatisfactoryClaim');
+  const claimPanel = document.getElementById('satisfactoryClaimPanel');
+  if (statusEl) statusEl.textContent = data.status_label || 'Inconnu';
+  if (messageEl) messageEl.textContent = data.message || '';
+  if (claimPanel) claimPanel.style.display = data.claimed === true ? 'none' : '';
+  if (claimBtn) claimBtn.disabled = data.claimed === true;
+  if (claimBtn && data.claimed === true) {
+    claimBtn.title = 'Le serveur est déjà revendiqué';
+    claimBtn.classList.add('btn-disabled');
+  } else if (claimBtn) {
+    claimBtn.title = '';
+    claimBtn.classList.remove('btn-disabled');
+  }
+}
+
+async function loadSatisfactoryStatus() {
+  const r = await fetch(`${PREFIX}/api/satisfactory/status`).catch(() => null);
+  if (!r?.ok) {
+    setSatisfactoryStatus({status_label: 'Injoignable', message: 'Impossible de joindre l’API du serveur'});
+    return;
+  }
+  const data = await r.json();
+  setSatisfactoryStatus(data);
+}
+
+async function postSatisfactory(path, payload, successMsg) {
+  const r = await fetch(`${PREFIX}${path}`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload),
+  }).catch(() => null);
+  const data = await r?.json().catch(() => ({})) || {};
+  if (!r?.ok) {
+    showToast(data.error || 'Erreur Satisfactory', 'error');
+    return false;
+  }
+  showToast(data.message || successMsg, 'success');
+  await loadSatisfactoryStatus();
+  return true;
+}
+
+document.getElementById('btnSatisfactoryClaim')?.addEventListener('click', async () => {
+  const serverName = document.getElementById('satClaimServerName')?.value || '';
+  const adminPassword = document.getElementById('satClaimAdminPassword')?.value || '';
+  await postSatisfactory('/api/satisfactory/claim', {
+    server_name: serverName,
+    admin_password: adminPassword,
+  }, 'Serveur revendiqué');
+});
+
+document.getElementById('btnSatisfactoryRename')?.addEventListener('click', async () => {
+  const currentAdminPassword = document.getElementById('satCurrentAdminPassword')?.value || '';
+  const serverName = document.getElementById('satServerName')?.value || '';
+  await postSatisfactory('/api/satisfactory/rename', {
+    current_admin_password: currentAdminPassword,
+    server_name: serverName,
+  }, 'Nom du serveur mis à jour');
+});
+
+document.getElementById('btnSatisfactoryAdminPassword')?.addEventListener('click', async () => {
+  const currentAdminPassword = document.getElementById('satCurrentAdminPassword')?.value || '';
+  const newAdminPassword = document.getElementById('satNewAdminPassword')?.value || '';
+  const ok = await postSatisfactory('/api/satisfactory/admin-password', {
+    current_admin_password: currentAdminPassword,
+    new_admin_password: newAdminPassword,
+  }, 'Mot de passe admin mis à jour');
+  if (ok) document.getElementById('satNewAdminPassword').value = '';
+});
+
+document.getElementById('btnSatisfactoryClientPassword')?.addEventListener('click', async () => {
+  const currentAdminPassword = document.getElementById('satCurrentAdminPassword')?.value || '';
+  const clientPassword = document.getElementById('satClientPassword')?.value || '';
+  await postSatisfactory('/api/satisfactory/client-password', {
+    current_admin_password: currentAdminPassword,
+    client_password: clientPassword,
+  }, 'Mot de passe joueur mis à jour');
+});
 </script>
 {% endblock %}

@@ -808,6 +808,62 @@ if GAME_ID == 'terraria':
     except ImportError as e:
         print(f'[WARN] worlds Terraria non chargé: {e}')
 
+if GAME_ID == 'satisfactory':
+    try:
+        import games.satisfactory.config as _sc
+
+        @app.route(f'{PREFIX}/api/satisfactory/status', methods=['GET'])
+        @auth.require_auth
+        def api_satisfactory_status():
+            data, err = _sc.get_claim_status()
+            return jsonify(data) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/satisfactory/claim', methods=['POST'])
+        @auth.require_auth
+        @auth.require_perm('manage_config')
+        def api_satisfactory_claim():
+            payload = request.get_json() or {}
+            data, err = _sc.claim_server(
+                payload.get('server_name', ''),
+                payload.get('admin_password', ''),
+            )
+            return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/satisfactory/rename', methods=['POST'])
+        @auth.require_auth
+        @auth.require_perm('manage_config')
+        def api_satisfactory_rename():
+            payload = request.get_json() or {}
+            data, err = _sc.rename_server(
+                payload.get('current_admin_password', ''),
+                payload.get('server_name', ''),
+            )
+            return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/satisfactory/admin-password', methods=['POST'])
+        @auth.require_auth
+        @auth.require_perm('manage_config')
+        def api_satisfactory_admin_password():
+            payload = request.get_json() or {}
+            data, err = _sc.set_admin_password(
+                payload.get('current_admin_password', ''),
+                payload.get('new_admin_password', ''),
+            )
+            return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+
+        @app.route(f'{PREFIX}/api/satisfactory/client-password', methods=['POST'])
+        @auth.require_auth
+        @auth.require_perm('manage_config')
+        def api_satisfactory_client_password():
+            payload = request.get_json() or {}
+            data, err = _sc.set_client_password(
+                payload.get('current_admin_password', ''),
+                payload.get('client_password', ''),
+            )
+            return jsonify({'ok': True, **data}) if not err else (jsonify({'error': err}), 400)
+    except ImportError as e:
+        print(f'[WARN] config Satisfactory non chargé: {e}')
+
 if minecraft_admins_module is not None:
     @app.route(f'{PREFIX}/api/admins', methods=['GET'])
     @auth.require_auth

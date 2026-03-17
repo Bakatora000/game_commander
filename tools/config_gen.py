@@ -83,7 +83,7 @@ def cmd_game_json(args):
         },
         "features": {
             "mods":    (game_id == "valheim" and bool(args.bepinex_path)) or game_id == "minecraft-fabric",
-            "config":  game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria", "soulmask"),
+            "config":  game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria", "soulmask", "satisfactory"),
             "console": True,
             "players": game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria", "soulmask"),
             "saves":   game_id in ("valheim", "enshrouded", "minecraft", "minecraft-fabric", "terraria", "soulmask", "satisfactory"),
@@ -143,7 +143,7 @@ def cmd_game_json(args):
     elif game_id == "satisfactory":
         game["permissions"] = [
             "start_server", "stop_server", "restart_server",
-            "manage_saves", "console", "manage_users",
+            "manage_config", "manage_saves", "console", "manage_users",
         ]
     else:
         game["permissions"] = [

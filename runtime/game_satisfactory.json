@@ -20,7 +20,7 @@
   },
   "features": {
     "mods": false,
-    "config": false,
+    "config": true,
     "console": true,
     "players": false,
     "saves": true
@@ -29,6 +29,7 @@
     "start_server",
     "stop_server",
     "restart_server",
+    "manage_config",
     "manage_saves",
     "console",
     "manage_users"

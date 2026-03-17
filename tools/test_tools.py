@@ -47,6 +47,7 @@ from runtime.games.terraria import config as terraria_config
 from runtime.games.terraria import admins as terraria_admins
 from runtime.games.terraria import worlds as terraria_worlds
 from runtime.games.terraria import players as terraria_players
+from runtime.games.satisfactory import config as satisfactory_config
 from runtime.games.valheim import world_modifiers as valheim_world_modifiers
 
 
@@ -509,12 +510,88 @@ class ConfigGenGameJsonTests(unittest.TestCase):
         data = json.loads(Path(out).read_text())
         self.assertEqual(data["id"], "satisfactory")
         self.assertEqual(data["server"]["binary"], "FactoryServer.sh")
-        self.assertFalse(data["features"]["config"])
+        self.assertTrue(data["features"]["config"])
         self.assertFalse(data["features"]["players"])
         self.assertTrue(data["features"]["saves"])
         self.assertEqual(data["theme"]["name"], "enshrouded")
         self.assertEqual(data["server"]["query_port"], 8888)
         self.assertEqual(data["steamcmd"]["app_id"], "1690800")
+        self.assertIn("manage_config", data["permissions"])
+
+
+class SatisfactoryConfigTests(unittest.TestCase):
+
+    def test_satisfactory_status_unclaimed(self):
+        app = Flask(__name__)
+        app.config['GAME'] = {'server': {'port': 7777}}
+        with app.app_context():
+            original = satisfactory_config._passwordless_login
+            try:
+                satisfactory_config._passwordless_login = lambda: ('tok', None)
+                data, err = satisfactory_config.get_claim_status()
+            finally:
+                satisfactory_config._passwordless_login = original
+        self.assertIsNone(err)
+        self.assertTrue(data['reachable'])
+        self.assertFalse(data['claimed'])
+
+    def test_satisfactory_status_claimed(self):
+        app = Flask(__name__)
+        app.config['GAME'] = {'server': {'port': 7777}}
+        with app.app_context():
+            original = satisfactory_config._passwordless_login
+            try:
+                satisfactory_config._passwordless_login = lambda: (None, 'Server already claimed')
+                data, err = satisfactory_config.get_claim_status()
+            finally:
+                satisfactory_config._passwordless_login = original
+        self.assertIsNone(err)
+        self.assertTrue(data['reachable'])
+        self.assertTrue(data['claimed'])
+
+    def test_satisfactory_claim_requires_fields(self):
+        app = Flask(__name__)
+        app.config['GAME'] = {'server': {'port': 7777}}
+        with app.app_context():
+            data, err = satisfactory_config.claim_server('', '')
+        self.assertIsNone(data)
+        self.assertIn('Nom du serveur requis', err)
+
+    def test_satisfactory_claim_server(self):
+        app = Flask(__name__)
+        app.config['GAME'] = {'server': {'port': 7777}}
+        with app.app_context():
+            orig_login = satisfactory_config._passwordless_login
+            orig_call = satisfactory_config._api_call
+            try:
+                satisfactory_config._passwordless_login = lambda: ('tok', None)
+                satisfactory_config._api_call = lambda function_name, data=None, token=None, timeout=8: (
+                    ({'data': {'serverName': data.get('ServerName')}}, None)
+                    if function_name == 'ClaimServer' and token == 'tok'
+                    else ({}, None)
+                )
+                data, err = satisfactory_config.claim_server('Mon usine', 'secret123')
+            finally:
+                satisfactory_config._passwordless_login = orig_login
+                satisfactory_config._api_call = orig_call
+        self.assertIsNone(err)
+        self.assertEqual(data['server_name'], 'Mon usine')
+
+    def test_satisfactory_set_client_password(self):
+        app = Flask(__name__)
+        app.config['GAME'] = {'server': {'port': 7777}}
+        with app.app_context():
+            orig_session = satisfactory_config._admin_session
+            orig_call = satisfactory_config._api_call
+            try:
+                satisfactory_config._admin_session = lambda password: ('tok', None)
+                satisfactory_config._api_call = lambda function_name, data=None, token=None, timeout=8: ({}, None)
+                data, err = satisfactory_config.set_client_password('adminpass', '')
+            finally:
+                satisfactory_config._admin_session = orig_session
+                satisfactory_config._api_call = orig_call
+        self.assertIsNone(err)
+        self.assertIn('supprimé', data['message'])
 
     def test_steamcmd_section(self):
         data = self._gen_valheim()
