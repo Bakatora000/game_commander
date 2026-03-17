@@ -50,12 +50,13 @@ def cmd_update_instance(args: argparse.Namespace) -> int:
         return 1
     for line in hooks:
         print(line)
-    ok, hub = hubsync.sync_hub_service(config_file, Path(args.main_script).resolve().parent)
-    if not ok:
-        print(hub, file=sys.stderr)
-        return 1
-    for line in hub:
-        print(line)
+    if not args.skip_hub_sync:
+        ok, hub = hubsync.sync_hub_service(config_file, Path(args.main_script).resolve().parent)
+        if not ok:
+            print(hub, file=sys.stderr)
+            return 1
+        for line in hub:
+            print(line)
     return 0
 
 
@@ -138,6 +139,7 @@ def build_parser() -> argparse.ArgumentParser:
     update = sub.add_parser("update-instance")
     update.add_argument("--main-script", required=True, type=_existing_path)
     update.add_argument("--instance", required=True)
+    update.add_argument("--skip-hub-sync", action="store_true")
     update.set_defaults(func=cmd_update_instance)
 
     redeploy = sub.add_parser("redeploy-instance")

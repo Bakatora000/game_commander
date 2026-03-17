@@ -566,6 +566,31 @@ class HostCliTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertIn("Répartition CPU recalculée", stdout.getvalue())
 
+    def test_update_instance_can_skip_hub_sync(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            inst = root / "game-commander-minecraft-fabric"
+            inst.mkdir()
+            (inst / "deploy_config.env").write_text(
+                'INSTANCE_ID="minecraft-fabric"\nGAME_ID="minecraft-fabric"\n',
+                encoding="utf-8",
+            )
+            from tools import host_cli
+            with mock.patch.object(hostctl, "resolve_instance_config", return_value=inst / "deploy_config.env"), \
+                 mock.patch.object(updatecore, "run_core_update", return_value=(True, ["core ok"])), \
+                 mock.patch.object(updatehooks, "run_post_update_hooks", return_value=(True, ["hooks ok"])), \
+                 mock.patch.object(hubsync, "sync_hub_service") as sync_hub, \
+                 mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                rc = host_cli.main([
+                    "update-instance",
+                    "--main-script", str(ROOT_DIR / "game_commander.sh"),
+                    "--instance", "minecraft-fabric",
+                    "--skip-hub-sync",
+                ])
+            self.assertEqual(rc, 0)
+            self.assertFalse(sync_hub.called)
+            self.assertIn("core ok", stdout.getvalue())
+
     def test_inject_missing_file(self):
         """Retourne 1 si le fichier n'existe pas."""
         rc = nginx_manager.cmd_inject(make_args(

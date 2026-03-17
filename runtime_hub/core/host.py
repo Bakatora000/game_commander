@@ -191,7 +191,7 @@ def run_instance_update(instance_name: str) -> tuple[bool, str, dict | None]:
     if not host_cli.is_file():
         return False, "CLI hôte introuvable", None
     ok, message = hostops.run_command(
-        ["sudo", "/usr/bin/python3", str(host_cli), "update-instance", "--main-script", str(script_path), "--instance", instance_name],
+        ["sudo", "/usr/bin/python3", str(host_cli), "update-instance", "--main-script", str(script_path), "--instance", instance_name, "--skip-hub-sync"],
         timeout=900,
     )
     payload = get_hub_payload()
