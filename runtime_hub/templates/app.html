@@ -395,15 +395,21 @@
             } catch (_err) {
               data = {};
             }
-            const fallback = response.ok
+          const fallback = response.ok
               ? 'Action lancée'
               : (raw && !raw.toLowerCase().startsWith('<!doctype') && !raw.toLowerCase().startsWith('<html')
                 ? raw
                 : 'Erreur serveur Hub');
             setFeedback(`feedback-instance-${instance}`, data.message || fallback, response.ok);
+            if (!document.getElementById('globalConsolePanel').hidden) {
+              await loadGlobalConsole();
+            }
             setTimeout(load, response.ok ? 1200 : 0);
           } catch (_err) {
             setFeedback(`feedback-instance-${instance}`, 'Erreur réseau ou Hub indisponible', false);
+            if (!document.getElementById('globalConsolePanel').hidden) {
+              await loadGlobalConsole();
+            }
           } finally {
             cardButtons.forEach((btn) => { btn.disabled = false; });
           }
@@ -539,6 +545,9 @@
       });
       const data = await response.json().catch(() => ({}));
       setFeedback('rebalanceFeedback', data.message || (response.ok ? 'Rebalance lancé' : 'Erreur'), response.ok);
+      if (!document.getElementById('globalConsolePanel').hidden) {
+        await loadGlobalConsole();
+      }
       button.disabled = false;
       if (response.ok) {
         setTimeout(load, 1500);
