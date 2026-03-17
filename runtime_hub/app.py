@@ -201,5 +201,18 @@ def api_rebalance():
     return jsonify({"ok": ok, "message": message, "payload": payload}), status
 
 
+@app.route(f"{PREFIX}/api/deploy", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("manage_lifecycle")
+def api_deploy():
+    data = request.get_json() or {}
+    try:
+        ok, message, payload = host.run_instance_deploy(data)
+    except Exception as exc:
+        return jsonify({"ok": False, "message": f"Erreur Hub pendant le déploiement : {exc}"}), 500
+    status = 200 if ok else 400
+    return jsonify({"ok": ok, "message": message, "payload": payload}), status
+
+
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=int(os.environ.get("GC_HUB_PORT", "5090")))

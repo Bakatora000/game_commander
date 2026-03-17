@@ -871,6 +871,10 @@ PYEOF
 
 deploy_step_hub_service() {
     hdr "ÉTAPE 8B : Hub Admin"
+    if [[ "${GC_SKIP_HUB_SERVICE:-0}" == "1" ]]; then
+        info "Hub Admin conservé — synchro/redémarrage ignorés pour cette exécution"
+        return
+    fi
     local hub_out=""
     if hub_out="$(python3 "$SCRIPT_DIR/shared/hubsync.py" sync-values \
         --sys-user "$SYS_USER" \

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import pwd
 import sys
 import time
 from datetime import datetime
@@ -112,6 +113,10 @@ def _instance_entry(instance_name: str) -> dict | None:
 
 def _instance_service(instance_name: str) -> str | None:
     return _load_instance_env(instance_name).get("GAME_SERVICE")
+
+
+def _default_sys_user() -> str:
+    return pwd.getpwuid(_main_script_path().stat().st_uid).pw_name
 
 
 def _build_instance_card(inst: dict, cpu_monitor: dict, alerts_by_instance: dict, cpu_instances: dict) -> dict:
@@ -277,6 +282,47 @@ def run_instance_uninstall(instance_name: str) -> tuple[bool, str, dict]:
     if ok:
         return True, f"Instance {instance_name} désinstallée", payload
     return False, message or "Échec désinstallation", payload
+
+
+def run_instance_deploy(data: dict) -> tuple[bool, str, dict]:
+    game_id = (data.get("game_id") or "").strip()
+    instance_name = (data.get("instance") or "").strip()
+    domain = (data.get("domain") or "").strip()
+    admin_password = data.get("admin_password") or ""
+    if not game_id or not instance_name or not domain or not admin_password:
+        return False, "Jeu, identifiant, domaine et mot de passe admin sont requis", get_hub_payload()
+    if _instance_entry(instance_name) or _instance_config_file(instance_name).is_file():
+        return False, "Une instance avec cet identifiant existe déjà", get_hub_payload()
+    script_path = _main_script_path()
+    if not script_path.is_file():
+        return False, "Script principal introuvable", get_hub_payload()
+    host_cli = _host_cli_path()
+    if not host_cli.is_file():
+        return False, "CLI hôte introuvable", get_hub_payload()
+    cmd = [
+        "sudo", "/usr/bin/python3", str(host_cli), "deploy-instance",
+        "--main-script", str(script_path),
+        "--game-id", game_id,
+        "--instance", instance_name,
+        "--domain", domain,
+        "--admin-login", (data.get("admin_login") or "admin").strip() or "admin",
+        "--admin-password", admin_password,
+        "--sys-user", (data.get("sys_user") or _default_sys_user()).strip() or _default_sys_user(),
+    ]
+    if data.get("server_name"):
+        cmd.extend(["--server-name", str(data.get("server_name"))])
+    if data.get("server_password"):
+        cmd.extend(["--server-password", str(data.get("server_password"))])
+    if data.get("server_port"):
+        cmd.extend(["--server-port", str(data.get("server_port"))])
+    if data.get("max_players"):
+        cmd.extend(["--max-players", str(data.get("max_players"))])
+    ok, message = hostops.run_command(cmd, timeout=1800)
+    _append_action_log(instance_name, "deploy", ok, message or f"Instance {instance_name} déployée")
+    payload = get_hub_payload()
+    if ok:
+        return True, f"Instance {instance_name} déployée", payload
+    return False, message or "Échec déploiement", payload
 
 
 def run_rebalance(restart: bool = False) -> tuple[bool, str, dict]:

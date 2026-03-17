@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import argparse
+import os
+import pwd
+import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from shared import cpuplan, hostctl, hostops, hubsync, redeploycore, uninstallcore, updatecore, updatehooks
+from shared import cpuplan, deployenv, hostctl, hostops, hubsync, redeploycore, uninstallcore, updatecore, updatehooks
 
 
 def _existing_path(value: str) -> Path:
@@ -67,6 +71,57 @@ def cmd_redeploy_instance(args: argparse.Namespace) -> int:
         return 1
     for line in result:
         print(line)
+    return 0
+
+
+def _default_sys_user(main_script: Path) -> str:
+    return pwd.getpwuid(main_script.stat().st_uid).pw_name
+
+
+def _write_temp_deploy_config(env: dict[str, str]) -> Path:
+    fd, path_str = tempfile.mkstemp(prefix="gc-hub-deploy-", suffix=".env")
+    path = Path(path_str)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        for key, value in env.items():
+            fh.write(f'{key}="{str(value).replace(chr(34), r"\"")}"\n')
+    return path
+
+
+def cmd_deploy_instance(args: argparse.Namespace) -> int:
+    main_script = Path(args.main_script).resolve()
+    env = dict(deployenv.BASE_DEFAULTS)
+    env["GAME_ID"] = args.game_id
+    env.update(deployenv.GAME_DEFAULTS.get(args.game_id, {}))
+    env["INSTANCE_ID"] = args.instance
+    env["DOMAIN"] = args.domain
+    env["ADMIN_LOGIN"] = args.admin_login or "admin"
+    env["ADMIN_PASSWORD"] = args.admin_password
+    env["SYS_USER"] = args.sys_user or _default_sys_user(main_script)
+    env["SERVER_NAME"] = args.server_name or env.get("SERVER_NAME", "Mon Serveur")
+    if args.server_password:
+        env["SERVER_PASSWORD"] = args.server_password
+    if args.server_port:
+        env["SERVER_PORT"] = str(args.server_port)
+    if args.max_players:
+        env["MAX_PLAYERS"] = str(args.max_players)
+    env["AUTO_CONFIRM"] = "true"
+
+    temp_config = _write_temp_deploy_config(env)
+    try:
+        result = subprocess.run(
+            ["sudo", "/bin/bash", str(main_script), "deploy", "--config", str(temp_config)],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "PYTHONUNBUFFERED": "1", "GC_SKIP_HUB_SERVICE": "1"},
+        )
+    finally:
+        temp_config.unlink(missing_ok=True)
+    if result.returncode != 0:
+        print((result.stderr or result.stdout or "Déploiement échoué").strip(), file=sys.stderr)
+        return 1
+    output = (result.stdout or "").strip()
+    if output:
+        print(output)
     return 0
 
 
@@ -146,6 +201,20 @@ def build_parser() -> argparse.ArgumentParser:
     redeploy.add_argument("--main-script", required=True, type=_existing_path)
     redeploy.add_argument("--config", required=True, type=_existing_path)
     redeploy.set_defaults(func=cmd_redeploy_instance)
+
+    deploy = sub.add_parser("deploy-instance")
+    deploy.add_argument("--main-script", required=True, type=_existing_path)
+    deploy.add_argument("--game-id", required=True)
+    deploy.add_argument("--instance", required=True)
+    deploy.add_argument("--domain", required=True)
+    deploy.add_argument("--admin-login", default="admin")
+    deploy.add_argument("--admin-password", required=True)
+    deploy.add_argument("--sys-user", default="")
+    deploy.add_argument("--server-name", default="")
+    deploy.add_argument("--server-password", default="")
+    deploy.add_argument("--server-port", default="")
+    deploy.add_argument("--max-players", default="")
+    deploy.set_defaults(func=cmd_deploy_instance)
 
     uninstall = sub.add_parser("uninstall-instance")
     uninstall.add_argument("--main-script", required=True, type=_existing_path)

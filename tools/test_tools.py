@@ -10,6 +10,7 @@ Usage :
 import json
 import io
 import os
+import pwd
 import sys
 import tempfile
 import time
@@ -1258,6 +1259,43 @@ class HubHostTests(unittest.TestCase):
             self.assertEqual(
                 run_mock.call_args.args[0],
                 ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "redeploy-instance", "--main-script", str(script_path), "--config", str(config_path)],
+            )
+
+    def test_run_instance_deploy_uses_host_cli(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({"instances": []}), encoding="utf-8")
+            script_path = root / "game_commander.sh"
+            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            with app.app_context(), \
+                 mock.patch.object(hostops, "run_command", return_value=(True, "")) as run_mock, \
+                 mock.patch.object(pwd, "getpwuid", return_value=types.SimpleNamespace(pw_name="vhserver")), \
+                 mock.patch.object(hub_host, "get_hub_payload", return_value={"instances": [{"name": "minecraft2"}], "monitor": {}}):
+                ok, message, payload = hub_host.run_instance_deploy({
+                    "game_id": "minecraft",
+                    "instance": "minecraft2",
+                    "domain": "gaming.example.com",
+                    "admin_login": "admin",
+                    "admin_password": "testtest01",
+                })
+            self.assertTrue(ok)
+            self.assertIn("déployée", message)
+            self.assertEqual(payload["instances"][0]["name"], "minecraft2")
+            self.assertEqual(
+                run_mock.call_args.args[0],
+                [
+                    "sudo", "/usr/bin/python3", str(root / "host_cli.py"), "deploy-instance",
+                    "--main-script", str(script_path),
+                    "--game-id", "minecraft",
+                    "--instance", "minecraft2",
+                    "--domain", "gaming.example.com",
+                    "--admin-login", "admin",
+                    "--admin-password", "testtest01",
+                    "--sys-user", "vhserver",
+                ],
             )
 
     def test_run_instance_uninstall_uses_noninteractive_flags(self):

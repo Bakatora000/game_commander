@@ -248,6 +248,52 @@
     </section>
 
     <section class="accounts-panel">
+      <div class="monitor-head">
+        <div>
+          <h2 class="section-title">Déployer une instance</h2>
+          <p class="section-subtitle">Déploiement rapide depuis le Hub avec les paramètres essentiels. Les réglages fins se font ensuite dans le Commander de l’instance.</p>
+        </div>
+        <button class="monitor-toggle" type="button" id="btnToggleDeployPanel">Déployer</button>
+      </div>
+      <div id="deployPanel" hidden>
+        <div class="accounts-grid">
+          <section class="card">
+            <label class="field-label" for="deployGame">Jeu</label>
+            <select class="field-input" id="deployGame">
+              <option value="minecraft">Minecraft Java</option>
+              <option value="minecraft-fabric">Minecraft Fabric</option>
+              <option value="valheim">Valheim</option>
+              <option value="enshrouded">Enshrouded</option>
+              <option value="terraria">Terraria</option>
+              <option value="satisfactory">Satisfactory</option>
+              <option value="soulmask">Soulmask</option>
+            </select>
+            <label class="field-label" for="deployInstance">Identifiant</label>
+            <input class="field-input" id="deployInstance" placeholder="minecraft2">
+            <label class="field-label" for="deployServerName">Nom du serveur</label>
+            <input class="field-input" id="deployServerName" placeholder="Mon Serveur Minecraft">
+            <label class="field-label" for="deployDomain">Domaine</label>
+            <input class="field-input" id="deployDomain" placeholder="gaming.expevay.net">
+          </section>
+          <section class="card">
+            <label class="field-label" for="deployAdminLogin">Admin instance</label>
+            <input class="field-input" id="deployAdminLogin" value="admin">
+            <label class="field-label" for="deployAdminPassword">Mot de passe admin</label>
+            <input class="field-input" id="deployAdminPassword" type="password">
+            <label class="field-label" for="deployServerPassword">Mot de passe serveur</label>
+            <input class="field-input" id="deployServerPassword" type="password" placeholder="optionnel">
+            <label class="field-label" for="deployServerPort">Port jeu</label>
+            <input class="field-input" id="deployServerPort" placeholder="laisser vide = défaut/auto">
+            <label class="field-label" for="deployMaxPlayers">Joueurs max</label>
+            <input class="field-input" id="deployMaxPlayers" placeholder="laisser vide = défaut">
+            <button class="primary-btn" type="button" id="btnDeployInstance">Lancer le déploiement</button>
+            <div class="feedback" id="deployFeedback"></div>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <section class="accounts-panel">
       <h2 class="section-title">Comptes Hub</h2>
       <p class="section-subtitle">Gestion des comptes administrateurs du Hub. Cette V1 prépare aussi le champ email pour une future réinitialisation par mail.</p>
       <div class="accounts-grid">
@@ -430,6 +476,49 @@
         output.textContent = 'Impossible de charger la console du Hub.';
       }
     }
+    async function deployInstance() {
+      const payload = {
+        game_id: document.getElementById('deployGame').value,
+        instance: document.getElementById('deployInstance').value.trim(),
+        server_name: document.getElementById('deployServerName').value.trim(),
+        domain: document.getElementById('deployDomain').value.trim(),
+        admin_login: document.getElementById('deployAdminLogin').value.trim(),
+        admin_password: document.getElementById('deployAdminPassword').value,
+        server_password: document.getElementById('deployServerPassword').value,
+        server_port: document.getElementById('deployServerPort').value.trim(),
+        max_players: document.getElementById('deployMaxPlayers').value.trim(),
+      };
+      if (!payload.instance || !payload.domain || !payload.admin_password) {
+        setFeedback('deployFeedback', 'Identifiant, domaine et mot de passe admin requis', false);
+        return;
+      }
+      if (!window.confirm(`Déployer ${payload.instance} (${payload.game_id}) ?`)) {
+        return;
+      }
+      const button = document.getElementById('btnDeployInstance');
+      button.disabled = true;
+      setFeedback('deployFeedback', 'Déploiement en cours…', true);
+      try {
+        const response = await fetch('{{ prefix }}/api/deploy', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json().catch(() => ({}));
+        setFeedback('deployFeedback', data.message || (response.ok ? 'Instance déployée' : 'Erreur'), response.ok);
+        if (!document.getElementById('globalConsolePanel').hidden) {
+          await loadGlobalConsole();
+        }
+        if (response.ok) {
+          setTimeout(load, 2000);
+        }
+      } catch (_err) {
+        setFeedback('deployFeedback', 'Erreur réseau ou Hub indisponible', false);
+      } finally {
+        button.disabled = false;
+      }
+    }
     function setFeedback(id, message, ok = false) {
       const el = document.getElementById(id);
       el.textContent = message || '';
@@ -555,6 +644,13 @@
     }
     document.querySelector('[data-action="rebalance"]').addEventListener('click', () => runRebalance(false));
     document.querySelector('[data-action="rebalance-restart"]').addEventListener('click', () => runRebalance(true));
+    document.getElementById('btnToggleDeployPanel').addEventListener('click', () => {
+      const panel = document.getElementById('deployPanel');
+      const hidden = panel.hidden;
+      panel.hidden = !hidden;
+      document.getElementById('btnToggleDeployPanel').textContent = hidden ? 'Masquer' : 'Déployer';
+    });
+    document.getElementById('btnDeployInstance').addEventListener('click', deployInstance);
     document.getElementById('btnToggleChangePassword').addEventListener('click', () => {
       const panel = document.getElementById('changePasswordPanel');
       const hidden = panel.hidden;
