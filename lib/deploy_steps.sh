@@ -1263,6 +1263,7 @@ Environment="GC_HUB_PORT=${hub_port}"
 Environment="GC_HUB_MANIFEST=${hub_manifest}"
 Environment="GC_HUB_CPU_MONITOR_STATE=${hub_cpu_state}"
 Environment="GC_HUB_MAIN_SCRIPT=${SCRIPT_DIR}/game_commander.sh"
+Environment="GC_HUB_HOST_CLI=${SCRIPT_DIR}/tools/host_cli.py"
 ExecStart=/usr/bin/python3 ${hub_app_dir}/app.py
 Restart=on-failure
 RestartSec=5
@@ -1274,13 +1275,14 @@ WantedBy=multi-user.target
 SVCEOF
 
     systemctl daemon-reload
-    cat > /etc/sudoers.d/game-commander-hub <<EOF
+cat > /etc/sudoers.d/game-commander-hub <<EOF
 # Game Commander — Hub actions
-${SYS_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SCRIPT_DIR}/game_commander.sh update --instance *
-${SYS_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SCRIPT_DIR}/game_commander.sh deploy --config *
-${SYS_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SCRIPT_DIR}/game_commander.sh uninstall --instance * --full --yes
-${SYS_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SCRIPT_DIR}/game_commander.sh rebalance
-${SYS_USER} ALL=(ALL) NOPASSWD: /bin/bash ${SCRIPT_DIR}/game_commander.sh rebalance --restart
+${SYS_USER} ALL=(ALL) NOPASSWD: /usr/bin/python3 ${SCRIPT_DIR}/tools/host_cli.py service-action --service * --action *
+${SYS_USER} ALL=(ALL) NOPASSWD: /usr/bin/python3 ${SCRIPT_DIR}/tools/host_cli.py update-instance --main-script * --instance *
+${SYS_USER} ALL=(ALL) NOPASSWD: /usr/bin/python3 ${SCRIPT_DIR}/tools/host_cli.py redeploy-instance --main-script * --config *
+${SYS_USER} ALL=(ALL) NOPASSWD: /usr/bin/python3 ${SCRIPT_DIR}/tools/host_cli.py uninstall-instance --main-script * --instance *
+${SYS_USER} ALL=(ALL) NOPASSWD: /usr/bin/python3 ${SCRIPT_DIR}/tools/host_cli.py rebalance --main-script *
+${SYS_USER} ALL=(ALL) NOPASSWD: /usr/bin/python3 ${SCRIPT_DIR}/tools/host_cli.py rebalance --main-script * --restart
 EOF
     chmod 440 /etc/sudoers.d/game-commander-hub
     if visudo -cf /etc/sudoers.d/game-commander-hub >/dev/null 2>&1; then

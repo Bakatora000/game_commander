@@ -27,6 +27,7 @@ app.config["PREFIX"] = PREFIX
 app.config["HUB_MANIFEST"] = os.environ.get("GC_HUB_MANIFEST", "/etc/nginx/game-commander-manifest.json")
 app.config["CPU_MONITOR_STATE"] = os.environ.get("GC_HUB_CPU_MONITOR_STATE", "/var/lib/game-commander/cpu-monitor.json")
 app.config["MAIN_SCRIPT"] = os.environ.get("GC_HUB_MAIN_SCRIPT", "/home/vhserver/gc/game_commander.sh")
+app.config["HOST_CLI"] = os.environ.get("GC_HUB_HOST_CLI", "/home/vhserver/gc/tools/host_cli.py")
 
 
 @app.context_processor

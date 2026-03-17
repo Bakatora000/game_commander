@@ -5,8 +5,6 @@ Agrège les statuts d'instances et l'état du monitor CPU.
 from __future__ import annotations
 
 import json
-import os
-import subprocess
 import sys
 import time
 from pathlib import Path
@@ -31,6 +29,10 @@ def _cpu_monitor_path() -> Path:
 
 def _main_script_path() -> Path:
     return Path(current_app.config["MAIN_SCRIPT"])
+
+
+def _host_cli_path() -> Path:
+    return Path(current_app.config["HOST_CLI"])
 
 
 def _load_manifest() -> dict:
@@ -174,7 +176,13 @@ def run_instance_service_action(instance_name: str, action: str) -> tuple[bool, 
     service = _instance_service(instance_name)
     if not service:
         return False, "Service introuvable pour cette instance", None
-    ok, message = hostops.run_command(hostops.service_action_cmd(service, action), timeout=120)
+    host_cli = _host_cli_path()
+    if not host_cli.is_file():
+        return False, "CLI hôte introuvable", None
+    ok, message = hostops.run_command(
+        ["sudo", "/usr/bin/python3", str(host_cli), "service-action", "--service", service, "--action", action],
+        timeout=120,
+    )
     payload = get_hub_payload()
     card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
     if ok:
@@ -189,7 +197,13 @@ def run_instance_update(instance_name: str) -> tuple[bool, str, dict | None]:
     script_path = _main_script_path()
     if not script_path.is_file():
         return False, "Script principal introuvable", None
-    ok, message = hostops.run_command(hostops.update_instance_cmd(script_path, instance_name), timeout=900)
+    host_cli = _host_cli_path()
+    if not host_cli.is_file():
+        return False, "CLI hôte introuvable", None
+    ok, message = hostops.run_command(
+        ["sudo", "/usr/bin/python3", str(host_cli), "update-instance", "--main-script", str(script_path), "--instance", instance_name],
+        timeout=900,
+    )
     payload = get_hub_payload()
     card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
     if ok:
@@ -204,10 +218,16 @@ def run_instance_redeploy(instance_name: str) -> tuple[bool, str, dict | None]:
     script_path = _main_script_path()
     if not script_path.is_file():
         return False, "Script principal introuvable", None
+    host_cli = _host_cli_path()
+    if not host_cli.is_file():
+        return False, "CLI hôte introuvable", None
     config_file = _instance_config_file(instance_name)
     if not config_file.is_file():
         return False, "deploy_config.env introuvable pour cette instance", None
-    ok, message = hostops.run_command(hostops.redeploy_instance_cmd(script_path, config_file), timeout=1200)
+    ok, message = hostops.run_command(
+        ["sudo", "/usr/bin/python3", str(host_cli), "redeploy-instance", "--main-script", str(script_path), "--config", str(config_file)],
+        timeout=1200,
+    )
     payload = get_hub_payload()
     card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
     if ok:
@@ -222,7 +242,13 @@ def run_instance_uninstall(instance_name: str) -> tuple[bool, str, dict]:
     script_path = _main_script_path()
     if not script_path.is_file():
         return False, "Script principal introuvable", get_hub_payload()
-    ok, message = hostops.run_command(hostops.uninstall_instance_cmd(script_path, instance_name), timeout=1200)
+    host_cli = _host_cli_path()
+    if not host_cli.is_file():
+        return False, "CLI hôte introuvable", get_hub_payload()
+    ok, message = hostops.run_command(
+        ["sudo", "/usr/bin/python3", str(host_cli), "uninstall-instance", "--main-script", str(script_path), "--instance", instance_name],
+        timeout=1200,
+    )
     payload = get_hub_payload()
     if ok:
         return True, f"Instance {instance_name} désinstallée", payload
@@ -233,7 +259,13 @@ def run_rebalance(restart: bool = False) -> tuple[bool, str, dict]:
     script_path = _main_script_path()
     if not script_path.is_file():
         return False, "Script principal introuvable", get_hub_payload()
-    ok, message = hostops.run_command(hostops.rebalance_cmd(script_path, restart=restart), timeout=900)
+    host_cli = _host_cli_path()
+    if not host_cli.is_file():
+        return False, "CLI hôte introuvable", get_hub_payload()
+    cmd = ["sudo", "/usr/bin/python3", str(host_cli), "rebalance", "--main-script", str(script_path)]
+    if restart:
+        cmd.append("--restart")
+    ok, message = hostops.run_command(cmd, timeout=900)
     payload = get_hub_payload()
     if ok:
         label = "Rebalance appliqué" if restart else "Rebalance recalculé"

@@ -870,6 +870,7 @@ class HubHostTests(unittest.TestCase):
         app.config["HUB_MANIFEST"] = str(manifest_path)
         app.config["CPU_MONITOR_STATE"] = str(root / "cpu.json")
         app.config["MAIN_SCRIPT"] = str(root / "game_commander.sh")
+        app.config["HOST_CLI"] = str(root / "host_cli.py")
         return app
 
     def test_run_instance_service_action_uses_systemctl(self):
@@ -882,15 +883,20 @@ class HubHostTests(unittest.TestCase):
             instance_dir = root / "game-commander-valheim2"
             instance_dir.mkdir()
             (instance_dir / "deploy_config.env").write_text('GAME_SERVICE="valheim-server-valheim2"\n', encoding="utf-8")
+            (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
             app = self._make_app(root, manifest_path)
             with app.app_context(), \
                  mock.patch.object(Path, "home", return_value=root), \
-                 mock.patch.object(hub_host, "_run_command", return_value=(True, "")), \
+                 mock.patch.object(hostops, "run_command", return_value=(True, "")) as run_mock, \
                  mock.patch.object(hub_host, "get_hub_payload", return_value={"instances": [{"name": "valheim2"}], "monitor": {}}):
                 ok, message, card = hub_host.run_instance_service_action("valheim2", "restart")
             self.assertTrue(ok)
-            self.assertIn("Restart", message)
+            self.assertIn("Redémarrage", message)
             self.assertEqual(card["name"], "valheim2")
+            self.assertEqual(
+                run_mock.call_args.args[0],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "service-action", "--service", "valheim-server-valheim2", "--action", "restart"],
+            )
 
     def test_run_instance_update_uses_main_script(self):
         with tempfile.TemporaryDirectory() as d:
@@ -901,17 +907,19 @@ class HubHostTests(unittest.TestCase):
             }), encoding="utf-8")
             script_path = root / "game_commander.sh"
             script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
             app = self._make_app(root, manifest_path)
             with app.app_context(), \
-                 mock.patch.object(hub_host, "_run_command", return_value=(True, "")) as run_mock, \
+                 mock.patch.object(hostops, "run_command", return_value=(True, "")) as run_mock, \
                  mock.patch.object(hub_host, "get_hub_payload", return_value={"instances": [{"name": "valheim2"}], "monitor": {}}):
                 ok, message, card = hub_host.run_instance_update("valheim2")
             self.assertTrue(ok)
             self.assertIn("mise à jour", message)
             self.assertEqual(card["name"], "valheim2")
-            cmd = run_mock.call_args.args[0]
-            self.assertEqual(cmd[:4], ["sudo", "/bin/bash", str(script_path), "update"])
-            self.assertEqual(cmd[-2:], ["--instance", "valheim2"])
+            self.assertEqual(
+                run_mock.call_args.args[0],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "update-instance", "--main-script", str(script_path), "--instance", "valheim2"],
+            )
 
     def test_run_instance_redeploy_uses_saved_config(self):
         with tempfile.TemporaryDirectory() as d:
@@ -922,6 +930,7 @@ class HubHostTests(unittest.TestCase):
             }), encoding="utf-8")
             script_path = root / "game_commander.sh"
             script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
             instance_dir = root / "game-commander-valheim2"
             instance_dir.mkdir()
             config_path = instance_dir / "deploy_config.env"
@@ -929,16 +938,16 @@ class HubHostTests(unittest.TestCase):
             app = self._make_app(root, manifest_path)
             with app.app_context(), \
                  mock.patch.object(Path, "home", return_value=root), \
-                 mock.patch.object(hub_host, "_run_command", return_value=(True, "")) as run_mock, \
+                 mock.patch.object(hostops, "run_command", return_value=(True, "")) as run_mock, \
                  mock.patch.object(hub_host, "get_hub_payload", return_value={"instances": [{"name": "valheim2"}], "monitor": {}}):
                 ok, message, card = hub_host.run_instance_redeploy("valheim2")
             self.assertTrue(ok)
             self.assertIn("redéployée", message)
             self.assertEqual(card["name"], "valheim2")
-            cmd = run_mock.call_args.args[0]
-            self.assertEqual(cmd[:4], ["sudo", "/bin/bash", str(script_path), "deploy"])
-            self.assertEqual(cmd[4], "--config")
-            self.assertEqual(cmd[5], str(config_path))
+            self.assertEqual(
+                run_mock.call_args.args[0],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "redeploy-instance", "--main-script", str(script_path), "--config", str(config_path)],
+            )
 
     def test_run_instance_uninstall_uses_noninteractive_flags(self):
         with tempfile.TemporaryDirectory() as d:
@@ -949,18 +958,18 @@ class HubHostTests(unittest.TestCase):
             }), encoding="utf-8")
             script_path = root / "game_commander.sh"
             script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
             app = self._make_app(root, manifest_path)
             with app.app_context(), \
-                 mock.patch.object(hub_host, "_run_command", return_value=(True, "")) as run_mock, \
+                 mock.patch.object(hostops, "run_command", return_value=(True, "")) as run_mock, \
                  mock.patch.object(hub_host, "get_hub_payload", return_value={"instances": [], "monitor": {}}):
                 ok, message, payload = hub_host.run_instance_uninstall("valheim2")
             self.assertTrue(ok)
             self.assertIn("désinstallée", message)
             self.assertEqual(payload["instances"], [])
-            cmd = run_mock.call_args.args[0]
             self.assertEqual(
-                cmd,
-                ["sudo", "/bin/bash", str(script_path), "uninstall", "--instance", "valheim2", "--full", "--yes"],
+                run_mock.call_args.args[0],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--main-script", str(script_path), "--instance", "valheim2"],
             )
 
     def test_get_hub_payload_reads_cpu_monitor_state(self):
