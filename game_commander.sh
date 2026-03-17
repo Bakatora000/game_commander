@@ -12,6 +12,7 @@
 #    sudo bash game_commander.sh uninstall --dry-run      # simulation
 #    sudo bash game_commander.sh status                   # état de toutes les instances
 #    sudo bash game_commander.sh update                   # resynchronise une instance
+#    sudo bash game_commander.sh rebalance                # recalcule l'affinité CPU
 # ═══════════════════════════════════════════════════════════════════════════════
 set -uo pipefail
 IFS=$'\n\t'
@@ -20,6 +21,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Chargement des modules ─────────────────────────────────────────────────────
 source "$SCRIPT_DIR/lib/helpers.sh"
+source "$SCRIPT_DIR/lib/cpu_affinity.sh"
 source "$SCRIPT_DIR/lib/nginx.sh"
 source "$SCRIPT_DIR/lib/cmd_status.sh"
 source "$SCRIPT_DIR/lib/deploy_helpers.sh"
@@ -31,6 +33,7 @@ source "$SCRIPT_DIR/lib/uninstall_orphans.sh"
 source "$SCRIPT_DIR/lib/cmd_deploy.sh"
 source "$SCRIPT_DIR/lib/cmd_uninstall.sh"
 source "$SCRIPT_DIR/lib/cmd_update.sh"
+source "$SCRIPT_DIR/lib/cmd_rebalance.sh"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # AIDE
@@ -52,6 +55,8 @@ show_help() {
     update                   Resynchroniser le runtime d'une instance existante
     update --instance ID     Mettre à jour une instance précise
     update --all             Met à jour toutes les instances
+    rebalance                Recalculer l'affinité CPU des instances gérées
+    rebalance --restart      Recalculer puis redémarrer les serveurs concernés
 
   MENU PRINCIPAL :
     [1] deploy     Nouvelle instance complète
@@ -59,6 +64,7 @@ show_help() {
     [3] uninstall  Retirer / nettoyer
     [4] status     Voir l'état
     [5] update     Propager les changements du dépôt
+    [6] rebalance  Répartir les serveurs sur les cœurs CPU
     [0] quit       Quitter
 
   EXEMPLES :
@@ -69,6 +75,7 @@ show_help() {
     sudo bash game_commander.sh uninstall
     sudo bash game_commander.sh status
     sudo bash game_commander.sh update --instance testfabric
+    sudo bash game_commander.sh rebalance --restart
 
 EOF
 }
@@ -82,6 +89,7 @@ run_command() {
         uninstall) cmd_uninstall ;;
         status)    cmd_status    ;;
         update)    cmd_update    "$@" ;;
+        rebalance) cmd_rebalance "$@" ;;
         *)         show_help; return 1 ;;
     esac
 }
@@ -94,7 +102,7 @@ REMAINING_ARGS=()
 
 for arg in "$@"; do
     case "$arg" in
-        deploy|attach|uninstall|status|update) COMMAND="$arg" ;;
+        deploy|attach|uninstall|status|update|rebalance) COMMAND="$arg" ;;
         --dry-run) DRY_RUN=true ;;
         --help|-h) show_help; exit 0 ;;
         *) REMAINING_ARGS+=("$arg") ;;
@@ -115,6 +123,7 @@ if [[ -z "$COMMAND" ]]; then
         echo -e "  ${CYAN}[3]${RESET} ${BOLD}uninstall${RESET}  — Retirer une instance ou nettoyer des reliquats"
         echo -e "  ${CYAN}[4]${RESET} ${BOLD}status${RESET}     — Voir l'état des instances déployées"
         echo -e "  ${CYAN}[5]${RESET} ${BOLD}update${RESET}     — Propager les changements du dépôt vers une instance"
+        echo -e "  ${CYAN}[6]${RESET} ${BOLD}rebalance${RESET}  — Répartir les serveurs sur les cœurs CPU"
         echo ""
         echo -en "  ${YELLOW}?  Votre choix : ${RESET}"
         read -r _choice
@@ -125,6 +134,7 @@ if [[ -z "$COMMAND" ]]; then
             3) run_command uninstall ;;
             4) run_command status ;;
             5) run_command update ;;
+            6) run_command rebalance ;;
             *) warn "Choix invalide." ;;
         esac
     done

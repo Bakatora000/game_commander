@@ -127,6 +127,7 @@ update_process_config() {
 
     SKIP_BACKUP_TEST=true
     deploy_step_backups
+    cpu_affinity_apply_all false
 
     systemctl restart "$GC_SERVICE"
     if service_active "$GC_SERVICE"; then

@@ -451,6 +451,12 @@ deploy_step_game_service() {
         return
     fi
 
+    local CPU_AFFINITY_LINE=""
+    local CPU_WEIGHT_LINE=""
+    CPU_AFFINITY_LINE="$(cpu_affinity_systemd_line "$INSTANCE_ID" "$GAME_ID" "$GAME_SERVICE" 2>/dev/null || true)"
+    CPU_WEIGHT_LINE="CPUWeight=$(cpu_affinity_cpu_weight_for_game "$GAME_ID")"
+    [[ -n "$CPU_AFFINITY_LINE" ]] && info "Affinité CPU prévue : ${CPU_AFFINITY_LINE#CPUAffinity=}"
+
     if [[ "$GAME_ID" == "minecraft" ]]; then
         START_SCRIPT="$SERVER_DIR/start_server.sh"
         cat > "$START_SCRIPT" << STARTEOF
@@ -474,6 +480,8 @@ WorkingDirectory=${SERVER_DIR}
 ExecStart=${START_SCRIPT}
 Restart=on-failure
 RestartSec=10
+${CPU_AFFINITY_LINE}
+${CPU_WEIGHT_LINE}
 SuccessExitStatus=0 130 143
 StandardOutput=journal
 StandardError=journal
@@ -520,6 +528,8 @@ WorkingDirectory=${SERVER_DIR}
 ExecStart=${START_SCRIPT}
 Restart=on-failure
 RestartSec=10
+${CPU_AFFINITY_LINE}
+${CPU_WEIGHT_LINE}
 SuccessExitStatus=0 130 143
 StandardOutput=journal
 StandardError=journal
@@ -604,6 +614,8 @@ WorkingDirectory=${SERVER_DIR}
 ExecStart=${WRAPPER_SCRIPT}
 Restart=on-failure
 RestartSec=10
+${CPU_AFFINITY_LINE}
+${CPU_WEIGHT_LINE}
 SuccessExitStatus=0 130 143
 StandardOutput=journal
 StandardError=journal
@@ -654,6 +666,8 @@ WorkingDirectory=${SERVER_DIR}
 ExecStart=${START_SCRIPT}
 Restart=on-failure
 RestartSec=10
+${CPU_AFFINITY_LINE}
+${CPU_WEIGHT_LINE}
 SuccessExitStatus=0 130 143
 StandardOutput=journal
 StandardError=journal
@@ -758,6 +772,8 @@ WorkingDirectory=${SERVER_DIR}
 ExecStart=${START_SCRIPT}
 Restart=on-failure
 RestartSec=10
+${CPU_AFFINITY_LINE}
+${CPU_WEIGHT_LINE}
 SuccessExitStatus=0 130 143
 StandardOutput=journal
 StandardError=journal
@@ -884,6 +900,8 @@ WorkingDirectory=${SERVER_DIR}
 ExecStart=${START_SCRIPT}
 Restart=on-failure
 RestartSec=10
+${CPU_AFFINITY_LINE}
+${CPU_WEIGHT_LINE}
 SuccessExitStatus=0 130 143
 StandardOutput=journal
 StandardError=journal
@@ -1229,6 +1247,8 @@ deploy_step_save_config() {
     chmod 600 "$CONFIG_SAVE"
     chown "$SYS_USER:$SYS_USER" "$CONFIG_SAVE"
     ok "Config sauvegardée : $CONFIG_SAVE"
+
+    cpu_affinity_apply_all false
 }
 
 deploy_step_validation() {

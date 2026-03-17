@@ -39,11 +39,13 @@ test_entrypoint_is_thin() {
     local file="$ROOT_DIR/game_commander.sh"
 
     grep -q 'source "\$SCRIPT_DIR/lib/helpers.sh"' "$file" || return 1
+    grep -q 'source "\$SCRIPT_DIR/lib/cpu_affinity.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/nginx.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_status.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_deploy.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_uninstall.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_update.sh"' "$file" || return 1
+    grep -q 'source "\$SCRIPT_DIR/lib/cmd_rebalance.sh"' "$file" || return 1
 
     if grep -qE 'apt-get|steamcmd|systemctl reload nginx|certbot|journalctl -u' "$file"; then
         return 1
@@ -161,6 +163,21 @@ test_update_module_present() {
     grep -q 'rsync -a --delete' "$file" || return 1
     grep -q 'tools/config_gen.py" game-json' "$file" || return 1
     grep -q 'systemctl restart "\$GC_SERVICE"' "$file" || return 1
+}
+
+test_cpu_affinity_module_present() {
+    local file="$ROOT_DIR/lib/cpu_affinity.sh"
+
+    grep -q 'cpu_affinity_detect_core_groups()' "$file" || return 1
+    grep -q 'cpu_affinity_weight_for_game()' "$file" || return 1
+    grep -q 'cpu_affinity_apply_all()' "$file" || return 1
+}
+
+test_rebalance_command_present() {
+    local file="$ROOT_DIR/lib/cmd_rebalance.sh"
+
+    grep -q 'cmd_rebalance()' "$file" || return 1
+    grep -q 'cpu_affinity_apply_all' "$file" || return 1
 }
 
 test_nginx_wrappers_call_python_manager() {
@@ -284,6 +301,8 @@ main() {
     run_test "Uninstall modules keep manifest and process logic" test_uninstall_modules_present
     run_test "Interactive prompt helper falls back to stdin" test_gc_read_falls_back_to_stdin
     run_test "Update command refreshes installed app runtime" test_update_module_present
+    run_test "CPU affinity helper module present" test_cpu_affinity_module_present
+    run_test "CPU rebalance command present" test_rebalance_command_present
     run_test "Nginx shell wrappers call python manager" test_nginx_wrappers_call_python_manager
     run_test "Helpers support dry-run and shared-dir detection" test_helpers_dry_run_and_shared_detection
     run_test "Orphan scan skips systemd-managed child processes" test_orphans_skip_systemd_managed_processes
