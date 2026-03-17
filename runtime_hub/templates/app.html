@@ -306,7 +306,6 @@
           const instance = button.dataset.instance;
           const action = button.dataset.action.replace('instance-', '');
           const label = button.dataset.label || 'Action';
-          const progress = button.dataset.progress || `${label} en cours…`;
           const confirmMessage = button.dataset.confirm || `Confirmer ${label.toLowerCase()} ?`;
           if (!window.confirm(confirmMessage)) {
             return;
@@ -317,8 +316,7 @@
           const card = button.closest('.card');
           const cardButtons = card ? Array.from(card.querySelectorAll('.card-actions button')) : [button];
           cardButtons.forEach((btn) => { btn.disabled = true; });
-          button.textContent = progress;
-          setFeedback(`feedback-instance-${instance}`, progress, true);
+          setFeedback(`feedback-instance-${instance}`, 'Action en cours…', true);
           const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -327,7 +325,6 @@
           const data = await response.json().catch(() => ({}));
           setFeedback(`feedback-instance-${instance}`, data.message || (response.ok ? 'Action lancée' : 'Erreur'), response.ok);
           cardButtons.forEach((btn) => { btn.disabled = false; });
-          button.textContent = label;
           setTimeout(load, response.ok ? 1200 : 0);
         });
       });
