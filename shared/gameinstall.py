@@ -6,9 +6,12 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
+import tempfile
 import urllib.request
+import zipfile
 from pathlib import Path
 
 
@@ -43,6 +46,30 @@ def latest_fabric_server_meta(fetch_json=_fetch_json) -> dict[str, str]:
 def _download_file(url: str, output_path: Path) -> None:
     with urllib.request.urlopen(url, timeout=60) as response, output_path.open("wb") as fh:
         fh.write(response.read())
+
+
+def _run_steamcmd(*, sys_user: str, steamcmd_path: str, platform: str, install_dir: Path, steam_appid: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        [
+            "sudo",
+            "-u",
+            sys_user,
+            steamcmd_path,
+            "+@sSteamCmdForcePlatformType",
+            platform,
+            "+force_install_dir",
+            str(install_dir),
+            "+login",
+            "anonymous",
+            "+app_update",
+            str(steam_appid),
+            "validate",
+            "+quit",
+        ],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+    )
 
 
 def _run_config_gen_minecraft_props(
@@ -203,26 +230,12 @@ def install_satisfactory(
     _chown_tree(sys_user, server_path)
     _chown_tree(sys_user, data_path)
 
-    result = subprocess.run(
-        [
-            "sudo",
-            "-u",
-            sys_user,
-            steamcmd_path,
-            "+@sSteamCmdForcePlatformType",
-            "linux",
-            "+force_install_dir",
-            str(server_path),
-            "+login",
-            "anonymous",
-            "+app_update",
-            str(steam_appid),
-            "validate",
-            "+quit",
-        ],
-        capture_output=True,
-        text=True,
-        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+    result = _run_steamcmd(
+        sys_user=sys_user,
+        steamcmd_path=steamcmd_path,
+        platform="linux",
+        install_dir=server_path,
+        steam_appid=steam_appid,
     )
     if result.returncode != 0:
         raise RuntimeError((result.stderr or result.stdout or "Échec SteamCMD").strip())
@@ -237,6 +250,84 @@ def install_satisfactory(
     _chown_tree(sys_user, server_path)
     messages.append("Serveur Satisfactory téléchargé")
     messages.append("Binaire FactoryServer.sh vérifié")
+    return messages
+
+
+def install_valheim(
+    *,
+    server_dir: str,
+    data_dir: str,
+    sys_user: str,
+    steamcmd_path: str,
+    steam_appid: str,
+    install_server: bool,
+    install_bepinex: bool,
+) -> list[str]:
+    messages: list[str] = []
+    server_path = Path(server_dir)
+    data_path = Path(data_dir)
+    server_path.mkdir(parents=True, exist_ok=True)
+    data_path.mkdir(parents=True, exist_ok=True)
+    _chown_tree(sys_user, server_path)
+    _chown_tree(sys_user, data_path)
+
+    if install_server:
+        result = _run_steamcmd(
+            sys_user=sys_user,
+            steamcmd_path=steamcmd_path,
+            platform="linux",
+            install_dir=server_path,
+            steam_appid=steam_appid,
+        )
+        if result.returncode != 0:
+            raise RuntimeError((result.stderr or result.stdout or "Échec SteamCMD").strip())
+        messages.append("Serveur Valheim téléchargé")
+
+    binary_path = server_path / "valheim_server.x86_64"
+    if not binary_path.is_file():
+        raise RuntimeError(f"Binaire valheim_server.x86_64 introuvable dans {server_path}")
+    try:
+        binary_path.chmod(binary_path.stat().st_mode | 0o111)
+    except OSError:
+        pass
+    _chown_tree(sys_user, server_path)
+    messages.append("Binaire valheim_server.x86_64 vérifié")
+
+    if install_bepinex:
+        bepinex_path = server_path / "BepInEx"
+        if bepinex_path.is_dir():
+            messages.append("BepInEx déjà présent")
+        else:
+            with tempfile.TemporaryDirectory() as tmp:
+                tmp_path = Path(tmp)
+                zip_path = tmp_path / "bep.zip"
+                extract_path = tmp_path / "extracted"
+                _download_file(
+                    "https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/5.4.2202/",
+                    zip_path,
+                )
+                with zipfile.ZipFile(zip_path) as zf:
+                    zf.extractall(extract_path)
+                src_path = extract_path
+                candidate = extract_path / "BepInExPack_Valheim"
+                if candidate.is_dir():
+                    src_path = candidate
+                for entry in src_path.iterdir():
+                    dest = server_path / entry.name
+                    if dest.exists():
+                        if dest.is_dir():
+                            shutil.rmtree(dest)
+                        else:
+                            dest.unlink()
+                    if entry.is_dir():
+                        shutil.copytree(entry, dest)
+                    else:
+                        shutil.copy2(entry, dest)
+            display_info = server_path / "BepInEx" / "plugins" / "Valheim.DisplayBepInExInfo.dll"
+            if display_info.exists():
+                display_info.unlink()
+            _chown_tree(sys_user, server_path)
+            messages.append("BepInEx installé")
     return messages
 
 
@@ -285,6 +376,25 @@ def _cmd_satisfactory(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_valheim(args: argparse.Namespace) -> int:
+    try:
+        messages = install_valheim(
+            server_dir=args.server_dir,
+            data_dir=args.data_dir,
+            sys_user=args.sys_user,
+            steamcmd_path=args.steamcmd_path,
+            steam_appid=args.steam_appid,
+            install_server=not args.skip_server_update,
+            install_bepinex=args.install_bepinex,
+        )
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    for line in messages:
+        print(line)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Game Commander game install helper")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -306,6 +416,16 @@ def build_parser() -> argparse.ArgumentParser:
     satisfactory.add_argument("--steamcmd-path", required=True)
     satisfactory.add_argument("--steam-appid", required=True)
     satisfactory.set_defaults(func=_cmd_satisfactory)
+
+    valheim = sub.add_parser("valheim")
+    valheim.add_argument("--server-dir", required=True)
+    valheim.add_argument("--data-dir", required=True)
+    valheim.add_argument("--sys-user", required=True)
+    valheim.add_argument("--steamcmd-path", required=True)
+    valheim.add_argument("--steam-appid", required=True)
+    valheim.add_argument("--skip-server-update", action="store_true")
+    valheim.add_argument("--install-bepinex", action="store_true")
+    valheim.set_defaults(func=_cmd_valheim)
     return parser
 
 

@@ -445,11 +445,68 @@ PYEOF
         return
     fi
 
+    if [[ "$GAME_ID" == "valheim" ]]; then
+        hdr "ÉTAPE 4 : Installation Valheim"
+        mkdir -p "$SERVER_DIR" "$DATA_DIR"
+        chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR" "$DATA_DIR"
+
+        DO_INSTALL=true
+        if [[ -f "$SERVER_DIR/$GAME_BINARY" ]]; then
+            ok "$GAME_LABEL déjà installé"
+            if $AUTO_UPDATE_SERVER; then
+                echo -e "  ${DIM}  (config) Mise à jour → oui${RESET}"
+            else
+                confirm "Mettre à jour depuis Steam ?" "n" || DO_INSTALL=false
+            fi
+        fi
+
+        local install_bep=false
+        if $BEPINEX; then
+            if [[ -d "$SERVER_DIR/BepInEx" ]]; then
+                install_bep=true
+            else
+                $AUTO_INSTALL_BEPINEX && install_bep=true || { confirm "Installer BepInEx ?" "o" && install_bep=true; }
+            fi
+        fi
+
+        if $DO_INSTALL || $install_bep; then
+            $DO_INSTALL && {
+                info "Téléchargement $GAME_LABEL via SteamCMD (AppID $STEAM_APPID)..."
+                info "Cela peut prendre plusieurs minutes..."
+            }
+            local val_out=""
+            local -a val_cmd=(
+                python3 "$SCRIPT_DIR/shared/gameinstall.py" valheim
+                --server-dir "$SERVER_DIR"
+                --data-dir "$DATA_DIR"
+                --sys-user "$SYS_USER"
+                --steamcmd-path "$STEAMCMD_PATH"
+                --steam-appid "$STEAM_APPID"
+            )
+            $DO_INSTALL || val_cmd+=(--skip-server-update)
+            $install_bep && val_cmd+=(--install-bepinex)
+            if val_out="$("${val_cmd[@]}" 2>&1)"; then
+                while IFS= read -r _line; do
+                    [[ -n "$_line" ]] && ok "$_line"
+                done <<< "$val_out"
+            else
+                [[ -n "$val_out" ]] && while IFS= read -r _line; do
+                    [[ -n "$_line" ]] && warn "$_line"
+                done <<< "$val_out"
+                die "Échec installation serveur Valheim"
+            fi
+        else
+            [[ -f "$SERVER_DIR/$GAME_BINARY" ]] || die "Binaire $GAME_BINARY introuvable dans $SERVER_DIR"
+            chmod +x "$SERVER_DIR/$GAME_BINARY" 2>/dev/null || true
+            chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
+            ok "Binaire $GAME_BINARY vérifié"
+        fi
+        return
+    fi
+
     hdr "ÉTAPE 4 : Installation $GAME_LABEL"
     mkdir -p "$SERVER_DIR"
-    [[ "$GAME_ID" == "valheim" ]] && mkdir -p "$DATA_DIR"
     chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
-    [[ "$GAME_ID" == "valheim" ]] && chown -R "$SYS_USER:$SYS_USER" "$DATA_DIR"
 
     DO_INSTALL=true
     if [[ -f "$SERVER_DIR/$GAME_BINARY" ]]; then
@@ -474,31 +531,6 @@ PYEOF
     [[ "$GAME_ID" != "enshrouded" ]] && chmod +x "$SERVER_DIR/$GAME_BINARY" 2>/dev/null || true
     chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
     ok "Binaire $GAME_BINARY vérifié"
-
-    if [[ "$GAME_ID" == "valheim" ]] && $BEPINEX; then
-        BEPINEX_PATH="$SERVER_DIR/BepInEx"
-        if [[ -d "$BEPINEX_PATH" ]]; then
-            ok "BepInEx déjà présent"
-        else
-            do_bep=false
-            $AUTO_INSTALL_BEPINEX && do_bep=true || { confirm "Installer BepInEx ?" "o" && do_bep=true; }
-            $do_bep && {
-                info "Téléchargement BepInEx..."
-                TMP=$(mktemp -d)
-                curl -sL "https://thunderstore.io/package/download/denikson/BepInExPack_Valheim/5.4.2202/" -o "$TMP/bep.zip"
-                unzip -q "$TMP/bep.zip" -d "$TMP/extracted"
-                SRC_BEP="$TMP/extracted"
-                [[ -d "$TMP/extracted/BepInExPack_Valheim" ]] && SRC_BEP="$TMP/extracted/BepInExPack_Valheim"
-                cp -r "$SRC_BEP/." "$SERVER_DIR/"
-                rm -f "$SERVER_DIR/BepInEx/plugins/Valheim.DisplayBepInExInfo.dll"
-                chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
-                rm -rf "$TMP"
-                ok "BepInEx installé"
-            }
-        fi
-    else
-        BEPINEX_PATH=""
-    fi
 }
 
 deploy_step_game_service() {

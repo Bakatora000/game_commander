@@ -1454,6 +1454,41 @@ class DeployHelpersTests(unittest.TestCase):
         self.assertEqual(meta["installer_version"], "1.0.2")
         self.assertIn("/1.21.1/0.16.10/1.0.2/server/jar", meta["jar_url"])
 
+    def test_install_valheim_installs_bepinex_and_strips_display_plugin(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            server_dir = Path(tmp) / "server"
+            data_dir = Path(tmp) / "data"
+            server_dir.mkdir()
+            data_dir.mkdir()
+            (server_dir / "valheim_server.x86_64").write_text("bin", encoding="utf-8")
+
+            bepinex_zip = Path(tmp) / "bep.zip"
+            with zipfile.ZipFile(bepinex_zip, "w") as zf:
+                zf.writestr("BepInExPack_Valheim/BepInEx/core/BepInEx.Preloader.dll", "core")
+                zf.writestr("BepInExPack_Valheim/BepInEx/plugins/Valheim.DisplayBepInExInfo.dll", "junk")
+                zf.writestr("BepInExPack_Valheim/start_game_bepinex.sh", "#!/bin/sh\n")
+
+            def fake_download(_url, output_path):
+                output_path.write_bytes(bepinex_zip.read_bytes())
+
+            with mock.patch.object(gameinstall, "_download_file", side_effect=fake_download), \
+                 mock.patch("shared.gameinstall.subprocess.run") as run_mock:
+                run_mock.return_value = mock.Mock(returncode=0, stdout="", stderr="")
+                messages = gameinstall.install_valheim(
+                    server_dir=str(server_dir),
+                    data_dir=str(data_dir),
+                    sys_user="vhserver",
+                    steamcmd_path="/home/vhserver/steamcmd/steamcmd.sh",
+                    steam_appid="896660",
+                    install_server=False,
+                    install_bepinex=True,
+                )
+
+            self.assertIn("Binaire valheim_server.x86_64 vérifié", messages)
+            self.assertIn("BepInEx installé", messages)
+            self.assertTrue((server_dir / "BepInEx" / "core" / "BepInEx.Preloader.dll").is_file())
+            self.assertFalse((server_dir / "BepInEx" / "plugins" / "Valheim.DisplayBepInExInfo.dll").exists())
+
 
 class ConfigGenUsersJsonTests(unittest.TestCase):
 
