@@ -24,7 +24,7 @@
       color: var(--text);
       min-height: 100vh;
     }
-    .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 20px 64px; }
+    .wrap { max-width: 1280px; margin: 0 auto; padding: 32px 20px 64px; }
     .head {
       display: flex;
       justify-content: space-between;
@@ -47,6 +47,55 @@
       text-decoration: none;
       font-weight: 700;
     }
+    .layout {
+      display: grid;
+      grid-template-columns: 240px minmax(0, 1fr);
+      gap: 20px;
+      align-items: start;
+    }
+    .sidebar {
+      position: sticky;
+      top: 20px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      box-shadow: 0 18px 50px rgba(0, 0, 0, .18);
+      padding: 16px;
+    }
+    .sidebar-title {
+      margin: 0 0 .35rem;
+      font-size: 1rem;
+    }
+    .sidebar-subtitle {
+      margin: 0 0 1rem;
+      color: var(--muted);
+      line-height: 1.4;
+      font-size: .9rem;
+    }
+    .nav-list {
+      display: grid;
+      gap: .6rem;
+    }
+    .nav-btn {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--border);
+      background: rgba(255,255,255,.03);
+      color: var(--text);
+      border-radius: 14px;
+      padding: .85rem .9rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .nav-btn.is-active {
+      background: var(--accent);
+      color: #09201a;
+      border-color: transparent;
+    }
+    .view-stack {
+      min-width: 0;
+    }
+    .view-panel[hidden] { display: none !important; }
     .monitor-panel, .card, .accounts-panel {
       border: 1px solid var(--border);
       border-radius: 18px;
@@ -206,6 +255,11 @@
       .head, .monitor-head { flex-direction: column; align-items: flex-start; }
       .monitor-table { font-size: .85rem; }
     }
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { position: static; }
+      .nav-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
   </style>
 </head>
 <body>
@@ -218,129 +272,154 @@
       <a class="logout" href="{{ prefix }}/logout">Déconnexion</a>
     </section>
 
-    <section class="monitor-panel">
-      <div class="monitor-head">
-        <div>
-          <div class="monitor-label">Monitor CPU</div>
-          <div class="monitor-status" data-field="cpu-monitor-status">Chargement…</div>
+    <div class="layout">
+      <aside class="sidebar">
+        <h2 class="sidebar-title">Navigation</h2>
+        <p class="sidebar-subtitle">Séparation simple entre vue d’exploitation et gestion des comptes Hub.</p>
+        <div class="nav-list">
+          <button class="nav-btn is-active" type="button" data-view-target="dashboard">Dashboard</button>
+          <button class="nav-btn" type="button" data-view-target="users">Utilisateurs</button>
         </div>
-        <div class="inline-actions">
-          <button class="monitor-toggle" type="button" data-action="rebalance">Rebalance</button>
-          <button class="monitor-toggle" type="button" data-action="rebalance-restart">Rebalance + restart</button>
-          <button class="monitor-toggle" type="button" data-action="toggle-cpu-monitor" hidden>Voir le détail</button>
-        </div>
-      </div>
-      <div class="monitor-meta" data-field="cpu-monitor-meta"></div>
-      <div class="feedback" id="rebalanceFeedback"></div>
-      <div class="monitor-details" data-field="cpu-monitor-details" hidden>
-        <table class="monitor-table">
-          <thead>
-            <tr>
-              <th>Instance</th>
-              <th>Actuelle</th>
-              <th>Planifiée</th>
-              <th>CPU</th>
-            </tr>
-          </thead>
-          <tbody data-field="cpu-monitor-body"></tbody>
-        </table>
-      </div>
-    </section>
+      </aside>
 
-    <section class="accounts-panel">
-      <div class="monitor-head">
-        <div>
-          <h2 class="section-title">Déployer une instance</h2>
-          <p class="section-subtitle">Déploiement rapide depuis le Hub avec les paramètres essentiels. Les réglages fins se font ensuite dans le Commander de l’instance.</p>
-        </div>
-        <button class="monitor-toggle" type="button" id="btnToggleDeployPanel">Déployer</button>
-      </div>
-      <div id="deployPanel" hidden>
-        <div class="accounts-grid">
-          <section class="card">
-            <label class="field-label" for="deployGame">Jeu</label>
-            <select class="field-input" id="deployGame">
-              <option value="minecraft">Minecraft Java</option>
-              <option value="minecraft-fabric">Minecraft Fabric</option>
-              <option value="valheim">Valheim</option>
-              <option value="enshrouded">Enshrouded</option>
-              <option value="terraria">Terraria</option>
-              <option value="satisfactory">Satisfactory</option>
-              <option value="soulmask">Soulmask</option>
-            </select>
-            <label class="field-label" for="deployInstance">Identifiant d’instance</label>
-            <input class="field-input" id="deployInstance" placeholder="minecraft2">
-            <p class="section-subtitle">Exemple : <code>minecraft2</code>. C’est le nom technique de l’instance : URL <code>/minecraft2</code>, dossier <code>game-commander-minecraft2</code>, services associés. Ce n’est pas l’utilisateur Linux ; le Hub réutilise l’utilisateur système par défaut du serveur.</p>
-            <label class="field-label" for="deployServerName">Nom du serveur</label>
-            <input class="field-input" id="deployServerName" placeholder="Mon Serveur Minecraft">
-            <p class="section-subtitle">Nom visible côté jeu quand le jeu le supporte. Ce n’est pas l’identifiant technique de l’instance.</p>
-            <label class="field-label" for="deployDomain">Domaine</label>
-            <input class="field-input" id="deployDomain" placeholder="gaming.expevay.net">
+      <div class="view-stack">
+        <section class="view-panel" data-view="dashboard">
+          <section class="monitor-panel">
+            <div class="monitor-head">
+              <div>
+                <div class="monitor-label">Monitor CPU</div>
+                <div class="monitor-status" data-field="cpu-monitor-status">Chargement…</div>
+              </div>
+              <div class="inline-actions">
+                <button class="monitor-toggle" type="button" data-action="rebalance">Rebalance</button>
+                <button class="monitor-toggle" type="button" data-action="rebalance-restart">Rebalance + restart</button>
+                <button class="monitor-toggle" type="button" data-action="toggle-cpu-monitor" hidden>Voir le détail</button>
+              </div>
+            </div>
+            <div class="monitor-meta" data-field="cpu-monitor-meta"></div>
+            <div class="feedback" id="rebalanceFeedback"></div>
+            <div class="monitor-details" data-field="cpu-monitor-details" hidden>
+              <table class="monitor-table">
+                <thead>
+                  <tr>
+                    <th>Instance</th>
+                    <th>Actuelle</th>
+                    <th>Planifiée</th>
+                    <th>CPU</th>
+                  </tr>
+                </thead>
+                <tbody data-field="cpu-monitor-body"></tbody>
+              </table>
+            </div>
           </section>
-          <section class="card">
-            <label class="field-label" for="deployAdminLogin">Admin instance</label>
-            <input class="field-input" id="deployAdminLogin" value="admin">
-            <p class="section-subtitle">Login du compte administrateur du Commander de cette instance, pas de l’utilisateur Linux.</p>
-            <label class="field-label" for="deployAdminPassword">Mot de passe admin</label>
-            <input class="field-input" id="deployAdminPassword" type="password">
-            <p class="section-subtitle">Mot de passe du compte <code>Admin instance</code> ci-dessus pour l’interface web de cette instance.</p>
-            <label class="field-label" for="deployServerPassword">Mot de passe serveur</label>
-            <input class="field-input" id="deployServerPassword" type="password" placeholder="optionnel">
-            <label class="field-label" for="deployServerPort">Port jeu</label>
-            <input class="field-input" id="deployServerPort" placeholder="laisser vide = défaut/auto">
-            <label class="field-label" for="deployMaxPlayers">Joueurs max</label>
-            <input class="field-input" id="deployMaxPlayers" placeholder="laisser vide = défaut">
-            <button class="primary-btn" type="button" id="btnDeployInstance">Lancer le déploiement</button>
-            <div class="feedback" id="deployFeedback"></div>
+
+          <section class="accounts-panel">
+            <div class="monitor-head">
+              <div>
+                <h2 class="section-title">Déployer une instance</h2>
+                <p class="section-subtitle">Déploiement rapide depuis le Hub avec les paramètres essentiels. Les réglages fins se font ensuite dans le Commander de l’instance.</p>
+              </div>
+              <button class="monitor-toggle" type="button" id="btnToggleDeployPanel">Déployer</button>
+            </div>
+            <div id="deployPanel" hidden>
+              <div class="accounts-grid">
+                <section class="card">
+                  <label class="field-label" for="deployGame">Jeu</label>
+                  <select class="field-input" id="deployGame">
+                    <option value="minecraft">Minecraft Java</option>
+                    <option value="minecraft-fabric">Minecraft Fabric</option>
+                    <option value="valheim">Valheim</option>
+                    <option value="enshrouded">Enshrouded</option>
+                    <option value="terraria">Terraria</option>
+                    <option value="satisfactory">Satisfactory</option>
+                    <option value="soulmask">Soulmask</option>
+                  </select>
+                  <label class="field-label" for="deployInstance">Identifiant d’instance</label>
+                  <input class="field-input" id="deployInstance" placeholder="minecraft2">
+                  <p class="section-subtitle">Exemple : <code>minecraft2</code>. C’est le nom technique de l’instance : URL <code>/minecraft2</code>, dossier <code>game-commander-minecraft2</code>, services associés. Ce n’est pas l’utilisateur Linux ; le Hub réutilise l’utilisateur système par défaut du serveur.</p>
+                  <label class="field-label" for="deployServerName">Nom du serveur</label>
+                  <input class="field-input" id="deployServerName" placeholder="Mon Serveur Minecraft">
+                  <p class="section-subtitle">Nom visible côté jeu quand le jeu le supporte. Ce n’est pas l’identifiant technique de l’instance.</p>
+                  <label class="field-label" for="deployDomain">Domaine</label>
+                  <input class="field-input" id="deployDomain" placeholder="gaming.expevay.net">
+                </section>
+                <section class="card">
+                  <label class="field-label" for="deployAdminLogin">Admin instance</label>
+                  <input class="field-input" id="deployAdminLogin" value="admin">
+                  <p class="section-subtitle">Login du compte administrateur du Commander de cette instance, pas de l’utilisateur Linux.</p>
+                  <label class="field-label" for="deployAdminPassword">Mot de passe admin</label>
+                  <input class="field-input" id="deployAdminPassword" type="password">
+                  <p class="section-subtitle">Mot de passe du compte <code>Admin instance</code> ci-dessus pour l’interface web de cette instance.</p>
+                  <label class="field-label" for="deployServerPassword">Mot de passe serveur</label>
+                  <input class="field-input" id="deployServerPassword" type="password" placeholder="optionnel">
+                  <label class="field-label" for="deployServerPort">Port jeu</label>
+                  <input class="field-input" id="deployServerPort" placeholder="laisser vide = défaut/auto">
+                  <label class="field-label" for="deployMaxPlayers">Joueurs max</label>
+                  <input class="field-input" id="deployMaxPlayers" placeholder="laisser vide = défaut">
+                  <button class="primary-btn" type="button" id="btnDeployInstance">Lancer le déploiement</button>
+                  <div class="feedback" id="deployFeedback"></div>
+                </section>
+              </div>
+            </div>
           </section>
-        </div>
-      </div>
-    </section>
 
-    <section class="accounts-panel">
-      <h2 class="section-title">Comptes Hub</h2>
-      <p class="section-subtitle">Gestion des comptes administrateurs du Hub. Cette V1 prépare aussi le champ email pour une future réinitialisation par mail.</p>
-      <div class="accounts-grid">
-        <section class="card">
-          <h3 class="section-title">Mon compte</h3>
-          <p class="section-subtitle">Change ton mot de passe seulement quand nécessaire.</p>
-          <div class="inline-actions">
-            <button class="primary-btn" type="button" id="btnToggleChangePassword">Changer mon mot de passe</button>
-          </div>
-          <div id="changePasswordPanel" hidden>
-            <label class="field-label" for="currentPassword">Mot de passe actuel</label>
-            <input class="field-input" id="currentPassword" type="password" autocomplete="current-password">
-            <label class="field-label" for="newPassword">Nouveau mot de passe</label>
-            <input class="field-input" id="newPassword" type="password" autocomplete="new-password">
-            <button class="primary-btn" type="button" id="btnChangePassword">Mettre à jour</button>
-          </div>
-          <div class="feedback" id="changePasswordFeedback"></div>
+          <section class="grid" id="cards"></section>
+
+          <section class="accounts-panel">
+            <div class="monitor-head">
+              <div>
+                <h2 class="section-title">Console Hub</h2>
+                <p class="section-subtitle">Trace globale des opérations déclenchées depuis le Hub, tous jeux confondus.</p>
+              </div>
+              <button class="monitor-toggle" type="button" id="btnToggleGlobalConsole">Console</button>
+            </div>
+            <div class="console-panel" id="globalConsolePanel" hidden>
+              <pre class="console-output" id="globalConsoleOutput">Chargement…</pre>
+            </div>
+          </section>
         </section>
-        <section class="card">
-          <h3 class="section-title">Comptes administrateurs</h3>
-          <div id="accountsList"></div>
+
+        <section class="view-panel" data-view="users" hidden>
+          <section class="accounts-panel">
+            <h2 class="section-title">Comptes Hub</h2>
+            <p class="section-subtitle">Gestion des comptes administrateurs du Hub. Cette V1 prépare aussi le champ email pour une future réinitialisation par mail.</p>
+            <div class="accounts-grid">
+              <section class="card">
+                <h3 class="section-title">Mon compte</h3>
+                <p class="section-subtitle">Change ton mot de passe seulement quand nécessaire.</p>
+                <div class="inline-actions">
+                  <button class="primary-btn" type="button" id="btnToggleChangePassword">Changer mon mot de passe</button>
+                </div>
+                <div id="changePasswordPanel" hidden>
+                  <label class="field-label" for="currentPassword">Mot de passe actuel</label>
+                  <input class="field-input" id="currentPassword" type="password" autocomplete="current-password">
+                  <label class="field-label" for="newPassword">Nouveau mot de passe</label>
+                  <input class="field-input" id="newPassword" type="password" autocomplete="new-password">
+                  <button class="primary-btn" type="button" id="btnChangePassword">Mettre à jour</button>
+                </div>
+                <div class="feedback" id="changePasswordFeedback"></div>
+              </section>
+              <section class="card">
+                <h3 class="section-title">Comptes administrateurs</h3>
+                <div id="accountsList"></div>
+              </section>
+            </div>
+          </section>
         </section>
       </div>
-    </section>
-
-    <section class="grid" id="cards"></section>
-
-    <section class="accounts-panel">
-      <div class="monitor-head">
-        <div>
-          <h2 class="section-title">Console Hub</h2>
-          <p class="section-subtitle">Trace globale des opérations déclenchées depuis le Hub, tous jeux confondus.</p>
-        </div>
-        <button class="monitor-toggle" type="button" id="btnToggleGlobalConsole">Console</button>
-      </div>
-      <div class="console-panel" id="globalConsolePanel" hidden>
-        <pre class="console-output" id="globalConsoleOutput">Chargement…</pre>
-      </div>
-    </section>
+    </div>
   </main>
   <script>
     const STATE_LABELS = { 0: 'Hors ligne', 10: 'Démarrage', 20: 'En ligne', 30: 'Arrêt', 40: 'Busy' };
     function formatAgeText(meta) { return meta || ''; }
+    function switchView(view) {
+      document.querySelectorAll('.view-panel').forEach((panel) => {
+        panel.hidden = panel.dataset.view !== view;
+      });
+      document.querySelectorAll('[data-view-target]').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.dataset.viewTarget === view);
+      });
+    }
     function getInstanceActions(inst) {
       const state = Number(inst.state || 0);
       if (state === 20) {
@@ -632,6 +711,9 @@
     }
     document.querySelector('[data-action="rebalance"]').addEventListener('click', () => runRebalance(false));
     document.querySelector('[data-action="rebalance-restart"]').addEventListener('click', () => runRebalance(true));
+    document.querySelectorAll('[data-view-target]').forEach((button) => {
+      button.addEventListener('click', () => switchView(button.dataset.viewTarget));
+    });
     document.getElementById('btnToggleDeployPanel').addEventListener('click', () => {
       const panel = document.getElementById('deployPanel');
       const hidden = panel.hidden;
@@ -683,6 +765,7 @@
         document.getElementById('newPassword').value = '';
       }
     });
+    switchView('dashboard');
     load();
   </script>
 </body>
