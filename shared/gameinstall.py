@@ -306,6 +306,7 @@ def install_terraria(
     server_name: str,
     server_port: str,
     max_players: str,
+    server_password: str,
     instance_id: str,
 ) -> list[str]:
     messages: list[str] = []
@@ -408,6 +409,8 @@ def install_terraria(
                 str(server_port),
                 "--max-players",
                 str(max_players),
+                "--password",
+                server_password or "",
                 "--world-path",
                 str(data_path),
                 "--world-name",
@@ -556,6 +559,7 @@ def _cmd_terraria(args: argparse.Namespace) -> int:
             server_name=args.server_name,
             server_port=args.server_port,
             max_players=args.max_players,
+            server_password=args.server_password,
             instance_id=args.instance_id,
         )
     except Exception as exc:
@@ -640,6 +644,7 @@ def build_parser() -> argparse.ArgumentParser:
     terraria.add_argument("--server-name", required=True)
     terraria.add_argument("--server-port", required=True)
     terraria.add_argument("--max-players", required=True)
+    terraria.add_argument("--server-password", default="")
     terraria.add_argument("--instance-id", required=True)
     terraria.set_defaults(func=_cmd_terraria)
 

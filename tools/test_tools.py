@@ -464,6 +464,22 @@ class DeployPostTests(unittest.TestCase):
         self.assertIn('QUERY_PORT="8888"', text)
         self.assertIn('GAME_ID="satisfactory"', text)
 
+    def test_render_saved_config_persists_server_password(self):
+        env = deployenv.normalize_deploy_env(
+            Path("/tmp/does-not-need-to-exist").with_name("dummy.env")
+        )
+        env.update(
+            {
+                "GAME_ID": "terraria",
+                "INSTANCE_ID": "terraria",
+                "SYS_USER": "root",
+                "APP_DIR": "/tmp/game-commander-terraria",
+                "SERVER_PASSWORD": "secret123",
+            }
+        )
+        text = deploypost.render_saved_config(env, "/tmp/game-commander-terraria/deploy_config.env")
+        self.assertIn('SERVER_PASSWORD="secret123"', text)
+
     def test_validation_lines_include_firewall_specs(self):
         env = {
             "GAME_ID": "satisfactory",
@@ -1646,8 +1662,11 @@ class DeployHelpersTests(unittest.TestCase):
                     return io.BytesIO(archive.read_bytes())
                 raise AssertionError(url)
 
+            captured_cfg_cmds = []
+
             def fake_run(cmd, **kwargs):
                 if isinstance(cmd, list) and len(cmd) >= 4 and cmd[2].endswith("config_gen.py") and cmd[3] == "terraria-cfg":
+                    captured_cfg_cmds.append(cmd)
                     out = Path(cmd[cmd.index("--out") + 1])
                     out.write_text("world=/tmp/world.wld\nworldpath=/tmp\nworldname=terraria2\n", encoding="utf-8")
                 return mock.Mock(returncode=0, stdout="", stderr="")
@@ -1662,6 +1681,7 @@ class DeployHelpersTests(unittest.TestCase):
                     server_name="Serveur Terraria",
                     server_port="7777",
                     max_players="8",
+                    server_password="secret123",
                     instance_id="terraria2",
                 )
 
@@ -1669,6 +1689,9 @@ class DeployHelpersTests(unittest.TestCase):
             self.assertIn("serverconfig.txt généré", messages)
             self.assertTrue((server_dir / "TerrariaServer.bin.x86_64").is_file())
             self.assertTrue((server_dir / "serverconfig.txt").is_file())
+            self.assertEqual(len(captured_cfg_cmds), 1)
+            cfg_cmd = captured_cfg_cmds[0]
+            self.assertEqual(cfg_cmd[cfg_cmd.index("--password") + 1], "secret123")
 
 
 class ConfigGenUsersJsonTests(unittest.TestCase):

@@ -49,6 +49,7 @@ def render_saved_config(env: dict[str, str], config_path: str | Path) -> str:
         f'SRC_DIR="{env.get("SRC_DIR", "")}"',
         f'GAME_SERVICE="{env.get("GAME_SERVICE", "")}"',
         f'SERVER_NAME="{env.get("SERVER_NAME", "")}"',
+        f'SERVER_PASSWORD="{env.get("SERVER_PASSWORD", "")}"',
         f'SERVER_PORT="{env.get("SERVER_PORT", "")}"',
     ]
     if _query_port(env):

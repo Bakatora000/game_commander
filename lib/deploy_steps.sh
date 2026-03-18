@@ -262,6 +262,7 @@ deploy_step_game_install() {
             --server-name "$SERVER_NAME" \
             --server-port "$SERVER_PORT" \
             --max-players "$MAX_PLAYERS" \
+            --server-password "$SERVER_PASSWORD" \
             --instance-id "$INSTANCE_ID" 2>&1)"; then
             while IFS= read -r _line; do
                 [[ -n "$_line" ]] && ok "$_line"

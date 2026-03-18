@@ -3,9 +3,26 @@
 
 deploy_check_port_conflict() {
     local port="$1" proto="${2:-u}"
-    ss -${proto}lnH 2>/dev/null | grep -q ":${port} " && return 0
-    ss -${proto}nH 2>/dev/null | grep -q ":${port} " && return 0
+    local line pid ignored_pid
+    ignored_pid="$(deploy_current_service_pid)"
+    while IFS= read -r line; do
+        [[ "$line" == *":${port} "* ]] || continue
+        if [[ -n "$ignored_pid" ]]; then
+            pid="$(printf '%s\n' "$line" | grep -oP 'pid=\K\d+' | head -1)"
+            [[ -n "$pid" && "$pid" == "$ignored_pid" ]] && continue
+        fi
+        return 0
+    done < <(ss -${proto}lnpH 2>/dev/null)
+    while IFS= read -r line; do
+        [[ "$line" == *":${port} "* ]] || continue
+        return 0
+    done < <(ss -${proto}lnH 2>/dev/null)
     return 1
+}
+
+deploy_current_service_pid() {
+    [[ -z "${GAME_SERVICE:-}" ]] && return 0
+    systemctl show "$GAME_SERVICE" --property MainPID --value 2>/dev/null | head -1
 }
 
 deploy_game_port_proto() {
