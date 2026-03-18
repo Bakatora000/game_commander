@@ -308,12 +308,22 @@ Note Hub Admin :
 - `/commander` est désormais une interface d'administration hôte distincte des Commanders d'instance
 - authentification séparée
 - vue globale des instances
+- console globale des actions hôte
 - premières actions d'exploitation disponibles :
   - `start / stop / restart`
   - `update` d'une instance
   - `rebalance` CPU
+  - `déployer` une nouvelle instance
   - `redéployer` une instance depuis son `deploy_config.env`
   - `désinstaller` une instance avec confirmation forte
+
+Note déploiement Hub :
+- le formulaire Hub utilise un `Identifiant d'instance` technique
+  - exemple : `minecraft2`
+  - il sert à l'URL, aux dossiers `game-commander-<id>` et aux services
+  - ce n'est pas l'utilisateur Linux
+- `Admin instance` et `Mot de passe admin` correspondent au compte admin web du Commander de cette instance
+- les sorties d'action sont agrégées dans la console globale du Hub, avec nettoyage automatique des codes couleur ANSI
 
 Note Minecraft Java :
 - le serveur téléchargé automatiquement peut être plus récent que ton client Java local

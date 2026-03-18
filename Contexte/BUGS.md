@@ -59,6 +59,38 @@
   - ✅ commencer à exposer les actions hôte depuis ce Hub
 - **Régression connue :** Ne pas redonner au Hub un comportement dépendant des comptes d'instance ; l'admin hôte et l'admin jeu doivent rester séparés.
 
+### [21] Hub deploy — un `deploy_config.env` invalide pouvait relancer un faux déploiement interactif par défaut
+- **Statut :** Résolu
+- **Composant :** `shared/deploypost.py` + `lib/deploy_steps.sh` + `lib/deploy_helpers.sh`
+- **Instance(s) affectée(s) :** `minecraft2` lors de la première validation réelle du deploy Hub
+- **Symptôme :**
+  - un premier `deploy` Hub pouvait écrire un `deploy_config.env` avec des valeurs par défaut au lieu des vraies valeurs du déploiement
+  - la validation finale devenait incohérente (`Service -server- : inactif`)
+  - puis un `deploy --config` sur ce fichier invalide pouvait retomber sur le flux interactif et repartir sur `Valheim`
+- **Cause racine :**
+  - la sauvegarde finale du `deploy_config.env` relisait le fichier cible au lieu d'utiliser les variables réelles du processus de déploiement
+  - le mode `--config` n'échouait pas explicitement quand `GAME_ID` ou `INSTANCE_ID` étaient absents
+- **Solutions essayées :**
+  - ❌ recharger le futur fichier cible comme source de vérité
+  - ✅ sauvegarder le `deploy_config.env` à partir des vraies valeurs du déploiement en cours
+  - ✅ faire échouer immédiatement `deploy --config` si `GAME_ID` ou `INSTANCE_ID` manquent
+- **Régression connue :** un `deploy --config` invalide ne doit jamais retomber silencieusement sur un jeu par défaut.
+
+### [22] Hub uninstall — une instance partielle visible dans nginx pouvait être impossible à supprimer
+- **Statut :** Résolu
+- **Composant :** `shared/uninstallcore.py` + `tools/host_cli.py` + `runtime_hub/core/host.py`
+- **Instance(s) affectée(s) :** `minecraft2` partiellement déployée
+- **Symptôme :**
+  - une instance partielle visible dans le Hub via le manifest nginx pouvait échouer au `uninstall` avec `Configuration d'instance introuvable`
+- **Cause racine :**
+  - le chemin de désinstallation ne savait traiter que les instances disposant d'un `deploy_config.env` valide
+- **Solutions essayées :**
+  - ❌ exiger systématiquement une config d'instance complète
+  - ✅ ajouter un fallback `partial uninstall`
+  - ✅ reconstruire un minimum d'environnement à partir du nom d'instance, du jeu et des chemins standards
+- **Validation réelle :**
+  - `minecraft2` partiellement déployée puis supprimée correctement via le Hub
+
 ### [17] Terraria — bannir un joueur via le Commander n'empêchait pas la reconnexion
 - **Statut :** Résolu
 - **Composant :** `runtime/games/terraria/admins.py` + `runtime/games/terraria/players.py`

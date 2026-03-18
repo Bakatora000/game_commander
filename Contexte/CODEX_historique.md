@@ -803,6 +803,39 @@ Direction validée pour `v3.0` :
 - formaliser un contrat commun par jeu
 - poursuivre le Hub Admin comme surface de pilotage principale côté hôte
 
+## Hub Admin + refacto v3.0 — validation réelle des premiers déploiements Hub
+
+Validation réelle supplémentaire atteinte :
+- le Hub sait maintenant déclencher un vrai `deploy` d'instance via un formulaire minimal
+- premier test réel effectué sur `minecraft2`
+
+Bugs rencontrés puis corrigés pendant cette validation :
+- le Hub n'avait pas encore la permission sudoers pour `deploy-instance`
+- le CLI hôte faisait encore un `sudo` imbriqué inutile pendant le chemin `deploy-instance`
+- le `deploy_config.env` écrit à la fin du déploiement repartait des valeurs par défaut au lieu des vraies valeurs du déploiement en cours
+  - conséquence observée :
+    - validation finale incohérente (`Service -server- : inactif`)
+    - relecture future du `deploy_config.env` cassée
+- un `deploy --config` invalide pouvait retomber sur le flux interactif et repartir sur `Valheim`
+  - désormais, le flux échoue explicitement si `GAME_ID` ou `INSTANCE_ID` manquent
+- une instance partielle visible dans le manifest/nginx mais sans `deploy_config.env` valide ne pouvait pas être désinstallée depuis le Hub
+  - désormais, le Hub sait reconstruire un minimum d'informations pour supprimer proprement ce type d'instance partielle
+- la console globale du Hub capturait les séquences ANSI brutes (`[0;32m`, etc.)
+  - elles sont maintenant nettoyées avant écriture dans `hub-actions.log`
+
+Conséquence produit validée :
+- l'instance partielle `minecraft2` a été supprimée proprement depuis le Hub
+- le nettoyage a bien retiré :
+  - services systemd
+  - entrée nginx/manifest
+  - répertoires serveur/app/backups
+- l'instance existante `ParkAPouet` n'a pas été corrompue par ce test raté
+
+État retenu en fin de séance :
+- `ParkAPouet` validée intacte
+- `enshrouded2` désinstallée proprement ensuite
+- Hub Admin + console globale + actions hôte = base désormais suffisamment robuste pour reprendre la refacto du `deploy` le lendemain
+
 Prochaines priorités après ce gel :
 - refactoriser les actions hôte (`deploy`, `attach`, `update`, `uninstall`, `rebalance`) pour réduire la logique shell
 - documenter et stabiliser le contrat commun par jeu

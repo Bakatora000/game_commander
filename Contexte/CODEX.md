@@ -242,11 +242,26 @@ Roadmap status update:
 - `/commander` is no longer only a landing page:
   - it is now a dedicated Hub Admin Flask app
   - auth is separate from per-instance Commanders
-  - first host actions are exposed there (`start/stop/restart`, `update --instance`, `rebalance`, `redeploy`, `uninstall`)
+  - first host actions are exposed there (`start/stop/restart`, `update --instance`, `rebalance`, `redeploy`, `uninstall`, `deploy`)
+  - it now includes a single global action console for host operations
 - the `v3.0` direction is now explicit:
   - keep shell for host-level provisioning and Linux integration
   - move orchestration and product logic progressively into Python
   - use the Hub Admin as the long-term host control surface
+
+Validated `v3.0` status update after the first real Hub deploy tests:
+- Hub-triggered `deploy` now exists for new instances, with a minimal non-interactive form
+- Hub-triggered `deploy` required multiple hardening fixes that are now in place:
+  - dedicated sudoers permission for `deploy-instance`
+  - nested `sudo` avoided inside the host CLI when already running as root
+  - `deploy_config.env` save now uses the real in-memory deploy values instead of default placeholders
+  - `deploy --config` now fails fast if `GAME_ID` or `INSTANCE_ID` are missing instead of silently falling back to an interactive default game flow
+  - partial instances left by an interrupted/failed Hub deploy can now be removed cleanly from the Hub even when `deploy_config.env` is missing or invalid
+  - Hub action logs now strip ANSI color sequences before writing to the global console
+
+Operational note:
+- during the first real Hub deploy validation, a partial `minecraft2` instance was created and then successfully removed through the Hub cleanup path
+- this validated the partial-instance uninstall fallback and confirmed that existing managed instances such as `ParkAPouet` were not overwritten by that failed deploy path
 
 ## Adding a New Game
 
