@@ -54,18 +54,7 @@ deploy_handle_special_args() {
 
 deploy_runtime_src_dir() {
     local src_dir="${1:-$SRC_DIR}"
-
-    if [[ -f "$src_dir/runtime/app.py" ]]; then
-        printf '%s\n' "$src_dir/runtime"
-        return 0
-    fi
-
-    if [[ -f "$src_dir/app.py" ]]; then
-        printf '%s\n' "$src_dir"
-        return 0
-    fi
-
-    return 1
+    python3 "$SCRIPT_DIR/shared/deployenv.py" runtime-src --src-dir "$src_dir"
 }
 
 deploy_has_runtime_sources() {
@@ -90,10 +79,9 @@ set_game_defaults() {
 
 deploy_load_config_file() {
     if $CONFIG_MODE; then
-        [[ -f "$CONFIG_FILE_DEPLOY" ]] || die "Fichier de config introuvable : $CONFIG_FILE_DEPLOY"
+        python3 "$SCRIPT_DIR/shared/deployenv.py" validate-config --config "$CONFIG_FILE_DEPLOY" \
+            || die "Config invalide : $CONFIG_FILE_DEPLOY"
         source <(python3 "$SCRIPT_DIR/shared/deployenv.py" exports --config "$CONFIG_FILE_DEPLOY")
-        [[ -n "$GAME_ID" ]] || die "Config invalide : GAME_ID manquant dans $CONFIG_FILE_DEPLOY"
-        [[ -n "$INSTANCE_ID" ]] || die "Config invalide : INSTANCE_ID manquant dans $CONFIG_FILE_DEPLOY"
         info "Config chargée depuis : $CONFIG_FILE_DEPLOY"
     fi
 }

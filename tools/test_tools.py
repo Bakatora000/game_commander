@@ -464,6 +464,22 @@ class DeployEnvTests(unittest.TestCase):
         self.assertIn("minecraft-fabric", template)
         self.assertIn('AUTO_CONFIRM=true', template)
 
+    def test_runtime_src_dir_finds_runtime_subdir(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            runtime_dir = root / "runtime"
+            runtime_dir.mkdir()
+            (runtime_dir / "app.py").write_text("", encoding="utf-8")
+            self.assertEqual(deployenv.runtime_src_dir(root), runtime_dir)
+
+    def test_validate_config_file_requires_game_and_instance(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = Path(d) / "deploy_config.env"
+            cfg.write_text('GAME_ID="valheim"\n', encoding="utf-8")
+            ok, message = deployenv.validate_config_file(cfg)
+            self.assertFalse(ok)
+            self.assertIn("INSTANCE_ID", message)
+
 
 class RedeployCoreTests(unittest.TestCase):
 

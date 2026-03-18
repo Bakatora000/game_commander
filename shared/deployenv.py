@@ -181,6 +181,27 @@ def apply_game_defaults(env: dict[str, str]) -> dict[str, str]:
     return merged
 
 
+def runtime_src_dir(src_dir: str | Path) -> Path | None:
+    root = Path(src_dir)
+    candidate = root / "runtime"
+    if (candidate / "app.py").is_file():
+        return candidate
+    if (root / "app.py").is_file():
+        return root
+    return None
+
+
+def validate_config_file(path: str | Path, required: tuple[str, ...] = ("GAME_ID", "INSTANCE_ID")) -> tuple[bool, str]:
+    cfg = Path(path)
+    if not cfg.is_file():
+        return False, f"Fichier introuvable : {cfg}"
+    env = normalize_deploy_env(cfg)
+    missing = [key for key in required if not env.get(key)]
+    if missing:
+        return False, f"Config invalide : {', '.join(missing)} manquant(s) dans {cfg}"
+    return True, ""
+
+
 def fill_defaults_from_process_env() -> dict[str, str]:
     env = {key: os.environ.get(key, "") for key in BASE_DEFAULTS}
     return apply_game_defaults(env)
@@ -272,6 +293,23 @@ def _cmd_template(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_runtime_src(args: argparse.Namespace) -> int:
+    resolved = runtime_src_dir(args.src_dir)
+    if not resolved:
+        print(f"Sources runtime introuvables dans {args.src_dir}", file=sys.stderr)
+        return 1
+    print(resolved)
+    return 0
+
+
+def _cmd_validate_config(args: argparse.Namespace) -> int:
+    ok, message = validate_config_file(args.config, tuple(args.require))
+    if not ok:
+        print(message, file=sys.stderr)
+        return 1
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Game Commander deploy env helper")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -283,6 +321,13 @@ def build_parser() -> argparse.ArgumentParser:
     template = sub.add_parser("template")
     template.add_argument("--out", required=True)
     template.set_defaults(func=_cmd_template)
+    runtime_src = sub.add_parser("runtime-src")
+    runtime_src.add_argument("--src-dir", required=True)
+    runtime_src.set_defaults(func=_cmd_runtime_src)
+    validate = sub.add_parser("validate-config")
+    validate.add_argument("--config", required=True)
+    validate.add_argument("--require", action="append", default=["GAME_ID", "INSTANCE_ID"])
+    validate.set_defaults(func=_cmd_validate_config)
     return parser
 
 
