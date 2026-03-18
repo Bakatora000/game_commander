@@ -7,6 +7,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+GAME_CATALOG: dict[str, dict[str, str]] = {
+    "valheim": {"label": "Valheim", "steam_appid": "896660", "game_binary": "valheim_server.x86_64"},
+    "enshrouded": {"label": "Enshrouded", "steam_appid": "2278520", "game_binary": "enshrouded_server.exe"},
+    "minecraft": {"label": "Minecraft Java", "steam_appid": "", "game_binary": "java"},
+    "minecraft-fabric": {"label": "Minecraft Fabric", "steam_appid": "", "game_binary": "java"},
+    "terraria": {"label": "Terraria", "steam_appid": "", "game_binary": "TerrariaServer.bin.x86_64"},
+    "soulmask": {"label": "Soulmask", "steam_appid": "3017300", "game_binary": "StartServer.sh"},
+    "satisfactory": {"label": "Satisfactory", "steam_appid": "1690800", "game_binary": "FactoryServer.sh"},
+}
+
 
 def _run_stdout(cmd: list[str]) -> str:
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
@@ -143,6 +153,47 @@ def check_port_conflict(port: int, proto: str, ignored_pid: str = "") -> bool:
     return False
 
 
+def game_meta(game_id: str) -> dict[str, str]:
+    return dict(GAME_CATALOG.get(game_id, {"label": game_id, "steam_appid": "", "game_binary": ""}))
+
+
+def next_free_flask_port(port: int) -> int:
+    current = port
+    while True:
+        result = subprocess.run(["ss", "-tlnH", f"sport = :{current}"], capture_output=True, text=True, check=False)
+        if f":{current}" not in (result.stdout or ""):
+            return current
+        current += 1
+
+
+def nginx_conf_for_domain(domain: str) -> str:
+    for path in (
+        f"/etc/nginx/conf.d/{domain}.conf",
+        f"/etc/nginx/sites-enabled/{domain}.conf",
+        f"/etc/nginx/sites-available/{domain}.conf",
+    ):
+        if Path(path).is_file():
+            return path
+    return ""
+
+
+def existing_prefix_owner(domain: str, url_prefix: str) -> tuple[str, str]:
+    conf = nginx_conf_for_domain(domain)
+    if not conf or not url_prefix:
+        return "", ""
+    content = Path(conf).read_text(encoding="utf-8", errors="replace")
+    marker = f"location {url_prefix} {{"
+    idx = content.find(marker)
+    if idx < 0:
+        return conf, ""
+    window = content[idx:idx + 400]
+    needle = "proxy_pass http://127.0.0.1:"
+    port = ""
+    if needle in window:
+        port = window.split(needle, 1)[1].split(";", 1)[0].strip()
+    return conf, port
+
+
 def suggest_free_port_group(
     *,
     game_id: str,
@@ -213,6 +264,28 @@ def _cmd_instance_defaults(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_game_meta(args: argparse.Namespace) -> int:
+    meta = game_meta(args.game_id)
+    payload = {
+        "GAME_LABEL": meta["label"],
+        "STEAM_APPID": meta["steam_appid"],
+        "GAME_BINARY": meta["game_binary"],
+    }
+    print(_exports(payload), end="")
+    return 0
+
+
+def _cmd_web_defaults(args: argparse.Namespace) -> int:
+    conf, owner = existing_prefix_owner(args.domain, args.url_prefix)
+    payload = {
+        "FLASK_PORT": str(next_free_flask_port(int(args.flask_port))),
+        "NGINX_CONF_FOR_DOMAIN": conf,
+        "EXISTING_OWNER": owner,
+    }
+    print(_exports(payload), end="")
+    return 0
+
+
 def _cmd_suggest_ports(args: argparse.Namespace) -> int:
     payload = suggest_free_port_group(
         game_id=args.game_id,
@@ -246,6 +319,14 @@ def build_parser() -> argparse.ArgumentParser:
     ports.add_argument("--echo-port", default="0")
     ports.add_argument("--game-service", default="")
     ports.set_defaults(func=_cmd_suggest_ports)
+    meta = sub.add_parser("game-meta")
+    meta.add_argument("--game-id", required=True)
+    meta.set_defaults(func=_cmd_game_meta)
+    web = sub.add_parser("web-defaults")
+    web.add_argument("--domain", required=True)
+    web.add_argument("--url-prefix", required=True)
+    web.add_argument("--flask-port", required=True)
+    web.set_defaults(func=_cmd_web_defaults)
     return parser
 
 

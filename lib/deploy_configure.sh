@@ -174,15 +174,7 @@ deploy_select_game() {
 
     set_game_defaults
 
-    case "$GAME_ID" in
-        valheim)    GAME_LABEL="Valheim";    STEAM_APPID="896660";  GAME_BINARY="valheim_server.x86_64" ;;
-        enshrouded) GAME_LABEL="Enshrouded"; STEAM_APPID="2278520"; GAME_BINARY="enshrouded_server.exe" ;;
-        minecraft)  GAME_LABEL="Minecraft Java";  STEAM_APPID="";        GAME_BINARY="java" ;;
-        minecraft-fabric) GAME_LABEL="Minecraft Fabric"; STEAM_APPID=""; GAME_BINARY="java" ;;
-        terraria) GAME_LABEL="Terraria"; STEAM_APPID=""; GAME_BINARY="TerrariaServer.bin.x86_64" ;;
-        soulmask) GAME_LABEL="Soulmask"; STEAM_APPID="3017300"; GAME_BINARY="StartServer.sh" ;;
-        satisfactory) GAME_LABEL="Satisfactory"; STEAM_APPID="1690800"; GAME_BINARY="FactoryServer.sh" ;;
-    esac
+    source <(python3 "$SCRIPT_DIR/shared/deployplan.py" game-meta --game-id "$GAME_ID")
     ok "Jeu sélectionné : ${BOLD}${GAME_LABEL}${RESET}"
 }
 
@@ -374,27 +366,22 @@ deploy_configure_server() {
     prompt "Préfixe URL" "${URL_PREFIX}"
     URL_PREFIX="${REPLY%/}"
 
-    nginx_conf_for_domain=""
-    for _nc in "/etc/nginx/conf.d/${DOMAIN}.conf" \
-               "/etc/nginx/sites-enabled/${DOMAIN}.conf" \
-               "/etc/nginx/sites-available/${DOMAIN}.conf"; do
-        [[ -f "$_nc" ]] && { nginx_conf_for_domain="$_nc"; break; }
-    done
-    if [[ -n "$nginx_conf_for_domain" ]]; then
-        existing_owner=$(grep -A5 "location ${URL_PREFIX} {" "$nginx_conf_for_domain" 2>/dev/null \
-            | grep -oP '(?<=proxy_pass http://127\.0\.0\.1:)\d+' | head -1 || true)
-        if [[ -n "$existing_owner" ]]; then
-            warn "Le préfixe '${URL_PREFIX}' est déjà utilisé sur ${DOMAIN}"
-            warn "  → proxy_pass existant : http://127.0.0.1:${existing_owner}"
-            echo ""
-            echo -e "  Suggestions : ${BOLD}/commander${RESET}  /gc  /gameadmin  /${GAME_ID}"
-            echo ""
-            prompt "Nouveau préfixe URL" "/${GAME_ID}"
-            URL_PREFIX="${REPLY%/}"
-        fi
+    source <(
+        python3 "$SCRIPT_DIR/shared/deployplan.py" web-defaults \
+            --domain "$DOMAIN" \
+            --url-prefix "$URL_PREFIX" \
+            --flask-port "${FLASK_PORT:-0}"
+    )
+    if [[ -n "$EXISTING_OWNER" ]]; then
+        warn "Le préfixe '${URL_PREFIX}' est déjà utilisé sur ${DOMAIN}"
+        warn "  → proxy_pass existant : http://127.0.0.1:${EXISTING_OWNER}"
+        echo ""
+        echo -e "  Suggestions : ${BOLD}/commander${RESET}  /gc  /gameadmin  /${GAME_ID}"
+        echo ""
+        prompt "Nouveau préfixe URL" "/${GAME_ID}"
+        URL_PREFIX="${REPLY%/}"
     fi
 
-    FLASK_PORT="$(deploy_next_free_flask_port "${FLASK_PORT}")"
     prompt "Port Flask interne" "${FLASK_PORT}"
     FLASK_PORT="$REPLY"
 
