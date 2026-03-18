@@ -761,42 +761,32 @@ STARTEOF
                 ok "Paramètres injectés dans start_server_bepinex.sh"
             else
                 warn "start_server_bepinex.sh introuvable — script BepInEx généré"
-                cat > "$START_SCRIPT" << STARTEOF
-#!/usr/bin/env bash
-export DOORSTOP_ENABLE=TRUE
-export DOORSTOP_INVOKE_DLL_PATH=./BepInEx/core/BepInEx.Preloader.dll
-export DOORSTOP_CORLIB_OVERRIDE_PATH=./unstripped_corlib
-export LD_LIBRARY_PATH="./doorstop_libs:\$LD_LIBRARY_PATH"
-export LD_PRELOAD="libdoorstop_x64.so:\$LD_PRELOAD"
-export LD_LIBRARY_PATH="./linux64:\$LD_LIBRARY_PATH"
-export SteamAppId=892970
-cd "${SERVER_DIR}"
-exec ./valheim_server.x86_64 \\
-    -name "${SERVER_NAME}" \\
-    -port ${SERVER_PORT} \\
-    -world "${WORLD_NAME}" \\
-    -password "${SERVER_PASSWORD}" \\
-    -savedir "${DATA_DIR}" \\
-    -public 1 \\
-    ${CROSSPLAY_FLAG}
-STARTEOF
+                python3 "$SCRIPT_DIR/shared/startscripts.py" valheim \
+                    --out "$START_SCRIPT" \
+                    --server-dir "$SERVER_DIR" \
+                    --data-dir "$DATA_DIR" \
+                    --server-name "$SERVER_NAME" \
+                    --server-port "$SERVER_PORT" \
+                    --world-name "$WORLD_NAME" \
+                    --server-password "$SERVER_PASSWORD" \
+                    --crossplay-flag "$CROSSPLAY_FLAG" \
+                    --sys-user "$SYS_USER" \
+                    --bepinex \
+                || die "Échec génération start_server.sh Valheim BepInEx"
                 ok "Script BepInEx généré"
             fi
         else
-            cat > "$START_SCRIPT" << STARTEOF
-#!/usr/bin/env bash
-export SteamAppId=892970
-export LD_LIBRARY_PATH="${SERVER_DIR}/linux64:\$LD_LIBRARY_PATH"
-cd "${SERVER_DIR}"
-exec ./valheim_server.x86_64 \\
-    -name "${SERVER_NAME}" \\
-    -port ${SERVER_PORT} \\
-    -world "${WORLD_NAME}" \\
-    -password "${SERVER_PASSWORD}" \\
-    -savedir "${DATA_DIR}" \\
-    -public 1 \\
-    ${CROSSPLAY_FLAG}
-STARTEOF
+            python3 "$SCRIPT_DIR/shared/startscripts.py" valheim \
+                --out "$START_SCRIPT" \
+                --server-dir "$SERVER_DIR" \
+                --data-dir "$DATA_DIR" \
+                --server-name "$SERVER_NAME" \
+                --server-port "$SERVER_PORT" \
+                --world-name "$WORLD_NAME" \
+                --server-password "$SERVER_PASSWORD" \
+                --crossplay-flag "$CROSSPLAY_FLAG" \
+                --sys-user "$SYS_USER" \
+            || die "Échec génération start_server.sh Valheim"
             ok "Script standard généré (sans BepInEx)"
         fi
     elif [[ "$GAME_ID" == "enshrouded" ]]; then

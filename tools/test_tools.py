@@ -540,6 +540,40 @@ class StartScriptsTests(unittest.TestCase):
         self.assertIn('cd "/srv/satisfactory"', content)
         self.assertIn('exec ./FactoryServer.sh -Port="7777" -ReliablePort="8888" -unattended -log', content)
 
+    def test_render_valheim_start_script_standard(self):
+        content = startscripts.render_valheim_start_script(
+            server_dir="/srv/valheim",
+            data_dir="/srv/valheim-data",
+            server_name="Serveur",
+            server_port="2456",
+            world_name="Monde",
+            server_password="secret",
+            crossplay_flag="-crossplay",
+            bepinex=False,
+        )
+        self.assertIn("export SteamAppId=892970", content)
+        self.assertIn('export LD_LIBRARY_PATH="/srv/valheim/linux64:$LD_LIBRARY_PATH"', content)
+        self.assertIn('cd "/srv/valheim"', content)
+        self.assertIn('-savedir "/srv/valheim-data"', content)
+        self.assertIn("-crossplay", content)
+
+    def test_render_valheim_start_script_bepinex(self):
+        content = startscripts.render_valheim_start_script(
+            server_dir="/srv/valheim",
+            data_dir="/srv/valheim-data",
+            server_name="Serveur",
+            server_port="2456",
+            world_name="Monde",
+            server_password="secret",
+            crossplay_flag="-playfab",
+            bepinex=True,
+        )
+        self.assertIn("export DOORSTOP_ENABLE=TRUE", content)
+        self.assertIn("export DOORSTOP_INVOKE_DLL_PATH=./BepInEx/core/BepInEx.Preloader.dll", content)
+        self.assertIn('export LD_PRELOAD="libdoorstop_x64.so:$LD_PRELOAD"', content)
+        self.assertIn('export LD_LIBRARY_PATH="./linux64:$LD_LIBRARY_PATH"', content)
+        self.assertIn("-playfab", content)
+
 
 class HostOpsTests(unittest.TestCase):
 

@@ -30,6 +30,53 @@ def render_satisfactory_start_script(*, server_dir: str, data_dir: str, server_p
     )
 
 
+def render_valheim_start_script(
+    *,
+    server_dir: str,
+    data_dir: str,
+    server_name: str,
+    server_port: str,
+    world_name: str,
+    server_password: str,
+    crossplay_flag: str,
+    bepinex: bool,
+) -> str:
+    if bepinex:
+        return (
+            "#!/usr/bin/env bash\n"
+            "export DOORSTOP_ENABLE=TRUE\n"
+            "export DOORSTOP_INVOKE_DLL_PATH=./BepInEx/core/BepInEx.Preloader.dll\n"
+            "export DOORSTOP_CORLIB_OVERRIDE_PATH=./unstripped_corlib\n"
+            'export LD_LIBRARY_PATH="./doorstop_libs:$LD_LIBRARY_PATH"\n'
+            'export LD_PRELOAD="libdoorstop_x64.so:$LD_PRELOAD"\n'
+            'export LD_LIBRARY_PATH="./linux64:$LD_LIBRARY_PATH"\n'
+            "export SteamAppId=892970\n"
+            f'cd "{server_dir}"\n'
+            "exec ./valheim_server.x86_64 \\\n"
+            f'    -name "{server_name}" \\\n'
+            f"    -port {server_port} \\\n"
+            f'    -world "{world_name}" \\\n'
+            f'    -password "{server_password}" \\\n'
+            f'    -savedir "{data_dir}" \\\n'
+            "    -public 1 \\\n"
+            f"    {crossplay_flag}\n"
+        )
+    return (
+        "#!/usr/bin/env bash\n"
+        "export SteamAppId=892970\n"
+        f'export LD_LIBRARY_PATH="{server_dir}/linux64:$LD_LIBRARY_PATH"\n'
+        f'cd "{server_dir}"\n'
+        "exec ./valheim_server.x86_64 \\\n"
+        f'    -name "{server_name}" \\\n'
+        f"    -port {server_port} \\\n"
+        f'    -world "{world_name}" \\\n'
+        f'    -password "{server_password}" \\\n'
+        f'    -savedir "{data_dir}" \\\n'
+        "    -public 1 \\\n"
+        f"    {crossplay_flag}\n"
+    )
+
+
 def write_start_script(*, out_path: str, content: str, sys_user: str) -> None:
     path = Path(out_path)
     path.write_text(content, encoding="utf-8")
@@ -58,6 +105,22 @@ def _cmd_satisfactory(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_valheim(args: argparse.Namespace) -> int:
+    content = render_valheim_start_script(
+        server_dir=args.server_dir,
+        data_dir=args.data_dir,
+        server_name=args.server_name,
+        server_port=args.server_port,
+        world_name=args.world_name,
+        server_password=args.server_password,
+        crossplay_flag=args.crossplay_flag,
+        bepinex=args.bepinex,
+    )
+    write_start_script(out_path=args.out, content=content, sys_user=args.sys_user)
+    print(args.out)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Génération de scripts de démarrage Game Commander")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -77,6 +140,19 @@ def build_parser() -> argparse.ArgumentParser:
     satisfactory.add_argument("--reliable-port", required=True)
     satisfactory.add_argument("--sys-user", required=True)
     satisfactory.set_defaults(func=_cmd_satisfactory)
+
+    valheim = sub.add_parser("valheim")
+    valheim.add_argument("--out", required=True)
+    valheim.add_argument("--server-dir", required=True)
+    valheim.add_argument("--data-dir", required=True)
+    valheim.add_argument("--server-name", required=True)
+    valheim.add_argument("--server-port", required=True)
+    valheim.add_argument("--world-name", required=True)
+    valheim.add_argument("--server-password", required=True)
+    valheim.add_argument("--crossplay-flag", default="")
+    valheim.add_argument("--sys-user", required=True)
+    valheim.add_argument("--bepinex", action="store_true")
+    valheim.set_defaults(func=_cmd_valheim)
     return parser
 
 
