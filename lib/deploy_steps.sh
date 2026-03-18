@@ -504,6 +504,48 @@ PYEOF
         return
     fi
 
+    if [[ "$GAME_ID" == "enshrouded" ]]; then
+        hdr "ÉTAPE 4 : Installation Enshrouded"
+        mkdir -p "$SERVER_DIR" "$DATA_DIR"
+        chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR" "$DATA_DIR"
+
+        DO_INSTALL=true
+        if [[ -f "$SERVER_DIR/$GAME_BINARY" ]]; then
+            ok "$GAME_LABEL déjà installé"
+            if $AUTO_UPDATE_SERVER; then
+                echo -e "  ${DIM}  (config) Mise à jour → oui${RESET}"
+            else
+                confirm "Mettre à jour depuis Steam ?" "n" || DO_INSTALL=false
+            fi
+        fi
+
+        if $DO_INSTALL; then
+            info "Téléchargement $GAME_LABEL via SteamCMD (AppID $STEAM_APPID)..."
+            info "Cela peut prendre plusieurs minutes..."
+            local ens_out=""
+            if ens_out="$(python3 "$SCRIPT_DIR/shared/gameinstall.py" enshrouded \
+                --server-dir "$SERVER_DIR" \
+                --data-dir "$DATA_DIR" \
+                --sys-user "$SYS_USER" \
+                --steamcmd-path "$STEAMCMD_PATH" \
+                --steam-appid "$STEAM_APPID" 2>&1)"; then
+                while IFS= read -r _line; do
+                    [[ -n "$_line" ]] && ok "$_line"
+                done <<< "$ens_out"
+            else
+                [[ -n "$ens_out" ]] && while IFS= read -r _line; do
+                    [[ -n "$_line" ]] && warn "$_line"
+                done <<< "$ens_out"
+                die "Échec installation serveur Enshrouded"
+            fi
+        else
+            [[ -f "$SERVER_DIR/$GAME_BINARY" ]] || die "Binaire $GAME_BINARY introuvable dans $SERVER_DIR"
+            chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
+            ok "Binaire $GAME_BINARY vérifié"
+        fi
+        return
+    fi
+
     hdr "ÉTAPE 4 : Installation $GAME_LABEL"
     mkdir -p "$SERVER_DIR"
     chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
@@ -801,13 +843,12 @@ STARTEOF
         || die "Échec génération enshrouded_server.json"
         chown "$SYS_USER:$SYS_USER" "$ENSHROUDED_CFG"
         ok "enshrouded_server.json généré"
-        cat > "$START_SCRIPT" << STARTEOF
-#!/usr/bin/env bash
-export WINEDEBUG=-all
-export WINEPREFIX="${HOME_DIR}/.wine"
-cd "${SERVER_DIR}"
-exec xvfb-run --auto-servernum wine64 ./enshrouded_server.exe
-STARTEOF
+        python3 "$SCRIPT_DIR/shared/startscripts.py" enshrouded \
+            --out "$START_SCRIPT" \
+            --server-dir "$SERVER_DIR" \
+            --home-dir "$HOME_DIR" \
+            --sys-user "$SYS_USER" \
+        || die "Échec génération start_server.sh Enshrouded"
     fi
 
     chmod +x "$START_SCRIPT"

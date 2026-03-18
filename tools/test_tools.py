@@ -571,6 +571,16 @@ class StartScriptsTests(unittest.TestCase):
         self.assertIn('cd "/srv/satisfactory"', content)
         self.assertIn('exec ./FactoryServer.sh -Port="7777" -ReliablePort="8888" -unattended -log', content)
 
+    def test_render_enshrouded_start_script_uses_wineprefix(self):
+        content = startscripts.render_enshrouded_start_script(
+            server_dir="/srv/enshrouded",
+            home_dir="/home/gameserver",
+        )
+        self.assertIn("export WINEDEBUG=-all", content)
+        self.assertIn('export WINEPREFIX="/home/gameserver/.wine"', content)
+        self.assertIn('cd "/srv/enshrouded"', content)
+        self.assertIn("exec xvfb-run --auto-servernum wine64 ./enshrouded_server.exe", content)
+
     def test_render_valheim_start_script_standard(self):
         content = startscripts.render_valheim_start_script(
             server_dir="/srv/valheim",
@@ -1578,6 +1588,31 @@ class DeployHelpersTests(unittest.TestCase):
             self.assertIn("BepInEx installé", messages)
             self.assertTrue((server_dir / "BepInEx" / "core" / "BepInEx.Preloader.dll").is_file())
             self.assertFalse((server_dir / "BepInEx" / "plugins" / "Valheim.DisplayBepInExInfo.dll").exists())
+
+    def test_install_enshrouded_uses_windows_steamcmd_and_verifies_binary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            server_dir = Path(tmp) / "server"
+            data_dir = Path(tmp) / "data"
+
+            def fake_run_steamcmd(**kwargs):
+                server_dir.mkdir(parents=True, exist_ok=True)
+                (server_dir / "enshrouded_server.exe").write_text("bin", encoding="utf-8")
+                self.assertEqual(kwargs["platform"], "windows")
+                return mock.Mock(returncode=0, stdout="", stderr="")
+
+            with mock.patch.object(gameinstall, "_run_steamcmd", side_effect=fake_run_steamcmd), \
+                 mock.patch("shared.gameinstall.subprocess.run") as run_mock:
+                run_mock.return_value = mock.Mock(returncode=0, stdout="", stderr="")
+                messages = gameinstall.install_enshrouded(
+                    server_dir=str(server_dir),
+                    data_dir=str(data_dir),
+                    sys_user="vhserver",
+                    steamcmd_path="/home/vhserver/steamcmd/steamcmd.sh",
+                    steam_appid="2278520",
+                )
+
+            self.assertIn("Serveur Enshrouded téléchargé", messages)
+            self.assertIn("Binaire enshrouded_server.exe vérifié", messages)
 
 
 class ConfigGenUsersJsonTests(unittest.TestCase):

@@ -77,6 +77,16 @@ def render_valheim_start_script(
     )
 
 
+def render_enshrouded_start_script(*, server_dir: str, home_dir: str) -> str:
+    return (
+        "#!/usr/bin/env bash\n"
+        "export WINEDEBUG=-all\n"
+        f'export WINEPREFIX="{home_dir}/.wine"\n'
+        f'cd "{server_dir}"\n'
+        "exec xvfb-run --auto-servernum wine64 ./enshrouded_server.exe\n"
+    )
+
+
 def write_start_script(*, out_path: str, content: str, sys_user: str) -> None:
     path = Path(out_path)
     path.write_text(content, encoding="utf-8")
@@ -121,6 +131,16 @@ def _cmd_valheim(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_enshrouded(args: argparse.Namespace) -> int:
+    content = render_enshrouded_start_script(
+        server_dir=args.server_dir,
+        home_dir=args.home_dir,
+    )
+    write_start_script(out_path=args.out, content=content, sys_user=args.sys_user)
+    print(args.out)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Génération de scripts de démarrage Game Commander")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -140,6 +160,13 @@ def build_parser() -> argparse.ArgumentParser:
     satisfactory.add_argument("--reliable-port", required=True)
     satisfactory.add_argument("--sys-user", required=True)
     satisfactory.set_defaults(func=_cmd_satisfactory)
+
+    enshrouded = sub.add_parser("enshrouded")
+    enshrouded.add_argument("--out", required=True)
+    enshrouded.add_argument("--server-dir", required=True)
+    enshrouded.add_argument("--home-dir", required=True)
+    enshrouded.add_argument("--sys-user", required=True)
+    enshrouded.set_defaults(func=_cmd_enshrouded)
 
     valheim = sub.add_parser("valheim")
     valheim.add_argument("--out", required=True)

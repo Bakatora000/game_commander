@@ -260,6 +260,41 @@ def install_satisfactory(
     return messages
 
 
+def install_enshrouded(
+    *,
+    server_dir: str,
+    data_dir: str,
+    sys_user: str,
+    steamcmd_path: str,
+    steam_appid: str,
+) -> list[str]:
+    messages: list[str] = []
+    server_path = Path(server_dir)
+    data_path = Path(data_dir)
+    server_path.mkdir(parents=True, exist_ok=True)
+    data_path.mkdir(parents=True, exist_ok=True)
+    _chown_tree(sys_user, server_path)
+    _chown_tree(sys_user, data_path)
+
+    result = _run_steamcmd(
+        sys_user=sys_user,
+        steamcmd_path=steamcmd_path,
+        platform="windows",
+        install_dir=server_path,
+        steam_appid=steam_appid,
+    )
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "Échec SteamCMD").strip())
+
+    binary_path = server_path / "enshrouded_server.exe"
+    if not binary_path.is_file():
+        raise RuntimeError(f"Binaire enshrouded_server.exe introuvable dans {server_path}")
+    _chown_tree(sys_user, server_path)
+    messages.append("Serveur Enshrouded téléchargé")
+    messages.append("Binaire enshrouded_server.exe vérifié")
+    return messages
+
+
 def install_valheim(
     *,
     server_dir: str,
@@ -402,6 +437,23 @@ def _cmd_valheim(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_enshrouded(args: argparse.Namespace) -> int:
+    try:
+        messages = install_enshrouded(
+            server_dir=args.server_dir,
+            data_dir=args.data_dir,
+            sys_user=args.sys_user,
+            steamcmd_path=args.steamcmd_path,
+            steam_appid=args.steam_appid,
+        )
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    for line in messages:
+        print(line)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Game Commander game install helper")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -423,6 +475,14 @@ def build_parser() -> argparse.ArgumentParser:
     satisfactory.add_argument("--steamcmd-path", required=True)
     satisfactory.add_argument("--steam-appid", required=True)
     satisfactory.set_defaults(func=_cmd_satisfactory)
+
+    enshrouded = sub.add_parser("enshrouded")
+    enshrouded.add_argument("--server-dir", required=True)
+    enshrouded.add_argument("--data-dir", required=True)
+    enshrouded.add_argument("--sys-user", required=True)
+    enshrouded.add_argument("--steamcmd-path", required=True)
+    enshrouded.add_argument("--steam-appid", required=True)
+    enshrouded.set_defaults(func=_cmd_enshrouded)
 
     valheim = sub.add_parser("valheim")
     valheim.add_argument("--server-dir", required=True)
