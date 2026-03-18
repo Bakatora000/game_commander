@@ -83,9 +83,6 @@ Documentation utilisateur disponible pour l'instant :
 ### Configuration
 ![Valheim Configuration](docs/screenshots/valheim/valheim_configuration.png)
 
-### Console
-![Valheim Console](docs/screenshots/valheim/valheim_console.png)
-
 ## Utilisation courante
 
 ```bash
