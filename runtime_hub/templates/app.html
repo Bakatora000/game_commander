@@ -403,7 +403,6 @@
               data-confirm="Désinstaller complètement ${inst.name} ?"
             >Désinstaller</button>
           </div>
-          <div class="action-feedback" id="feedback-instance-${inst.name}"></div>
         </article>
       `).join('');
       cardsEl.querySelectorAll('[data-action^="instance-"]').forEach((button) => {
@@ -418,7 +417,6 @@
           if (action === 'uninstall') {
             const typed = window.prompt(`Confirme la désinstallation de ${instance} en retapant son identifiant :`, '');
             if (typed !== instance) {
-              setFeedback(`feedback-instance-${instance}`, 'Désinstallation annulée', false);
               return;
             }
           }
@@ -431,32 +429,18 @@
           const card = button.closest('.card');
           const cardButtons = card ? Array.from(card.querySelectorAll('.card-actions button')) : [button];
           cardButtons.forEach((btn) => { btn.disabled = true; });
-          setFeedback(`feedback-instance-${instance}`, 'Action en cours…', true);
           try {
             const response = await fetch(endpoint, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'same-origin',
             });
-            const raw = await response.text();
-            let data = {};
-            try {
-              data = raw ? JSON.parse(raw) : {};
-            } catch (_err) {
-              data = {};
-            }
-          const fallback = response.ok
-              ? 'Action lancée'
-              : (raw && !raw.toLowerCase().startsWith('<!doctype') && !raw.toLowerCase().startsWith('<html')
-                ? raw
-                : 'Erreur serveur Hub');
-            setFeedback(`feedback-instance-${instance}`, data.message || fallback, response.ok);
+            await response.text();
             if (!document.getElementById('globalConsolePanel').hidden) {
               await loadGlobalConsole();
             }
             setTimeout(load, response.ok ? 1200 : 0);
           } catch (_err) {
-            setFeedback(`feedback-instance-${instance}`, 'Erreur réseau ou Hub indisponible', false);
             if (!document.getElementById('globalConsolePanel').hidden) {
               await loadGlobalConsole();
             }
