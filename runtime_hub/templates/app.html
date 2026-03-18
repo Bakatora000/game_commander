@@ -270,17 +270,20 @@
             </select>
             <label class="field-label" for="deployInstance">Identifiant d’instance</label>
             <input class="field-input" id="deployInstance" placeholder="minecraft2">
-            <p class="section-subtitle">Exemple : <code>minecraft2</code>. Ce n’est pas l’utilisateur Linux ; le Hub réutilise l’utilisateur système par défaut du serveur.</p>
+            <p class="section-subtitle">Exemple : <code>minecraft2</code>. C’est le nom technique de l’instance : URL <code>/minecraft2</code>, dossier <code>game-commander-minecraft2</code>, services associés. Ce n’est pas l’utilisateur Linux ; le Hub réutilise l’utilisateur système par défaut du serveur.</p>
             <label class="field-label" for="deployServerName">Nom du serveur</label>
             <input class="field-input" id="deployServerName" placeholder="Mon Serveur Minecraft">
+            <p class="section-subtitle">Nom visible côté jeu quand le jeu le supporte. Ce n’est pas l’identifiant technique de l’instance.</p>
             <label class="field-label" for="deployDomain">Domaine</label>
             <input class="field-input" id="deployDomain" placeholder="gaming.expevay.net">
           </section>
           <section class="card">
             <label class="field-label" for="deployAdminLogin">Admin instance</label>
             <input class="field-input" id="deployAdminLogin" value="admin">
+            <p class="section-subtitle">Login du compte administrateur du Commander de cette instance, pas de l’utilisateur Linux.</p>
             <label class="field-label" for="deployAdminPassword">Mot de passe admin</label>
             <input class="field-input" id="deployAdminPassword" type="password">
+            <p class="section-subtitle">Mot de passe du compte <code>Admin instance</code> ci-dessus pour l’interface web de cette instance.</p>
             <label class="field-label" for="deployServerPassword">Mot de passe serveur</label>
             <input class="field-input" id="deployServerPassword" type="password" placeholder="optionnel">
             <label class="field-label" for="deployServerPort">Port jeu</label>
