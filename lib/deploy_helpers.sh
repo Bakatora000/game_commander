@@ -190,6 +190,8 @@ deploy_load_config_file() {
     if $CONFIG_MODE; then
         [[ -f "$CONFIG_FILE_DEPLOY" ]] || die "Fichier de config introuvable : $CONFIG_FILE_DEPLOY"
         source <(python3 "$SCRIPT_DIR/shared/deployenv.py" exports --config "$CONFIG_FILE_DEPLOY")
+        [[ -n "$GAME_ID" ]] || die "Config invalide : GAME_ID manquant dans $CONFIG_FILE_DEPLOY"
+        [[ -n "$INSTANCE_ID" ]] || die "Config invalide : INSTANCE_ID manquant dans $CONFIG_FILE_DEPLOY"
         info "Config chargée depuis : $CONFIG_FILE_DEPLOY"
     fi
 }
