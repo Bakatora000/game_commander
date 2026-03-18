@@ -273,8 +273,13 @@ def run_instance_uninstall(instance_name: str) -> tuple[bool, str, dict]:
     host_cli = _host_cli_path()
     if not host_cli.is_file():
         return False, "CLI hôte introuvable", get_hub_payload()
+    game_label = (instance.get("game") or "").strip()
+    game_id = next((gid for gid, meta in instanceenv.GAME_META.items() if meta.get("label") == game_label), "")
+    cmd = ["sudo", "/usr/bin/python3", str(host_cli), "uninstall-instance", "--main-script", str(script_path), "--instance", instance_name]
+    if game_id:
+        cmd.extend(["--game-id", game_id])
     ok, message = hostops.run_command(
-        ["sudo", "/usr/bin/python3", str(host_cli), "uninstall-instance", "--main-script", str(script_path), "--instance", instance_name],
+        cmd,
         timeout=1200,
     )
     _append_action_log(instance_name, "uninstall", ok, message or f"Instance {instance_name} désinstallée")

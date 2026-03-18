@@ -171,6 +171,50 @@ def _home_dir_for_user(sys_user: str) -> Path:
     return Path(pwd.getpwnam(sys_user).pw_dir)
 
 
+def _discover_partial_app_dir(instance_id: str) -> Path | None:
+    candidates = []
+    for root in hostctl.DEFAULT_SEARCH_ROOTS:
+        root_path = Path(root)
+        if not root_path.exists():
+            continue
+        if root_path.name == "root":
+            candidate = root_path / f"game-commander-{instance_id}"
+            candidates.append(candidate)
+            continue
+        for home in root_path.iterdir():
+            if not home.is_dir():
+                continue
+            candidates.append(home / f"game-commander-{instance_id}")
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate.resolve()
+    return None
+
+
+def _infer_env_for_partial_instance(instance_id: str, game_id: str) -> dict[str, str] | None:
+    app_dir = _discover_partial_app_dir(instance_id)
+    if not app_dir:
+        return None
+    home_dir = app_dir.parent
+    sys_user = ""
+    try:
+        sys_user = pwd.getpwuid(app_dir.stat().st_uid).pw_name
+    except KeyError:
+        if home_dir.parent == Path("/home"):
+            sys_user = home_dir.name
+    backup_dir = home_dir / "gamebackups"
+    return {
+        "INSTANCE_ID": instance_id,
+        "GAME_ID": game_id,
+        "SYS_USER": sys_user,
+        "APP_DIR": str(app_dir),
+        "SERVER_DIR": str(home_dir / f"{instance_id}_server"),
+        "DATA_DIR": str(home_dir / f"{instance_id}_data"),
+        "BACKUP_DIR": str(backup_dir),
+        "GAME_SERVICE": instanceenv.default_game_service(game_id, instance_id),
+    }
+
+
 def run_full_uninstall(config_file: str | Path, repo_root: str | Path) -> tuple[bool, list[str] | str]:
     cfg = Path(config_file).resolve()
     env = instanceenv.parse_env_file(cfg)
@@ -212,5 +256,37 @@ def run_full_uninstall(config_file: str | Path, repo_root: str | Path) -> tuple[
             messages.append(f"Config supprimée : {cfg}")
         except FileNotFoundError:
             pass
+
+    return True, messages
+
+
+def run_partial_uninstall(instance_id: str, game_id: str, repo_root: str | Path) -> tuple[bool, list[str] | str]:
+    env = _infer_env_for_partial_instance(instance_id, game_id)
+    if not env:
+        return False, "Configuration d'instance introuvable"
+
+    messages: list[str] = []
+    repo_root = Path(repo_root).resolve()
+    game_service = env.get("GAME_SERVICE") or instanceenv.default_game_service(game_id, instance_id)
+    gc_service = f"game-commander-{instance_id}"
+
+    _stop_disable_remove_service(game_service, messages)
+    _stop_disable_remove_service(gc_service, messages)
+    _remove_nginx_instance(instance_id, repo_root, messages)
+    _remove_sudoers(game_id, instance_id, messages)
+
+    sys_user = env.get("SYS_USER", "").strip()
+    app_dir = _path_value(env, "APP_DIR")
+    if sys_user and app_dir and app_dir.exists():
+        _remove_cron(sys_user, app_dir, messages)
+
+    cfg = Path(env["APP_DIR"]) / "deploy_config.env"
+    _remove_tree_if_owned(app_dir, "Répertoire Game Commander", cfg, messages)
+    server_dir = _path_value(env, "SERVER_DIR")
+    data_dir = _path_value(env, "DATA_DIR")
+    _remove_tree_if_owned(server_dir, "Répertoire serveur", cfg, messages)
+    if data_dir and data_dir != server_dir:
+        _remove_tree_if_owned(data_dir, "Répertoire données", cfg, messages)
+    _remove_tree_if_owned(_effective_backup_dir(env), "Répertoire sauvegardes", cfg, messages)
 
     return True, messages

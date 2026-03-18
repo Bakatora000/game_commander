@@ -130,10 +130,14 @@ def cmd_deploy_instance(args: argparse.Namespace) -> int:
 
 def cmd_uninstall_instance(args: argparse.Namespace) -> int:
     config_file = hostctl.resolve_instance_config(args.instance)
-    if not config_file:
-        print("Configuration d'instance introuvable", file=sys.stderr)
-        return 1
-    ok, result = uninstallcore.run_full_uninstall(config_file, Path(args.main_script).resolve().parent)
+    repo_root = Path(args.main_script).resolve().parent
+    if config_file:
+        ok, result = uninstallcore.run_full_uninstall(config_file, repo_root)
+    else:
+        if not args.game_id:
+            print("Configuration d'instance introuvable", file=sys.stderr)
+            return 1
+        ok, result = uninstallcore.run_partial_uninstall(args.instance, args.game_id, repo_root)
     if not ok:
         print(result, file=sys.stderr)
         return 1
@@ -222,6 +226,7 @@ def build_parser() -> argparse.ArgumentParser:
     uninstall = sub.add_parser("uninstall-instance")
     uninstall.add_argument("--main-script", required=True, type=_existing_path)
     uninstall.add_argument("--instance", required=True)
+    uninstall.add_argument("--game-id", default="")
     uninstall.set_defaults(func=cmd_uninstall_instance)
 
     rebalance = sub.add_parser("rebalance")
