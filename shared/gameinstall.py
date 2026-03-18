@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import urllib.request
@@ -76,6 +77,11 @@ def _chown_paths(sys_user: str, *paths: Path) -> None:
     valid = [str(path) for path in paths if path.exists()]
     if valid:
         subprocess.run(["chown", f"{sys_user}:{sys_user}", *valid], check=False)
+
+
+def _chown_tree(sys_user: str, path: Path) -> None:
+    if path.exists():
+        subprocess.run(["chown", "-R", f"{sys_user}:{sys_user}", str(path)], check=False)
 
 
 def install_minecraft_java(
@@ -181,6 +187,59 @@ def install_minecraft_fabric(
     return messages
 
 
+def install_satisfactory(
+    *,
+    server_dir: str,
+    data_dir: str,
+    sys_user: str,
+    steamcmd_path: str,
+    steam_appid: str,
+) -> list[str]:
+    messages: list[str] = []
+    server_path = Path(server_dir)
+    data_path = Path(data_dir)
+    server_path.mkdir(parents=True, exist_ok=True)
+    data_path.mkdir(parents=True, exist_ok=True)
+    _chown_tree(sys_user, server_path)
+    _chown_tree(sys_user, data_path)
+
+    result = subprocess.run(
+        [
+            "sudo",
+            "-u",
+            sys_user,
+            steamcmd_path,
+            "+@sSteamCmdForcePlatformType",
+            "linux",
+            "+force_install_dir",
+            str(server_path),
+            "+login",
+            "anonymous",
+            "+app_update",
+            str(steam_appid),
+            "validate",
+            "+quit",
+        ],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "PYTHONUNBUFFERED": "1"},
+    )
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "Échec SteamCMD").strip())
+
+    binary_path = server_path / "FactoryServer.sh"
+    if not binary_path.is_file():
+        raise RuntimeError(f"Binaire FactoryServer.sh introuvable dans {server_path}")
+    try:
+        binary_path.chmod(binary_path.stat().st_mode | 0o111)
+    except OSError:
+        pass
+    _chown_tree(sys_user, server_path)
+    messages.append("Serveur Satisfactory téléchargé")
+    messages.append("Binaire FactoryServer.sh vérifié")
+    return messages
+
+
 def _cmd_minecraft(args: argparse.Namespace) -> int:
     try:
         if args.fabric:
@@ -209,6 +268,23 @@ def _cmd_minecraft(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_satisfactory(args: argparse.Namespace) -> int:
+    try:
+        messages = install_satisfactory(
+            server_dir=args.server_dir,
+            data_dir=args.data_dir,
+            sys_user=args.sys_user,
+            steamcmd_path=args.steamcmd_path,
+            steam_appid=args.steam_appid,
+        )
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    for line in messages:
+        print(line)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Game Commander game install helper")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -222,6 +298,14 @@ def build_parser() -> argparse.ArgumentParser:
     minecraft.add_argument("--max-players", required=True)
     minecraft.add_argument("--fabric", action="store_true")
     minecraft.set_defaults(func=_cmd_minecraft)
+
+    satisfactory = sub.add_parser("satisfactory")
+    satisfactory.add_argument("--server-dir", required=True)
+    satisfactory.add_argument("--data-dir", required=True)
+    satisfactory.add_argument("--sys-user", required=True)
+    satisfactory.add_argument("--steamcmd-path", required=True)
+    satisfactory.add_argument("--steam-appid", required=True)
+    satisfactory.set_defaults(func=_cmd_satisfactory)
     return parser
 
 

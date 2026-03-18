@@ -404,6 +404,47 @@ PYEOF
         return
     fi
 
+    if [[ "$GAME_ID" == "satisfactory" ]]; then
+        hdr "ÉTAPE 4 : Installation Satisfactory"
+        mkdir -p "$SERVER_DIR" "$DATA_DIR"
+        chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR" "$DATA_DIR"
+
+        DO_INSTALL=true
+        if [[ -f "$SERVER_DIR/$GAME_BINARY" ]]; then
+            ok "$GAME_LABEL déjà installé"
+            if $AUTO_UPDATE_SERVER; then
+                echo -e "  ${DIM}  (config) Mise à jour → oui${RESET}"
+            else
+                confirm "Mettre à jour depuis Steam ?" "n" || DO_INSTALL=false
+            fi
+        fi
+
+        if $DO_INSTALL; then
+            info "Téléchargement $GAME_LABEL via SteamCMD (AppID $STEAM_APPID)..."
+            info "Cela peut prendre plusieurs minutes..."
+            local sat_out=""
+            if sat_out="$(python3 "$SCRIPT_DIR/shared/gameinstall.py" satisfactory \
+                --server-dir "$SERVER_DIR" \
+                --data-dir "$DATA_DIR" \
+                --sys-user "$SYS_USER" \
+                --steamcmd-path "$STEAMCMD_PATH" \
+                --steam-appid "$STEAM_APPID" 2>&1)"; then
+                while IFS= read -r _line; do
+                    [[ -n "$_line" ]] && ok "$_line"
+                done <<< "$sat_out"
+            else
+                [[ -n "$sat_out" ]] && while IFS= read -r _line; do
+                    [[ -n "$_line" ]] && warn "$_line"
+                done <<< "$sat_out"
+                die "Échec installation serveur Satisfactory"
+            fi
+        else
+            [[ -f "$SERVER_DIR/$GAME_BINARY" ]] || die "Binaire $GAME_BINARY introuvable dans $SERVER_DIR"
+            ok "Binaire $GAME_BINARY vérifié"
+        fi
+        return
+    fi
+
     hdr "ÉTAPE 4 : Installation $GAME_LABEL"
     mkdir -p "$SERVER_DIR"
     [[ "$GAME_ID" == "valheim" ]] && mkdir -p "$DATA_DIR"
