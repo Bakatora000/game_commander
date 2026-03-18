@@ -614,17 +614,14 @@ WRAPEOF
 
     if [[ "$GAME_ID" == "satisfactory" ]]; then
         START_SCRIPT="$SERVER_DIR/start_server.sh"
-        cat > "$START_SCRIPT" << STARTEOF
-#!/usr/bin/env bash
-set -euo pipefail
-export HOME="${DATA_DIR}"
-export XDG_CONFIG_HOME="${DATA_DIR}/.config"
-mkdir -p "${DATA_DIR}/.config/Epic/FactoryGame/Saved/SaveGames/server"
-cd "${SERVER_DIR}"
-exec ./FactoryServer.sh -Port="${SERVER_PORT}" -ReliablePort="${QUERY_PORT}" -unattended -log
-STARTEOF
-        chmod +x "$START_SCRIPT"
-        chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
+        python3 "$SCRIPT_DIR/shared/startscripts.py" satisfactory \
+            --out "$START_SCRIPT" \
+            --server-dir "$SERVER_DIR" \
+            --data-dir "$DATA_DIR" \
+            --server-port "$SERVER_PORT" \
+            --reliable-port "$QUERY_PORT" \
+            --sys-user "$SYS_USER" \
+        || die "Échec génération start_server.sh Satisfactory"
         ok "Script de démarrage : $START_SCRIPT"
 
         install_game_service_unit "$START_SCRIPT"

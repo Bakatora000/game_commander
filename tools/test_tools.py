@@ -527,6 +527,19 @@ class StartScriptsTests(unittest.TestCase):
         content = startscripts.render_minecraft_start_script(server_dir="/srv/fabric", jar_name="fabric-server-launch.jar")
         self.assertIn("fabric-server-launch.jar", content)
 
+    def test_render_satisfactory_start_script_uses_reliable_port(self):
+        content = startscripts.render_satisfactory_start_script(
+            server_dir="/srv/satisfactory",
+            data_dir="/srv/satisfactory-data",
+            server_port="7777",
+            reliable_port="8888",
+        )
+        self.assertIn('export HOME="/srv/satisfactory-data"', content)
+        self.assertIn('export XDG_CONFIG_HOME="/srv/satisfactory-data/.config"', content)
+        self.assertIn('mkdir -p "/srv/satisfactory-data/.config/Epic/FactoryGame/Saved/SaveGames/server"', content)
+        self.assertIn('cd "/srv/satisfactory"', content)
+        self.assertIn('exec ./FactoryServer.sh -Port="7777" -ReliablePort="8888" -unattended -log', content)
+
 
 class HostOpsTests(unittest.TestCase):
 
