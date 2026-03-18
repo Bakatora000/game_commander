@@ -36,7 +36,7 @@ Pour installer seulement le `Hub Admin` sur un Ubuntu vierge, le point d’entr�
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Bakatora000/game_commander/main/install_hub.sh | \
-  sudo GC_DOMAIN=gaming.example.com GC_ADMIN_PASSWORD='AdmCommander01' bash
+  sudo GC_DOMAIN=gaming.example.com bash
 ```
 
 Cela :
@@ -45,11 +45,12 @@ Cela :
 - clone/met à jour le dépôt sous `/opt/game-commander`
 - publie le `Hub Admin`
 - initialise Nginx pour `/commander`
+- génère un mot de passe admin si aucun n’est fourni explicitement
 
 Alternative locale une fois le dépôt présent :
 
 ```bash
-sudo bash game_commander.sh bootstrap-hub --domain gaming.example.com --admin-password 'AdmCommander01'
+sudo bash game_commander.sh bootstrap-hub --domain gaming.example.com
 ```
 
 ## Jeux gérés actuellement
