@@ -575,6 +575,26 @@ class DeployPlanTests(unittest.TestCase):
         self.assertEqual(payload["QUERY_PORT"], "8890")
         self.assertEqual(payload["CONFLICT_PORT"], "7777")
 
+    def test_describe_port_conflicts_reports_owner(self):
+        with (
+            mock.patch.object(deployplan, "_current_service_pid", return_value=""),
+            mock.patch.object(deployplan, "check_port_conflict", side_effect=[True, False, True]),
+            mock.patch.object(deployplan, "port_owner", side_effect=["PID 10 (foo)", "PID 11 (bar)"]),
+        ):
+            conflicts = deployplan.describe_port_conflicts(
+                game_id="satisfactory",
+                server_port=7777,
+                query_port=8888,
+                game_service="",
+            )
+        self.assertEqual(
+            conflicts,
+            [
+                ("Port de jeu (TCP)", "t", 7777, "PID 10 (foo)"),
+                ("Port fiable / join", "t", 8888, "PID 11 (bar)"),
+            ],
+        )
+
 
 class DeployPostTests(unittest.TestCase):
 

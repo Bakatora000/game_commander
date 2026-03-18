@@ -71,8 +71,10 @@ test_deploy_modules_present() {
     grep -q 'deploy_handle_special_args()' "$helpers_file" || return 1
     grep -q 'deploy_init_logging()' "$helpers_file" || return 1
     grep -q 'deploy_step_configuration()' "$configure_file" || return 1
-    grep -q 'deploy_check_port_conflict()' "$configure_file" || return 1
     grep -q 'deploy_configure_server()' "$configure_file" || return 1
+    grep -q 'shared/deployplan.py" game-meta' "$configure_file" || return 1
+    grep -q 'shared/deployplan.py" web-defaults' "$configure_file" || return 1
+    grep -q 'shared/deployplan.py" describe-conflicts' "$configure_file" || return 1
     grep -q 'deploy_step_dependencies()' "$steps_file" || return 1
     grep -q 'shared/deploybackups.py' "$steps_file" || return 1
     grep -q 'shared/appfiles.py' "$steps_file" || return 1

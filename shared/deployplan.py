@@ -153,6 +153,22 @@ def check_port_conflict(port: int, proto: str, ignored_pid: str = "") -> bool:
     return False
 
 
+def port_owner(port: int) -> str:
+    pid = ""
+    for proto in ("u", "t"):
+        for line in _ss_lines(proto, True):
+            if f":{port} " not in line or "pid=" not in line:
+                continue
+            pid = line.split("pid=", 1)[1].split(",", 1)[0].split(")", 1)[0]
+            break
+        if pid:
+            break
+    if not pid:
+        return "processus inconnu"
+    cmd = _run_stdout(["ps", "-p", pid, "-o", "comm="]) or "commande inconnue"
+    return f"PID {pid} ({cmd})"
+
+
 def game_meta(game_id: str) -> dict[str, str]:
     return dict(GAME_CATALOG.get(game_id, {"label": game_id, "steam_appid": "", "game_binary": ""}))
 
@@ -244,6 +260,23 @@ def suggest_free_port_group(
     return result
 
 
+def describe_port_conflicts(
+    *,
+    game_id: str,
+    server_port: int,
+    query_port: int = 0,
+    echo_port: int = 0,
+    game_service: str = "",
+) -> list[tuple[str, str, int, str]]:
+    ignored_pid = _current_service_pid(game_service)
+    conflicts: list[tuple[str, str, int, str]] = []
+    for spec, proto, label in port_group_specs(game_id):
+        port = _port_value(spec, server_port, query_port, echo_port)
+        if check_port_conflict(port, proto, ignored_pid):
+            conflicts.append((label, proto, port, port_owner(port)))
+    return conflicts
+
+
 def _exports(payload: dict[str, str]) -> str:
     return "".join(f'{k}="{v}"\n' for k, v in payload.items())
 
@@ -298,6 +331,18 @@ def _cmd_suggest_ports(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_describe_conflicts(args: argparse.Namespace) -> int:
+    for label, proto, port, owner in describe_port_conflicts(
+        game_id=args.game_id,
+        server_port=int(args.server_port or 0),
+        query_port=int(args.query_port or 0),
+        echo_port=int(args.echo_port or 0),
+        game_service=args.game_service,
+    ):
+        sys.stdout.write(f"{label}|{proto}|{port}|{owner}\n")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Game Commander deploy planning helpers")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -319,6 +364,13 @@ def build_parser() -> argparse.ArgumentParser:
     ports.add_argument("--echo-port", default="0")
     ports.add_argument("--game-service", default="")
     ports.set_defaults(func=_cmd_suggest_ports)
+    conflicts = sub.add_parser("describe-conflicts")
+    conflicts.add_argument("--game-id", required=True)
+    conflicts.add_argument("--server-port", required=True)
+    conflicts.add_argument("--query-port", default="0")
+    conflicts.add_argument("--echo-port", default="0")
+    conflicts.add_argument("--game-service", default="")
+    conflicts.set_defaults(func=_cmd_describe_conflicts)
     meta = sub.add_parser("game-meta")
     meta.add_argument("--game-id", required=True)
     meta.set_defaults(func=_cmd_game_meta)

@@ -1,143 +1,21 @@
 # ── lib/deploy_configure.sh ──────────────────────────────────────────────────
 # Étape 2 interactive / config du déploiement
 
-deploy_check_port_conflict() {
-    local port="$1" proto="${2:-u}"
-    local line pid ignored_pid
-    ignored_pid="$(deploy_current_service_pid)"
-    while IFS= read -r line; do
-        [[ "$line" == *":${port} "* ]] || continue
-        if [[ -n "$ignored_pid" ]]; then
-            pid="$(printf '%s\n' "$line" | grep -oP 'pid=\K\d+' | head -1)"
-            [[ -n "$pid" && "$pid" == "$ignored_pid" ]] && continue
-        fi
-        return 0
-    done < <(ss -${proto}lnpH 2>/dev/null)
-    while IFS= read -r line; do
-        [[ "$line" == *":${port} "* ]] || continue
-        return 0
-    done < <(ss -${proto}lnH 2>/dev/null)
-    return 1
-}
-
-deploy_current_service_pid() {
-    [[ -z "${GAME_SERVICE:-}" ]] && return 0
-    systemctl show "$GAME_SERVICE" --property MainPID --value 2>/dev/null | head -1
-}
-
-deploy_game_port_proto() {
-    case "${GAME_ID:-}" in
-        minecraft|minecraft-fabric|terraria|satisfactory) printf 't\n' ;;
-        *) printf 'u\n' ;;
-    esac
-}
-
-deploy_port_owner() {
-    local port="$1" pid cmd
-    pid=$(ss -ulnpH 2>/dev/null | grep ":${port} " | grep -oP 'pid=\K\d+' | head -1)
-    [[ -z "$pid" ]] && pid=$(ss -tlnpH 2>/dev/null | grep ":${port} " | grep -oP 'pid=\K\d+' | head -1)
-    if [[ -n "$pid" ]]; then
-        cmd=$(ps -p "$pid" -o comm= 2>/dev/null)
-        echo "PID $pid ($cmd)"
-    else
-        echo "processus inconnu"
-    fi
-}
-
-deploy_next_free_flask_port() {
-    local port="$1"
-    while ss -tlnH "sport = :$port" 2>/dev/null | grep -q ":$port"; do
-        port=$((port + 1))
-    done
-    echo "$port"
-}
-
-deploy_port_group_step() {
-    case "${GAME_ID:-}" in
-        valheim|enshrouded) printf '2\n' ;;
-        *) printf '1\n' ;;
-    esac
-}
-
-deploy_port_group_specs() {
-    case "${GAME_ID:-}" in
-        minecraft|minecraft-fabric)
-            printf 'SERVER_PORT|t|Port principal\n'
-            ;;
-        terraria)
-            printf 'SERVER_PORT|t|Port principal\n'
-            ;;
-        satisfactory)
-            printf 'SERVER_PORT|t|Port de jeu (TCP)\n'
-            printf 'SERVER_PORT|u|Port de jeu (UDP)\n'
-            printf 'QUERY_PORT|t|Port fiable / join\n'
-            ;;
-        soulmask)
-            printf 'SERVER_PORT|u|Port de jeu\n'
-            printf 'QUERY_PORT|u|Port requête\n'
-            printf 'ECHO_PORT|t|Port Echo\n'
-            ;;
-        valheim)
-            printf 'SERVER_PORT|u|Port principal\n'
-            printf 'SERVER_PORT_PLUS1|u|Port query\n'
-            ;;
-        enshrouded)
-            printf 'SERVER_PORT|u|Port principal\n'
-            printf 'SERVER_PORT_PLUS1|u|Port requête\n'
-            ;;
-    esac
-}
-
-deploy_port_value() {
-    local spec="$1"
-    case "$spec" in
-        SERVER_PORT) printf '%s\n' "${SERVER_PORT:-}" ;;
-        QUERY_PORT) printf '%s\n' "${QUERY_PORT:-}" ;;
-        ECHO_PORT) printf '%s\n' "${ECHO_PORT:-}" ;;
-        SERVER_PORT_PLUS1) printf '%s\n' "$((SERVER_PORT + 1))" ;;
-        *) printf '0\n' ;;
-    esac
-}
-
-deploy_shift_port_group() {
-    local step="$1"
-    SERVER_PORT=$((SERVER_PORT + step))
-    [[ -n "${QUERY_PORT:-}" ]] && QUERY_PORT=$((QUERY_PORT + step))
-    [[ -n "${ECHO_PORT:-}" ]] && ECHO_PORT=$((ECHO_PORT + step))
-}
-
-deploy_first_port_group_conflict() {
-    local line spec proto label port
-    while IFS='|' read -r spec proto label; do
-        [[ -n "$spec" ]] || continue
-        port="$(deploy_port_value "$spec")"
-        if deploy_check_port_conflict "$port" "$proto"; then
-            printf '%s|%s|%s|%s\n' "$spec" "$proto" "$label" "$port"
-            return 0
-        fi
-    done < <(deploy_port_group_specs)
-    return 1
-}
-
-deploy_suggest_port_group() {
-    local step
-    step="$(deploy_port_group_step)"
-    while deploy_first_port_group_conflict >/dev/null; do
-        deploy_shift_port_group "$step"
-    done
-}
-
 deploy_warn_port_group_conflicts() {
-    local line spec proto label port
-    while IFS='|' read -r spec proto label; do
-        [[ -n "$spec" ]] || continue
-        port="$(deploy_port_value "$spec")"
-        if deploy_check_port_conflict "$port" "$proto"; then
-            local proto_label="UDP"
-            [[ "$proto" == "t" ]] && proto_label="TCP"
-            warn "${label} ${port}/${proto_label} déjà utilisé par : $(deploy_port_owner "$port")"
-        fi
-    done < <(deploy_port_group_specs)
+    local line label proto port owner proto_label
+    while IFS='|' read -r label proto port owner; do
+        [[ -n "$label" ]] || continue
+        proto_label="UDP"
+        [[ "$proto" == "t" ]] && proto_label="TCP"
+        warn "${label} ${port}/${proto_label} déjà utilisé par : ${owner}"
+    done < <(
+        python3 "$SCRIPT_DIR/shared/deployplan.py" describe-conflicts \
+            --game-id "$GAME_ID" \
+            --server-port "${SERVER_PORT:-0}" \
+            --query-port "${QUERY_PORT:-0}" \
+            --echo-port "${ECHO_PORT:-0}" \
+            --game-service "$GAME_SERVICE"
+    )
 }
 
 deploy_select_game() {
