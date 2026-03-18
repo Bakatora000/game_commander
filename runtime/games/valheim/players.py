@@ -11,6 +11,7 @@ Patterns Valheim (PlayFab/BepInEx) :
 """
 import re
 import subprocess
+from collections import deque
 from flask import current_app
 
 
@@ -18,14 +19,31 @@ def _service():
     return current_app.config['GAME']['server']['service']
 
 
-def _journal_since_start(service):
-    """Retourne les lignes de journal depuis le dernier démarrage du service."""
+def _systemctl_value(service, prop):
     try:
         r = subprocess.run(
-            ['journalctl', '-u', service, '--no-pager', '-o', 'short-iso',
-             '--since', '1 hour ago'],
+            ['systemctl', 'show', service, '--property', prop, '--value'],
             capture_output=True, text=True, timeout=5
         )
+        return (r.stdout or '').strip()
+    except Exception:
+        return ''
+
+
+def _journal_since_start(service):
+    """Retourne les lignes de journal pour l'invocation systemd courante du service."""
+    try:
+        invocation_id = _systemctl_value(service, 'InvocationID')
+        args = ['journalctl', '-u', service, '--no-pager', '-o', 'short-iso']
+        if invocation_id:
+            args.append(f'_SYSTEMD_INVOCATION_ID={invocation_id}')
+        else:
+            main_pid = _systemctl_value(service, 'MainPID')
+            if main_pid and main_pid != '0':
+                args.append(f'_PID={main_pid}')
+            else:
+                args.extend(['--since', '1 hour ago'])
+        r = subprocess.run(args, capture_output=True, text=True, timeout=5)
         return r.stdout.splitlines()
     except Exception:
         return []
@@ -36,7 +54,7 @@ _RE_ZDOID    = re.compile(r'Got character ZDOID from (.+?) :')
 _RE_STEAMID  = re.compile(r'Got connection SteamID (\d+)')
 _RE_PLATFORM = re.compile(r'local Platform ID Steam_(\d+)')
 _RE_BN_DISC  = re.compile(r'\[Message:Better Networking\].*?Compression: (.+?)\[(?:Steam_)?\d')
-_RE_BN_ID    = re.compile(r'\[Message:Better Networking\].*?Compression: \[(\d+)\] disconnected')
+_RE_BN_ID    = re.compile(r'\[Message:Better Networking\].*?Compression: \[(?:Steam_)?(\d+)\] disconnected')
 _RE_COUNT    = re.compile(r'now (\d+) player\(s\)')
 
 
@@ -50,7 +68,8 @@ def get_players():
 
     connected = []   # liste ordonnée de dicts
     count_check = 0  # dernier compteur "now X player(s)"
-    pending_ids = []
+    pending_ids = deque()
+    pending_names = deque()
 
     def add_player(name, steamid=None):
         for entry in connected:
@@ -62,12 +81,16 @@ def get_players():
                     entry['steamid'] = steamid
                 return
         connected.append({'name': name, 'steamid': steamid})
+        if not steamid:
+            pending_names.append(name)
 
-    def attach_latest_steamid(steamid):
-        for entry in reversed(connected):
-            if not entry.get('steamid'):
-                entry['steamid'] = steamid
-                return True
+    def attach_oldest_pending_name(steamid):
+        while pending_names:
+            name = pending_names.popleft()
+            for entry in connected:
+                if entry['name'] == name and not entry.get('steamid'):
+                    entry['steamid'] = steamid
+                    return True
         return False
 
     def remove_by_name(name):
@@ -90,14 +113,14 @@ def get_players():
         m = _RE_STEAMID.search(line)
         if m:
             steamid = m.group(1).strip()
-            if not attach_latest_steamid(steamid):
+            if not attach_oldest_pending_name(steamid):
                 pending_ids.append(steamid)
             continue
 
         m = _RE_PLATFORM.search(line)
         if m:
             steamid = m.group(1).strip()
-            if not attach_latest_steamid(steamid):
+            if not attach_oldest_pending_name(steamid):
                 pending_ids.append(steamid)
             continue
 
@@ -105,7 +128,7 @@ def get_players():
         m = _RE_ZDOID.search(line)
         if m:
             name = m.group(1).strip()
-            steamid = pending_ids.pop(0) if pending_ids else None
+            steamid = pending_ids.popleft() if pending_ids else None
             add_player(name, steamid)
             continue
 

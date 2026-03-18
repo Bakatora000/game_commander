@@ -2219,8 +2219,8 @@ class ValheimPlayersTests(unittest.TestCase):
 
         def fake_run(*args, **kwargs):
             lines = "\n".join([
-                "03/15/2026 12:36:51: Got connection SteamID 76561198298757896",
-                "03/15/2026 12:36:52: Got character ZDOID from toto : 123:456",
+                "03/15/2026 12:36:51: Got connection SteamID 11111111111111111",
+                "03/15/2026 12:36:52: Got character ZDOID from PlayerOne : 123:456",
             ])
             return types.SimpleNamespace(stdout=lines)
 
@@ -2232,16 +2232,16 @@ class ValheimPlayersTests(unittest.TestCase):
                 players = valheim_players.get_players()
         finally:
             valheim_players.subprocess.run = original_run
-        self.assertEqual(players, [{"name": "toto", "steamid": "76561198298757896"}])
+        self.assertEqual(players, [{"name": "PlayerOne", "steamid": "11111111111111111"}])
 
     def test_disconnect_by_steamid_removes_player(self):
         original_run = valheim_players.subprocess.run
 
         def fake_run(*args, **kwargs):
             lines = "\n".join([
-                "03/15/2026 12:36:51: Got connection SteamID 76561198298757896",
-                "03/15/2026 12:36:52: Got character ZDOID from toto : 123:456",
-                "[Message:Better Networking] Compression: [76561198298757896] disconnected",
+                "03/15/2026 12:36:51: Got connection SteamID 11111111111111111",
+                "03/15/2026 12:36:52: Got character ZDOID from PlayerOne : 123:456",
+                "[Message:Better Networking] Compression: [11111111111111111] disconnected",
             ])
             return types.SimpleNamespace(stdout=lines)
 
@@ -2260,8 +2260,8 @@ class ValheimPlayersTests(unittest.TestCase):
 
         def fake_run(*args, **kwargs):
             lines = "\n".join([
-                "03/15/2026 12:36:51: Got character ZDOID from toto : 123:456",
-                "03/15/2026 12:36:52: Got connection SteamID 76561198298757896",
+                "03/15/2026 12:36:51: Got character ZDOID from PlayerOne : 123:456",
+                "03/15/2026 12:36:52: Got connection SteamID 11111111111111111",
             ])
             return types.SimpleNamespace(stdout=lines)
 
@@ -2273,15 +2273,15 @@ class ValheimPlayersTests(unittest.TestCase):
                 players = valheim_players.get_players()
         finally:
             valheim_players.subprocess.run = original_run
-        self.assertEqual(players, [{"name": "toto", "steamid": "76561198298757896"}])
+        self.assertEqual(players, [{"name": "PlayerOne", "steamid": "11111111111111111"}])
 
     def test_tracks_connected_players_from_playfab_platform_id(self):
         original_run = valheim_players.subprocess.run
 
         def fake_run(*args, **kwargs):
             lines = "\n".join([
-                "03/15/2026 17:46:53: PlayFab socket with remote ID playfab/333D6B4687BBBA00 received local Platform ID Steam_76561198355296827",
-                "03/15/2026 17:47:20: Got character ZDOID from Pantsu Kudasai : 1436054514:2",
+                "03/15/2026 17:46:53: PlayFab socket with remote ID playfab/333D6B4687BBBA00 received local Platform ID Steam_22222222222222222",
+                "03/15/2026 17:47:20: Got character ZDOID from PlayerTwo : 1436054514:2",
             ])
             return types.SimpleNamespace(stdout=lines)
 
@@ -2293,7 +2293,35 @@ class ValheimPlayersTests(unittest.TestCase):
                 players = valheim_players.get_players()
         finally:
             valheim_players.subprocess.run = original_run
-        self.assertEqual(players, [{"name": "Pantsu Kudasai", "steamid": "76561198355296827"}])
+        self.assertEqual(players, [{"name": "PlayerTwo", "steamid": "22222222222222222"}])
+
+    def test_tracks_multiple_players_when_names_precede_steamids(self):
+        original_run = valheim_players.subprocess.run
+
+        def fake_run(*args, **kwargs):
+            lines = "\n".join([
+                "03/15/2026 12:36:51: Got character ZDOID from Alice : 123:456",
+                "03/15/2026 12:36:52: Got character ZDOID from Bob : 123:457",
+                "03/15/2026 12:36:53: Got character ZDOID from Carol : 123:458",
+                "03/15/2026 12:36:54: Got connection SteamID 11111111111111111",
+                "03/15/2026 12:36:55: Got connection SteamID 22222222222222222",
+                "03/15/2026 12:36:56: Got connection SteamID 33333333333333333",
+            ])
+            return types.SimpleNamespace(stdout=lines)
+
+        valheim_players.subprocess.run = fake_run
+        app = Flask(__name__)
+        app.config["GAME"] = {"server": {"service": "valheim-server-test"}}
+        try:
+            with app.app_context():
+                players = valheim_players.get_players()
+        finally:
+            valheim_players.subprocess.run = original_run
+        self.assertEqual(players, [
+            {"name": "Alice", "steamid": "11111111111111111"},
+            {"name": "Bob", "steamid": "22222222222222222"},
+            {"name": "Carol", "steamid": "33333333333333333"},
+        ])
 
 
 class ConfigGenEnshroudedCfgTests(unittest.TestCase):
