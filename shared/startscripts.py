@@ -129,6 +129,42 @@ def render_terraria_wrapper_script(*, start_script: str) -> str:
     )
 
 
+def render_soulmask_start_script(*, server_dir: str, cfg_path: str) -> str:
+    return (
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        f'cd "{server_dir}"\n'
+        f'CFG="{cfg_path}"\n'
+        "json_get() {\n"
+        '    jq -r "$1" "$CFG"\n'
+        "}\n"
+        'SERVER_NAME="$(json_get \'.server_name\')"\n'
+        'MAX_PLAYERS="$(json_get \'.max_players\')"\n'
+        'PASSWORD="$(json_get \'.password\')"\n'
+        'ADMIN_PASSWORD="$(json_get \'.admin_password\')"\n'
+        'MODE="$(json_get \'.mode\')"\n'
+        'PORT="$(json_get \'.port\')"\n'
+        'QUERY_PORT="$(json_get \'.query_port\')"\n'
+        'ECHO_PORT="$(json_get \'.echo_port\')"\n'
+        'BACKUP_ENABLED="$(json_get \'.backup_enabled\')"\n'
+        'SAVING_ENABLED="$(json_get \'.saving_enabled\')"\n'
+        'BACKUP_INTERVAL="$(json_get \'.backup_interval\')"\n'
+        "ARGS=(\n"
+        '  "-SteamServerName=${SERVER_NAME}"\n'
+        '  "-MaxPlayers=${MAX_PLAYERS}"\n'
+        '  "-Port=${PORT}"\n'
+        '  "-QueryPort=${QUERY_PORT}"\n'
+        ")\n"
+        '[[ -n "$PASSWORD" && "$PASSWORD" != "null" ]] && ARGS+=("-PSW=${PASSWORD}")\n'
+        '[[ -n "$ADMIN_PASSWORD" && "$ADMIN_PASSWORD" != "null" ]] && ARGS+=("-adminpsw=${ADMIN_PASSWORD}")\n'
+        '[[ "$MODE" == "pvp" ]] && ARGS+=(-pvp) || ARGS+=(-pve)\n'
+        '[[ "$BACKUP_ENABLED" == "true" ]] && ARGS+=(-backup)\n'
+        '[[ "$SAVING_ENABLED" == "true" ]] && ARGS+=(-saving)\n'
+        '[[ -n "$BACKUP_INTERVAL" && "$BACKUP_INTERVAL" != "null" ]] && ARGS+=("-backupinterval=${BACKUP_INTERVAL}")\n'
+        'exec ./WSServer.sh Level01_Main -server "${ARGS[@]}" -log -UTF8Output -MULTIHOME=0.0.0.0 "-EchoPort=${ECHO_PORT}" -forcepassthrough\n'
+    )
+
+
 def write_start_script(*, out_path: str, content: str, sys_user: str) -> None:
     path = Path(out_path)
     path.write_text(content, encoding="utf-8")
@@ -193,6 +229,13 @@ def _cmd_terraria(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_soulmask(args: argparse.Namespace) -> int:
+    content = render_soulmask_start_script(server_dir=args.server_dir, cfg_path=args.cfg_path)
+    write_start_script(out_path=args.out, content=content, sys_user=args.sys_user)
+    print(args.out)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Génération de scripts de démarrage Game Commander")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -226,6 +269,13 @@ def build_parser() -> argparse.ArgumentParser:
     terraria.add_argument("--server-dir", required=True)
     terraria.add_argument("--sys-user", required=True)
     terraria.set_defaults(func=_cmd_terraria)
+
+    soulmask = sub.add_parser("soulmask")
+    soulmask.add_argument("--out", required=True)
+    soulmask.add_argument("--server-dir", required=True)
+    soulmask.add_argument("--cfg-path", required=True)
+    soulmask.add_argument("--sys-user", required=True)
+    soulmask.set_defaults(func=_cmd_soulmask)
 
     valheim = sub.add_parser("valheim")
     valheim.add_argument("--out", required=True)

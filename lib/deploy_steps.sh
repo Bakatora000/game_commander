@@ -237,8 +237,22 @@ deploy_step_game_install() {
         if $DO_INSTALL; then
             info "Téléchargement $GAME_LABEL via SteamCMD (AppID $STEAM_APPID)..."
             info "Cela peut prendre plusieurs minutes..."
-            deploy_run_steamcmd "linux" "$SERVER_DIR" "$STEAM_APPID" || die "Échec SteamCMD."
-            ok "$GAME_LABEL téléchargé"
+            local soul_out=""
+            if soul_out="$(python3 "$SCRIPT_DIR/shared/gameinstall.py" soulmask \
+                --server-dir "$SERVER_DIR" \
+                --data-dir "$DATA_DIR" \
+                --sys-user "$SYS_USER" \
+                --steamcmd-path "$STEAMCMD_PATH" \
+                --steam-appid "$STEAM_APPID" 2>&1)"; then
+                while IFS= read -r _line; do
+                    [[ -n "$_line" ]] && ok "$_line"
+                done <<< "$soul_out"
+            else
+                [[ -n "$soul_out" ]] && while IFS= read -r _line; do
+                    [[ -n "$_line" ]] && warn "$_line"
+                done <<< "$soul_out"
+                die "Échec installation serveur Soulmask"
+            fi
         fi
 
         [[ -f "$SERVER_DIR/$GAME_BINARY" ]] || die "Binaire $GAME_BINARY introuvable dans $SERVER_DIR"
@@ -611,47 +625,12 @@ deploy_step_game_service() {
         chown "$SYS_USER:$SYS_USER" "$SOULMASK_CFG"
         ok "soulmask_server.json généré"
 
-        cat > "$START_SCRIPT" << 'STARTEOF'
-#!/usr/bin/env bash
-set -euo pipefail
-cd "__SERVER_DIR__"
-CFG="__CFG_PATH__"
-
-json_get() {
-    jq -r "$1" "$CFG"
-}
-
-SERVER_NAME="$(json_get '.server_name')"
-MAX_PLAYERS="$(json_get '.max_players')"
-PASSWORD="$(json_get '.password')"
-ADMIN_PASSWORD="$(json_get '.admin_password')"
-MODE="$(json_get '.mode')"
-PORT="$(json_get '.port')"
-QUERY_PORT="$(json_get '.query_port')"
-ECHO_PORT="$(json_get '.echo_port')"
-BACKUP_ENABLED="$(json_get '.backup_enabled')"
-SAVING_ENABLED="$(json_get '.saving_enabled')"
-BACKUP_INTERVAL="$(json_get '.backup_interval')"
-
-ARGS=(
-  "-SteamServerName=${SERVER_NAME}"
-  "-MaxPlayers=${MAX_PLAYERS}"
-  "-Port=${PORT}"
-  "-QueryPort=${QUERY_PORT}"
-)
-
-[[ -n "$PASSWORD" && "$PASSWORD" != "null" ]] && ARGS+=("-PSW=${PASSWORD}")
-[[ -n "$ADMIN_PASSWORD" && "$ADMIN_PASSWORD" != "null" ]] && ARGS+=("-adminpsw=${ADMIN_PASSWORD}")
-[[ "$MODE" == "pvp" ]] && ARGS+=(-pvp) || ARGS+=(-pve)
-[[ "$BACKUP_ENABLED" == "true" ]] && ARGS+=(-backup)
-[[ "$SAVING_ENABLED" == "true" ]] && ARGS+=(-saving)
-[[ -n "$BACKUP_INTERVAL" && "$BACKUP_INTERVAL" != "null" ]] && ARGS+=("-backupinterval=${BACKUP_INTERVAL}")
-
-exec ./WSServer.sh Level01_Main -server "${ARGS[@]}" -log -UTF8Output -MULTIHOME=0.0.0.0 "-EchoPort=${ECHO_PORT}" -forcepassthrough
-STARTEOF
-        sed -i "s|__SERVER_DIR__|${SERVER_DIR}|g; s|__CFG_PATH__|${SOULMASK_CFG}|g" "$START_SCRIPT"
-        chmod +x "$START_SCRIPT"
-        chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
+        python3 "$SCRIPT_DIR/shared/startscripts.py" soulmask \
+            --out "$START_SCRIPT" \
+            --server-dir "$SERVER_DIR" \
+            --cfg-path "$SOULMASK_CFG" \
+            --sys-user "$SYS_USER" \
+        || die "Échec génération start_server.sh Soulmask"
         ok "Script de démarrage : $START_SCRIPT"
 
         install_game_service_unit "$START_SCRIPT"

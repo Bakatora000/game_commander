@@ -504,6 +504,45 @@ def install_valheim(
     return messages
 
 
+def install_soulmask(
+    *,
+    server_dir: str,
+    data_dir: str,
+    sys_user: str,
+    steamcmd_path: str,
+    steam_appid: str,
+) -> list[str]:
+    messages: list[str] = []
+    server_path = Path(server_dir)
+    data_path = Path(data_dir)
+    server_path.mkdir(parents=True, exist_ok=True)
+    data_path.mkdir(parents=True, exist_ok=True)
+    _chown_tree(sys_user, server_path)
+    _chown_tree(sys_user, data_path)
+
+    result = _run_steamcmd(
+        sys_user=sys_user,
+        steamcmd_path=steamcmd_path,
+        platform="linux",
+        install_dir=server_path,
+        steam_appid=steam_appid,
+    )
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "Échec SteamCMD").strip())
+
+    binary_path = server_path / "StartServer.sh"
+    if not binary_path.is_file():
+        raise RuntimeError(f"Binaire StartServer.sh introuvable dans {server_path}")
+    try:
+        binary_path.chmod(binary_path.stat().st_mode | 0o111)
+    except OSError:
+        pass
+    _chown_tree(sys_user, server_path)
+    messages.append("Serveur Soulmask téléchargé")
+    messages.append("Binaire StartServer.sh vérifié")
+    return messages
+
+
 def _cmd_minecraft(args: argparse.Namespace) -> int:
     try:
         if args.fabric:
@@ -561,6 +600,23 @@ def _cmd_terraria(args: argparse.Namespace) -> int:
             max_players=args.max_players,
             server_password=args.server_password,
             instance_id=args.instance_id,
+        )
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    for line in messages:
+        print(line)
+    return 0
+
+
+def _cmd_soulmask(args: argparse.Namespace) -> int:
+    try:
+        messages = install_soulmask(
+            server_dir=args.server_dir,
+            data_dir=args.data_dir,
+            sys_user=args.sys_user,
+            steamcmd_path=args.steamcmd_path,
+            steam_appid=args.steam_appid,
         )
     except Exception as exc:
         print(str(exc), file=sys.stderr)
@@ -647,6 +703,14 @@ def build_parser() -> argparse.ArgumentParser:
     terraria.add_argument("--server-password", default="")
     terraria.add_argument("--instance-id", required=True)
     terraria.set_defaults(func=_cmd_terraria)
+
+    soulmask = sub.add_parser("soulmask")
+    soulmask.add_argument("--server-dir", required=True)
+    soulmask.add_argument("--data-dir", required=True)
+    soulmask.add_argument("--sys-user", required=True)
+    soulmask.add_argument("--steamcmd-path", required=True)
+    soulmask.add_argument("--steam-appid", required=True)
+    soulmask.set_defaults(func=_cmd_soulmask)
 
     valheim = sub.add_parser("valheim")
     valheim.add_argument("--server-dir", required=True)

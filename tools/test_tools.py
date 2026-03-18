@@ -608,6 +608,16 @@ class StartScriptsTests(unittest.TestCase):
         content = startscripts.render_terraria_wrapper_script(start_script="/srv/terraria/start_server.sh")
         self.assertIn('exec /usr/bin/script -qefc "/srv/terraria/start_server.sh" /dev/null', content)
 
+    def test_render_soulmask_start_script_uses_json_config(self):
+        content = startscripts.render_soulmask_start_script(
+            server_dir="/srv/soulmask",
+            cfg_path="/srv/soulmask/soulmask_server.json",
+        )
+        self.assertIn('cd "/srv/soulmask"', content)
+        self.assertIn('CFG="/srv/soulmask/soulmask_server.json"', content)
+        self.assertIn('SERVER_NAME="$(json_get \'.server_name\')"', content)
+        self.assertIn('exec ./WSServer.sh Level01_Main -server "${ARGS[@]}" -log -UTF8Output -MULTIHOME=0.0.0.0 "-EchoPort=${ECHO_PORT}" -forcepassthrough', content)
+
     def test_render_valheim_start_script_standard(self):
         content = startscripts.render_valheim_start_script(
             server_dir="/srv/valheim",
@@ -1754,6 +1764,31 @@ class DeployHelpersTests(unittest.TestCase):
             self.assertEqual(len(captured_cfg_cmds), 1)
             cfg_cmd = captured_cfg_cmds[0]
             self.assertEqual(cfg_cmd[cfg_cmd.index("--password") + 1], "secret123")
+
+    def test_install_soulmask_uses_linux_steamcmd_and_verifies_binary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            server_dir = Path(tmp) / "server"
+            data_dir = Path(tmp) / "data"
+
+            def fake_run_steamcmd(**kwargs):
+                server_dir.mkdir(parents=True, exist_ok=True)
+                (server_dir / "StartServer.sh").write_text("bin", encoding="utf-8")
+                self.assertEqual(kwargs["platform"], "linux")
+                return mock.Mock(returncode=0, stdout="", stderr="")
+
+            with mock.patch.object(gameinstall, "_run_steamcmd", side_effect=fake_run_steamcmd), \
+                 mock.patch("shared.gameinstall.subprocess.run") as run_mock:
+                run_mock.return_value = mock.Mock(returncode=0, stdout="", stderr="")
+                messages = gameinstall.install_soulmask(
+                    server_dir=str(server_dir),
+                    data_dir=str(data_dir),
+                    sys_user="vhserver",
+                    steamcmd_path="/home/vhserver/steamcmd/steamcmd.sh",
+                    steam_appid="3017300",
+                )
+
+            self.assertIn("Serveur Soulmask téléchargé", messages)
+            self.assertIn("Binaire StartServer.sh vérifié", messages)
 
 
 class ConfigGenUsersJsonTests(unittest.TestCase):
