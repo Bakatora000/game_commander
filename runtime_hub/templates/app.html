@@ -357,6 +357,9 @@
                   <p class="deploy-help">Nom visible côté jeu quand le jeu le supporte. Ce n’est pas l’identifiant technique de l’instance.</p>
                   <label class="field-label" for="deployDomain">URL du Commander</label>
                   <input class="field-input" id="deployDomain" placeholder="gaming.expevay.net">
+                  <label class="field-label" for="deployUrlPrefix">Chemin web du Commander</label>
+                  <input class="field-input" id="deployUrlPrefix" placeholder="/valheim">
+                  <p class="deploy-help">Chemin web de l’interface, indépendant du nom technique de l’instance. Exemple : <code>/valheim</code> ou <code>/parkapouet</code>.</p>
                 </section>
                 <section class="card">
                   <label class="field-label" for="deployAdminLogin">Nom du compte admin Commander</label>
@@ -432,6 +435,16 @@
     const STATE_LABELS = { 0: 'Hors ligne', 10: 'Démarrage', 20: 'En ligne', 30: 'Arrêt', 40: 'Busy' };
     let HUB_INSTANCES = [];
     let LAST_AUTO_INSTANCE = '';
+    let LAST_AUTO_PREFIX = '';
+    const DEFAULT_GAME_PREFIX = {
+      valheim: '/valheim',
+      enshrouded: '/enshrouded',
+      minecraft: '/minecraft',
+      'minecraft-fabric': '/minecraft-fabric',
+      terraria: '/terraria',
+      satisfactory: '/satisfactory',
+      soulmask: '/soulmask',
+    };
     function formatAgeText(meta) { return meta || ''; }
     function suggestedInstanceName(gameId) {
       const existing = HUB_INSTANCES
@@ -446,15 +459,33 @@
       }
       return `${gameId}${index}`;
     }
+    function suggestedCommanderPrefix(gameId) {
+      const base = DEFAULT_GAME_PREFIX[gameId] || `/${gameId}`;
+      const existing = HUB_INSTANCES.map((inst) => String(inst.prefix || ''));
+      if (!existing.includes(base)) {
+        return base;
+      }
+      let index = 2;
+      while (existing.includes(`${base}${index}`)) {
+        index += 1;
+      }
+      return `${base}${index}`;
+    }
     function refreshDeployDefaults(force = false) {
       const gameId = document.getElementById('deployGame').value;
       const instanceInput = document.getElementById('deployInstance');
       const serverNameInput = document.getElementById('deployServerName');
       const domainInput = document.getElementById('deployDomain');
+      const prefixInput = document.getElementById('deployUrlPrefix');
       const suggested = suggestedInstanceName(gameId);
+      const suggestedPrefix = suggestedCommanderPrefix(gameId);
       if (force || !instanceInput.value.trim() || instanceInput.value.trim() === LAST_AUTO_INSTANCE) {
         instanceInput.value = suggested;
         LAST_AUTO_INSTANCE = suggested;
+      }
+      if (force || !prefixInput.value.trim() || prefixInput.value.trim() === LAST_AUTO_PREFIX) {
+        prefixInput.value = suggestedPrefix;
+        LAST_AUTO_PREFIX = suggestedPrefix;
       }
       if (force || !serverNameInput.value.trim()) {
         serverNameInput.value = 'Mon_serveur';
@@ -600,6 +631,7 @@
         instance: document.getElementById('deployInstance').value.trim(),
         server_name: document.getElementById('deployServerName').value.trim(),
         domain: document.getElementById('deployDomain').value.trim(),
+        url_prefix: document.getElementById('deployUrlPrefix').value.trim(),
         admin_login: document.getElementById('deployAdminLogin').value.trim(),
         admin_password: document.getElementById('deployAdminPassword').value,
         server_password: document.getElementById('deployServerPassword').value,

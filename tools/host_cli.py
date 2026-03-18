@@ -94,6 +94,8 @@ def cmd_deploy_instance(args: argparse.Namespace) -> int:
     env.update(deployenv.GAME_DEFAULTS.get(args.game_id, {}))
     env["INSTANCE_ID"] = args.instance
     env["DOMAIN"] = args.domain
+    if args.url_prefix:
+        env["URL_PREFIX"] = args.url_prefix
     env["ADMIN_LOGIN"] = args.admin_login or "admin"
     env["ADMIN_PASSWORD"] = args.admin_password
     env["SYS_USER"] = args.sys_user or _default_sys_user(main_script)
@@ -214,6 +216,7 @@ def build_parser() -> argparse.ArgumentParser:
     deploy.add_argument("--game-id", required=True)
     deploy.add_argument("--instance", required=True)
     deploy.add_argument("--domain", required=True)
+    deploy.add_argument("--url-prefix", default="")
     deploy.add_argument("--admin-login", default="admin")
     deploy.add_argument("--admin-password", required=True)
     deploy.add_argument("--sys-user", default="")

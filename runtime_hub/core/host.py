@@ -315,11 +315,17 @@ def run_instance_deploy(data: dict) -> tuple[bool, str, dict]:
     game_id = (data.get("game_id") or "").strip()
     instance_name = (data.get("instance") or "").strip()
     domain = (data.get("domain") or "").strip()
+    url_prefix = (data.get("url_prefix") or "").strip()
     admin_password = data.get("admin_password") or ""
     if not game_id or not instance_name or not domain or not admin_password:
         return False, "Jeu, identifiant, domaine et mot de passe admin sont requis", get_hub_payload()
     if _instance_entry(instance_name) or _instance_config_file(instance_name).is_file():
         return False, "Une instance avec cet identifiant existe déjà", get_hub_payload()
+    if url_prefix:
+        normalized_prefix = url_prefix if url_prefix.startswith("/") else f"/{url_prefix}"
+        for item in _load_manifest().get("instances", []):
+            if (item.get("prefix") or "").strip() == normalized_prefix:
+                return False, "Ce chemin web Commander est déjà utilisé", get_hub_payload()
     script_path = _main_script_path()
     if not script_path.is_file():
         return False, "Script principal introuvable", get_hub_payload()
@@ -336,6 +342,8 @@ def run_instance_deploy(data: dict) -> tuple[bool, str, dict]:
         "--admin-password", admin_password,
         "--sys-user", (data.get("sys_user") or _default_sys_user()).strip() or _default_sys_user(),
     ]
+    if url_prefix:
+        cmd.extend(["--url-prefix", normalized_prefix])
     if data.get("server_name"):
         cmd.extend(["--server-name", str(data.get("server_name"))])
     if data.get("server_password"):
