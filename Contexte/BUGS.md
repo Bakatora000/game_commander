@@ -368,7 +368,7 @@
 - **Statut :** Résolu
 - **Composant :** `runtime/game_valheim.json` — flags de démarrage du serveur
 - **Symptôme :** `Steam is not initialized` / `Awake of network backend failed` au démarrage d'une deuxième instance Valheim.
-- **Cause racine :** Le flag `-vanilla` tente d'initialiser Steam localement, ce qui entre en conflit avec l'instance AMP Valheim (CauchemarCommu01) déjà active.
+- **Cause racine :** Le flag `-vanilla` tente d'initialiser Steam localement, ce qui entre en conflit avec une autre instance AMP Valheim déjà active.
 - **Solutions essayées :**
   - ❌ `-vanilla` — conflit Steam si une autre instance Valheim tourne
   - ✅ `-playfab` (crossplay PlayFab) — n'initialise pas Steam localement, pas de conflit

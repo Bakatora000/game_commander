@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import appfiles, appservice, cpuplan, deploybackups, deploydeps, deployenv, deploynginx, deploypost, deployssl, deploysudo, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
+from shared import appfiles, appservice, bootstraphub, cpuplan, deploybackups, deploydeps, deployenv, deploynginx, deploypost, deployssl, deploysudo, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -387,6 +387,37 @@ class HubSyncTests(unittest.TestCase):
         )
         self.assertFalse(ok)
         self.assertIn("SYS_USER manquant", message)
+
+
+class BootstrapHubTests(unittest.TestCase):
+
+    def test_run_bootstrap_hub_generates_password_when_missing(self):
+        fake_pwd = types.SimpleNamespace(pw_dir="/home/test", pw_uid=1000, pw_gid=1000)
+        with mock.patch.object(bootstraphub.pwd, "getpwnam", return_value=fake_pwd), \
+             mock.patch.object(bootstraphub, "_install_dependencies", return_value=(True, ["deps ok"])), \
+             mock.patch.object(bootstraphub, "_ensure_state_dir") as ensure_state, \
+             mock.patch.object(bootstraphub.hubsync, "sync_hub_service_from_values", return_value=(True, ["hub ok"])) as sync_hub, \
+             mock.patch.object(bootstraphub, "_bootstrap_nginx", return_value=(True, ["nginx ok"])), \
+             mock.patch.object(bootstraphub.deployssl, "apply_ssl", return_value=(True, ["ssl ok"])), \
+             mock.patch.object(bootstraphub, "_open_hub_ports", return_value=["ufw ok"]):
+            ok, messages = bootstraphub.run_bootstrap_hub(
+                repo_root=ROOT_DIR,
+                sys_user="test",
+                domain="gaming.example.com",
+                admin_login="admin",
+                admin_password="",
+                ssl_mode="none",
+            )
+        self.assertTrue(ok)
+        self.assertIn("deps ok", messages)
+        self.assertIn("hub ok", messages)
+        self.assertIn("nginx ok", messages)
+        self.assertIn("ssl ok", messages)
+        self.assertIn("ufw ok", messages)
+        self.assertIn("Hub Admin : http://gaming.example.com/commander", messages)
+        self.assertTrue(any(line.startswith("Mot de passe admin généré : ") for line in messages))
+        ensure_state.assert_called_once_with("test")
+        sync_hub.assert_called_once()
 
 
 class DeployEnvTests(unittest.TestCase):
@@ -2033,12 +2064,12 @@ class ValheimWorldSelectionTests(unittest.TestCase):
     def test_list_worlds_ignores_auto_backup_world_files(self):
         worlds = self.root / "data" / "worlds_local"
         (worlds / "Cauchemar2.db").write_text("db")
-        (worlds / "ParkAPouet.fwl").write_text("fwl")
+        (worlds / "MondePerso.fwl").write_text("fwl")
         (worlds / "ParcEssai_backup_auto-20260315130210.db").write_text("backup")
         with self.app.app_context():
             data, err = valheim_worlds.list_worlds()
         self.assertIsNone(err)
-        self.assertEqual([w["name"] for w in data["worlds"]], ["Cauchemar2", "Monde", "ParkAPouet"])
+        self.assertEqual([w["name"] for w in data["worlds"]], ["Cauchemar2", "Monde", "MondePerso"])
 
     def test_select_world_updates_runtime_and_scripts(self):
         worlds = self.root / "data" / "worlds_local"
@@ -2645,10 +2676,10 @@ class TerrariaPlayersTests(unittest.TestCase):
     def test_tracks_connected_players_from_logs(self):
         lines = "\n".join([
             "Server started",
-            "88.120.128.49:60232 is connecting...",
-            "Expevay has joined.",
+            "203.0.113.10:60232 is connecting...",
+            "PlayerOne has joined.",
             "Alice has joined.",
-            "Expevay has left.",
+            "PlayerOne has left.",
         ])
         original = terraria_players.subprocess.run
         terraria_players.subprocess.run = lambda *args, **kwargs: types.SimpleNamespace(stdout=lines)
@@ -2660,11 +2691,11 @@ class TerrariaPlayersTests(unittest.TestCase):
 
     def test_reconnect_does_not_duplicate_player(self):
         lines = "\n".join([
-            "88.120.128.49:60232 is connecting...",
-            "Expevay has joined.",
-            "Expevay has left.",
-            "88.120.128.49:60233 is connecting...",
-            "Expevay has joined.",
+            "203.0.113.10:60232 is connecting...",
+            "PlayerOne has joined.",
+            "PlayerOne has left.",
+            "203.0.113.10:60233 is connecting...",
+            "PlayerOne has joined.",
         ])
         original = terraria_players.subprocess.run
         terraria_players.subprocess.run = lambda *args, **kwargs: types.SimpleNamespace(stdout=lines)
@@ -2672,7 +2703,7 @@ class TerrariaPlayersTests(unittest.TestCase):
             players = terraria_players.get_players()
         finally:
             terraria_players.subprocess.run = original
-        self.assertEqual(players, [{'name': 'Expevay', 'ip': '88.120.128.49'}])
+        self.assertEqual(players, [{'name': 'PlayerOne', 'ip': '203.0.113.10'}])
 
 
 class TerrariaBanlistTests(unittest.TestCase):
@@ -2709,19 +2740,19 @@ class TerrariaBanlistTests(unittest.TestCase):
                 self.assertTrue(ok)
                 self.assertIsNone(err)
                 terraria_admins._journal_lines = lambda: [
-                    "88.120.128.49:60232 is connecting...",
-                    "Expevay has joined.",
+                    "203.0.113.10:60232 is connecting...",
+                    "PlayerOne has joined.",
                 ]
-                data, err = terraria_admins.add_ban("Expevay")
+                data, err = terraria_admins.add_ban("PlayerOne")
                 self.assertIsNone(err)
                 self.assertFalse(data["already_present"])
-                self.assertEqual(data["ip"], "88.120.128.49")
+                self.assertEqual(data["ip"], "203.0.113.10")
                 data, err = terraria_admins.list_bans()
                 self.assertIsNone(err)
-                self.assertEqual(data["entries"], [{"name": "Expevay", "ip": "88.120.128.49"}])
-                data, err = terraria_admins.remove_ban("Expevay")
+                self.assertEqual(data["entries"], [{"name": "PlayerOne", "ip": "203.0.113.10"}])
+                data, err = terraria_admins.remove_ban("PlayerOne")
                 self.assertIsNone(err)
-                self.assertEqual(data["name"], "Expevay")
+                self.assertEqual(data["name"], "PlayerOne")
                 data, err = terraria_admins.list_bans()
                 self.assertIsNone(err)
                 self.assertEqual(data["entries"], [])
@@ -3038,7 +3069,7 @@ class SoulmaskPlayersTests(unittest.TestCase):
         def fake_run(*args, **kwargs):
             return types.SimpleNamespace(stdout="\n".join([
                 "[2026.03.14-13.59.20:000][334]LogOnline: STEAM: AUTH HANDLER: Sending auth result to user 76561197981668140 with flag success? 1",
-                "[2026.03.14-13.59.22:480][335]logStoreGamemode: player ready. Addr:88.120.128.49, Netuid:76561197981668140, Name:SyNTaX",
+                "[2026.03.14-13.59.22:480][335]logStoreGamemode: player ready. Addr:203.0.113.10, Netuid:76561197981668140, Name:PlayerSteam",
                 "[2026.03.14-14.04.33:060][614]logStoreGamemode: Display: player leave world. 76561197981668140",
             ]))
 
@@ -3077,11 +3108,11 @@ class SoulmaskPlayersTests(unittest.TestCase):
 
         def fake_run(*args, **kwargs):
             return types.SimpleNamespace(stdout="\n".join([
-                "[2026.03.14-13.59.22:479][335]logStoreGamemode: FirstLoginGame: Addr:88.120.128.49, Netuid:111, Name:Alice",
-                "[2026.03.14-13.59.22:480][335]logStoreGamemode: player ready. Addr:88.120.128.49, Netuid:111, Name:Alice",
+                "[2026.03.14-13.59.22:479][335]logStoreGamemode: FirstLoginGame: Addr:203.0.113.11, Netuid:111, Name:Alice",
+                "[2026.03.14-13.59.22:480][335]logStoreGamemode: player ready. Addr:203.0.113.11, Netuid:111, Name:Alice",
                 "[2026.03.14-14.00.00:000][399]LogNet: Login request: ?Name=ClientOne?culture=fr-FR",
-                "[2026.03.14-14.00.10:100][400]logStoreGamemode: FirstLoginGame: Addr:88.120.128.50, Netuid:222, Name:Bob",
-                "[2026.03.14-14.00.10:101][400]logStoreGamemode: player ready. Addr:88.120.128.50, Netuid:222, Name:Bob",
+                "[2026.03.14-14.00.10:100][400]logStoreGamemode: FirstLoginGame: Addr:203.0.113.12, Netuid:222, Name:Bob",
+                "[2026.03.14-14.00.10:101][400]logStoreGamemode: player ready. Addr:203.0.113.12, Netuid:222, Name:Bob",
                 "[2026.03.14-14.01.00:000][500]logStoreGamemode: Display: player leave world. 111",
             ]))
 
@@ -3821,12 +3852,13 @@ if __name__ == "__main__":
         MinecraftConsoleTests,
         MinecraftFabricModsTests,
         SaveManagerTests,
+        BootstrapHubTests,
     ]
     if len(sys.argv) > 1:
         names = sys.argv[1:]
         test_classes = [c for c in test_classes if c.__name__ in names]
         if not test_classes:
-            print(f"Classes disponibles : {[c.__name__ for c in [NginxInjectTests, NginxRemoveTests, NginxFindConfTests, NginxManifestTests, ConfigGenGameJsonTests, ConfigGenUsersJsonTests, ConfigGenEnshroudedCfgTests, ConfigGenPatchBepinexTests, ConfigGenMinecraftPropsTests, MinecraftConfigTests, TerrariaConfigTests, MinecraftPlayersTests, MinecraftAdminsTests, MinecraftConsoleTests, MinecraftFabricModsTests, SaveManagerTests]]}")
+            print(f"Classes disponibles : {[c.__name__ for c in [NginxInjectTests, NginxRemoveTests, NginxFindConfTests, NginxManifestTests, ConfigGenGameJsonTests, ConfigGenUsersJsonTests, ConfigGenEnshroudedCfgTests, ConfigGenPatchBepinexTests, ConfigGenMinecraftPropsTests, MinecraftConfigTests, TerrariaConfigTests, MinecraftPlayersTests, MinecraftAdminsTests, MinecraftConsoleTests, MinecraftFabricModsTests, SaveManagerTests, BootstrapHubTests]]}")
             sys.exit(1)
 
     for cls in test_classes:

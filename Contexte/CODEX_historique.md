@@ -17,8 +17,8 @@ dédiés (Valheim, Enshrouded, Minecraft Java, Minecraft Fabric, Terraria) sur u
 - **Instances Game Commander actives :**
   - aucune actuellement
 - **Autres instances sur le même serveur (AMP) :**
-  - `CauchemarCommu01` — Valheim AMP (port AMP 8081)
-  - `Test01` — Enshrouded AMP (port AMP 8082, ports jeu 15636/15637)
+  - `amp-valheim-01` — Valheim AMP (port AMP 8081)
+  - `amp-enshrouded-01` — Enshrouded AMP (port AMP 8082, ports jeu 15636/15637)
 
 ---
 
@@ -622,8 +622,8 @@ ou 30 (Redémarrage) avec bouton désactivé, et poll toutes les 3s jusqu'à sta
 
 | Instance | Jeu | Ports jeu | Flask | URL |
 |---|---|---|---|---|
-| Test01 (AMP) | Enshrouded | 15636/UDP 15637/UDP | — | — |
-| CauchemarCommu01 (AMP) | Valheim | — | — | — |
+| amp-enshrouded-01 (AMP) | Enshrouded | 15636/UDP 15637/UDP | — | — |
+| amp-valheim-01 (AMP) | Valheim | — | — | — |
 
 ---
 
@@ -829,10 +829,10 @@ Conséquence produit validée :
   - services systemd
   - entrée nginx/manifest
   - répertoires serveur/app/backups
-- l'instance existante `ParkAPouet` n'a pas été corrompue par ce test raté
+- l'instance existante `valheim-main` n'a pas été corrompue par ce test raté
 
 État retenu en fin de séance :
-- `ParkAPouet` validée intacte
+- `valheim-main` validée intacte
 - `enshrouded2` désinstallée proprement ensuite
 - Hub Admin + console globale + actions hôte = base désormais suffisamment robuste pour reprendre la refacto du `deploy` le lendemain
 

@@ -13,6 +13,7 @@
 #    sudo bash game_commander.sh status                   # état de toutes les instances
 #    sudo bash game_commander.sh update                   # resynchronise une instance
 #    sudo bash game_commander.sh rebalance                # recalcule l'affinité CPU
+#    sudo bash game_commander.sh bootstrap-hub            # installe le Hub Admin seul
 # ═══════════════════════════════════════════════════════════════════════════════
 set -uo pipefail
 IFS=$'\n\t'
@@ -58,6 +59,7 @@ show_help() {
     update --all             Met à jour toutes les instances
     rebalance                Recalculer l'affinité CPU des instances gérées
     rebalance --restart      Recalculer puis redémarrer les serveurs concernés
+    bootstrap-hub            Installer uniquement le Hub Admin sur un serveur vierge
 
   MENU PRINCIPAL :
     [1] deploy     Nouvelle instance complète
@@ -77,6 +79,7 @@ show_help() {
     sudo bash game_commander.sh status
     sudo bash game_commander.sh update --instance testfabric
     sudo bash game_commander.sh rebalance --restart
+    sudo bash game_commander.sh bootstrap-hub --domain gaming.example.com --admin-password '...'
 
 EOF
 }
@@ -91,6 +94,11 @@ run_command() {
         status)    cmd_status    ;;
         update)    cmd_update    "$@" ;;
         rebalance) cmd_rebalance "$@" ;;
+        bootstrap-hub)
+            python3 "$SCRIPT_DIR/tools/host_cli.py" bootstrap-hub \
+                --main-script "$SCRIPT_DIR/game_commander.sh" \
+                "$@"
+            ;;
         *)         show_help; return 1 ;;
     esac
 }
@@ -103,7 +111,7 @@ REMAINING_ARGS=()
 
 for arg in "$@"; do
     case "$arg" in
-        deploy|attach|uninstall|status|update|rebalance) COMMAND="$arg" ;;
+        deploy|attach|uninstall|status|update|rebalance|bootstrap-hub) COMMAND="$arg" ;;
         --dry-run) DRY_RUN=true ;;
         --help|-h) show_help; exit 0 ;;
         *) REMAINING_ARGS+=("$arg") ;;
@@ -125,6 +133,7 @@ if [[ -z "$COMMAND" ]]; then
         echo -e "  ${CYAN}[4]${RESET} ${BOLD}status${RESET}     — Voir l'état des instances déployées"
         echo -e "  ${CYAN}[5]${RESET} ${BOLD}update${RESET}     — Propager les changements du dépôt vers une instance"
         echo -e "  ${CYAN}[6]${RESET} ${BOLD}rebalance${RESET}  — Répartir les serveurs sur les cœurs CPU"
+        echo -e "  ${CYAN}[7]${RESET} ${BOLD}bootstrap${RESET}  — Installer uniquement le Hub Admin"
         echo ""
         echo -en "  ${YELLOW}?  Votre choix : ${RESET}"
         read -r _choice
@@ -136,6 +145,7 @@ if [[ -z "$COMMAND" ]]; then
             4) run_command status ;;
             5) run_command update ;;
             6) run_command rebalance ;;
+            7) run_command bootstrap-hub ;;
             *) warn "Choix invalide." ;;
         esac
     done

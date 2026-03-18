@@ -261,7 +261,7 @@ Validated `v3.0` status update after the first real Hub deploy tests:
 
 Operational note:
 - during the first real Hub deploy validation, a partial `minecraft2` instance was created and then successfully removed through the Hub cleanup path
-- this validated the partial-instance uninstall fallback and confirmed that existing managed instances such as `ParkAPouet` were not overwritten by that failed deploy path
+- this validated the partial-instance uninstall fallback and confirmed that existing managed instances such as `valheim-main` were not overwritten by that failed deploy path
 
 ## Adding a New Game
 

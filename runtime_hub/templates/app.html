@@ -104,6 +104,7 @@
     }
     .monitor-panel { padding: 18px; margin-bottom: 24px; }
     .accounts-panel { padding: 18px; margin-bottom: 24px; }
+    .hub-console-section { margin-top: 24px; }
     .monitor-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
     .monitor-label { color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .08em; margin-bottom: .35rem; }
     .monitor-status { font-size: 1.05rem; font-weight: 700; }
@@ -361,20 +362,21 @@
                   <input class="field-input" id="deployServerName" value="Mon_serveur" placeholder="Mon_serveur">
                   <p class="deploy-help">Nom visible côté jeu quand le jeu le supporte. Ce n’est pas l’identifiant technique de l’instance.</p>
                   <label class="field-label" for="deployDomain">URL du Commander</label>
-                  <input class="field-input" id="deployDomain" placeholder="gaming.expevay.net">
+                  <input class="field-input" id="deployDomain" placeholder="gaming.example.com">
                   <label class="field-label" for="deployUrlPrefix">Chemin web du Commander</label>
                   <input class="field-input" id="deployUrlPrefix" placeholder="/valheim">
-                  <p class="deploy-help">Chemin web de l’interface, indépendant du nom technique de l’instance. Exemple : <code>/valheim</code> ou <code>/parkapouet</code>.</p>
+                  <p class="deploy-help" id="deployUrlPrefixHelp">Chemin web de l’interface : <code>gaming.example.com/valheim</code></p>
                 </section>
                 <section class="card">
                   <label class="field-label" for="deployAdminLogin">Nom du compte admin Commander</label>
                   <input class="field-input" id="deployAdminLogin" value="admin">
                   <p class="deploy-help">Login du compte administrateur du Commander de cette instance, pas de l’utilisateur Linux.</p>
                   <label class="field-label" for="deployAdminPassword">Mot de passe admin Commander</label>
-                  <input class="field-input" id="deployAdminPassword" type="password">
-                  <p class="deploy-help">Mot de passe du compte admin Commander ci-dessus pour l’interface web de cette instance.</p>
+                  <input class="field-input" id="deployAdminPassword" type="password" value="AdmCommander01">
+                  <p class="deploy-help">Mot de passe par défaut : <code>AdmCommander01</code> (à changer au plus vite).</p>
                   <label class="field-label" for="deployServerPassword">Mot de passe du serveur de jeu</label>
-                  <input class="field-input" id="deployServerPassword" type="password" placeholder="optionnel">
+                  <input class="field-input" id="deployServerPassword" type="password" value="testtest01">
+                  <p class="deploy-help">Mot de passe par défaut : <code>testtest01</code> (à changer au plus vite).</p>
                   <label class="field-label" for="deployServerPort">Port jeu</label>
                   <input class="field-input" id="deployServerPort" placeholder="laisser vide = défaut/auto">
                   <label class="field-label" for="deployMaxPlayers">Joueurs max</label>
@@ -387,7 +389,7 @@
 
           <section class="grid" id="cards"></section>
 
-          <section class="accounts-panel">
+          <section class="accounts-panel hub-console-section">
             <div class="monitor-head">
               <div>
                 <h2 class="section-title">Console Hub</h2>
@@ -476,6 +478,13 @@
       }
       return `${base}${index}`;
     }
+    function refreshDeployPrefixHelp() {
+      const domain = (document.getElementById('deployDomain').value || '').trim() || (window.location.hostname || 'gaming.example.com');
+      const rawPrefix = (document.getElementById('deployUrlPrefix').value || '').trim();
+      const prefix = rawPrefix ? (rawPrefix.startsWith('/') ? rawPrefix : `/${rawPrefix}`) : '/';
+      const help = document.getElementById('deployUrlPrefixHelp');
+      help.innerHTML = `Chemin web de l’interface : <code>${domain}${prefix}</code>`;
+    }
     function refreshDeployDefaults(force = false) {
       const gameId = document.getElementById('deployGame').value;
       const instanceInput = document.getElementById('deployInstance');
@@ -496,8 +505,9 @@
         serverNameInput.value = 'Mon_serveur';
       }
       if (force || !domainInput.value.trim()) {
-        domainInput.value = window.location.hostname || 'gaming.expevay.net';
+        domainInput.value = window.location.hostname || 'gaming.example.com';
       }
+      refreshDeployPrefixHelp();
     }
     function switchView(view) {
       document.querySelectorAll('.view-panel').forEach((panel) => {
@@ -945,6 +955,8 @@
         document.getElementById('newPassword').value = '';
       }
     });
+    document.getElementById('deployDomain').addEventListener('input', refreshDeployPrefixHelp);
+    document.getElementById('deployUrlPrefix').addEventListener('input', refreshDeployPrefixHelp);
     switchView('dashboard');
     refreshDeployDefaults(true);
     load();

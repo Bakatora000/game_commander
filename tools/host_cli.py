@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import os
 import pwd
+import socket
 import subprocess
 import sys
 import tempfile
@@ -14,7 +15,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from shared import cpuplan, deployenv, hostctl, hostops, hubsync, redeploycore, uninstallcore, updatecore, updatehooks
+from shared import bootstraphub, cpuplan, deployenv, hostctl, hostops, hubsync, redeploycore, uninstallcore, updatecore, updatehooks
 
 
 def _existing_path(value: str) -> Path:
@@ -76,6 +77,13 @@ def cmd_redeploy_instance(args: argparse.Namespace) -> int:
 
 def _default_sys_user(main_script: Path) -> str:
     return pwd.getpwuid(main_script.stat().st_uid).pw_name
+
+
+def _default_domain() -> str:
+    try:
+        return socket.getfqdn() or "localhost"
+    except Exception:
+        return "localhost"
 
 
 def _write_temp_deploy_config(env: dict[str, str]) -> Path:
@@ -165,6 +173,24 @@ def cmd_rebalance(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_bootstrap_hub(args: argparse.Namespace) -> int:
+    ok, result = bootstraphub.run_bootstrap_hub(
+        repo_root=Path(args.main_script).resolve().parent,
+        sys_user=args.sys_user or _default_sys_user(Path(args.main_script).resolve()),
+        domain=args.domain or _default_domain(),
+        admin_login=args.admin_login or "admin",
+        admin_password=args.admin_password,
+        ssl_mode=args.ssl_mode,
+    )
+    stream = sys.stdout if ok else sys.stderr
+    if isinstance(result, str):
+        print(result, file=stream)
+    else:
+        for line in result:
+            print(line, file=stream)
+    return 0 if ok else 1
+
+
 def cmd_list_configs(args: argparse.Namespace) -> int:
     configs = hostctl.discover_instance_configs(search_roots=args.root, max_depth=args.max_depth)
     for path in configs:
@@ -236,6 +262,15 @@ def build_parser() -> argparse.ArgumentParser:
     rebalance.add_argument("--main-script", required=True, type=_existing_path)
     rebalance.add_argument("--restart", action="store_true")
     rebalance.set_defaults(func=cmd_rebalance)
+
+    bootstrap = sub.add_parser("bootstrap-hub")
+    bootstrap.add_argument("--main-script", required=True, type=_existing_path)
+    bootstrap.add_argument("--sys-user", default="")
+    bootstrap.add_argument("--domain", default="")
+    bootstrap.add_argument("--admin-login", default="admin")
+    bootstrap.add_argument("--admin-password", default="")
+    bootstrap.add_argument("--ssl-mode", default="none", choices=["none", "existing", "certbot"])
+    bootstrap.set_defaults(func=cmd_bootstrap_hub)
 
     list_configs = sub.add_parser("list-configs")
     add_search_flags(list_configs)
