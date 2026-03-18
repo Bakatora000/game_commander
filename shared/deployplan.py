@@ -210,6 +210,26 @@ def existing_prefix_owner(domain: str, url_prefix: str) -> tuple[str, str]:
     return conf, port
 
 
+def detect_other_valheim_process() -> str:
+    result = subprocess.run(["pgrep", "-a", "valheim_server"], capture_output=True, text=True, check=False)
+    lines = [line.strip() for line in (result.stdout or "").splitlines() if line.strip()]
+    return lines[0] if lines else ""
+
+
+def resolve_ssl_mode(choice: str) -> tuple[bool, str]:
+    if choice == "0":
+        return False, ""
+    if choice == "1":
+        return True, "certbot"
+    if choice == "2":
+        return True, "none"
+    return True, "existing"
+
+
+def admin_password_required(password: str) -> bool:
+    return bool(password)
+
+
 def suggest_free_port_group(
     *,
     game_id: str,
@@ -319,6 +339,32 @@ def _cmd_web_defaults(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_valheim_playfab(args: argparse.Namespace) -> int:
+    other = detect_other_valheim_process() if args.crossplay == "true" else ""
+    payload = {
+        "OTHER_VALHEIM": other,
+        "GC_FORCE_PLAYFAB": "true" if other else "false",
+    }
+    print(_exports(payload), end="")
+    return 0
+
+
+def _cmd_ssl_mode(args: argparse.Namespace) -> int:
+    accepted, mode = resolve_ssl_mode(args.choice)
+    payload = {
+        "SSL_ACCEPTED": "true" if accepted else "false",
+        "SSL_MODE": mode,
+    }
+    print(_exports(payload), end="")
+    return 0
+
+
+def _cmd_validate_admin(args: argparse.Namespace) -> int:
+    payload = {"ADMIN_PASSWORD_OK": "true" if admin_password_required(args.password) else "false"}
+    print(_exports(payload), end="")
+    return 0
+
+
 def _cmd_suggest_ports(args: argparse.Namespace) -> int:
     payload = suggest_free_port_group(
         game_id=args.game_id,
@@ -379,6 +425,15 @@ def build_parser() -> argparse.ArgumentParser:
     web.add_argument("--url-prefix", required=True)
     web.add_argument("--flask-port", required=True)
     web.set_defaults(func=_cmd_web_defaults)
+    valheim = sub.add_parser("valheim-playfab")
+    valheim.add_argument("--crossplay", required=True)
+    valheim.set_defaults(func=_cmd_valheim_playfab)
+    ssl = sub.add_parser("ssl-mode")
+    ssl.add_argument("--choice", required=True)
+    ssl.set_defaults(func=_cmd_ssl_mode)
+    admin = sub.add_parser("validate-admin")
+    admin.add_argument("--password", required=True)
+    admin.set_defaults(func=_cmd_validate_admin)
     return parser
 
 

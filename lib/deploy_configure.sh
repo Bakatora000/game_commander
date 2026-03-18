@@ -214,12 +214,12 @@ deploy_configure_server() {
             confirm "Installer BepInEx (mods) ?" "o" && BEPINEX=true || BEPINEX=false
         fi
         if $CROSSPLAY; then
-            other_valheim=$(pgrep -a valheim_server 2>/dev/null | grep -v "^$$" | head -1 || true)
-            if [[ -n "$other_valheim" ]]; then
+            source <(python3 "$SCRIPT_DIR/shared/deployplan.py" valheim-playfab --crossplay true)
+            other_valheim="${OTHER_VALHEIM:-}"
+            if [[ -n "${GC_FORCE_PLAYFAB:-}" && "$GC_FORCE_PLAYFAB" == "true" ]]; then
                 warn "Une autre instance Valheim est déjà en cours d'exécution"
                 warn "  $other_valheim"
                 warn "Le flag -crossplay sera remplacé par -playfab (multi-instance PlayFab)."
-                GC_FORCE_PLAYFAB=true
             fi
         fi
     elif [[ "$GAME_ID" == "soulmask" ]]; then
@@ -272,12 +272,8 @@ deploy_configure_server() {
         echo -e "  ${CYAN}[2]${RESET} HTTP uniquement"
         echo -e "  ${CYAN}[3]${RESET} SSL déjà configuré"
         prompt "Configuration SSL" "3"
-        case "$REPLY" in
-            0) return 10 ;;
-            1) SSL_MODE="certbot" ;;
-            2) SSL_MODE="none" ;;
-            *) SSL_MODE="existing" ;;
-        esac
+        source <(python3 "$SCRIPT_DIR/shared/deployplan.py" ssl-mode --choice "$REPLY")
+        [[ "$SSL_ACCEPTED" == "true" ]] || return 10
     fi
 }
 
@@ -290,7 +286,8 @@ deploy_configure_admin() {
         prompt_secret "Mot de passe pour $ADMIN_LOGIN"
         ADMIN_PASSWORD="$REPLY"
     fi
-    [[ -n "$ADMIN_PASSWORD" ]] || die "Mot de passe admin obligatoire."
+    source <(python3 "$SCRIPT_DIR/shared/deployplan.py" validate-admin --password "$ADMIN_PASSWORD")
+    [[ "$ADMIN_PASSWORD_OK" == "true" ]] || die "Mot de passe admin obligatoire."
 }
 
 deploy_print_summary() {

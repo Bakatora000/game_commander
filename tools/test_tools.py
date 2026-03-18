@@ -595,6 +595,21 @@ class DeployPlanTests(unittest.TestCase):
             ],
         )
 
+    def test_detect_other_valheim_process_returns_first_line(self):
+        with mock.patch("subprocess.run") as run:
+            run.return_value = mock.Mock(stdout="1234 valheim_server.x86_64\n5678 valheim_server.x86_64\n")
+            self.assertEqual(deployplan.detect_other_valheim_process(), "1234 valheim_server.x86_64")
+
+    def test_resolve_ssl_mode(self):
+        self.assertEqual(deployplan.resolve_ssl_mode("1"), (True, "certbot"))
+        self.assertEqual(deployplan.resolve_ssl_mode("2"), (True, "none"))
+        self.assertEqual(deployplan.resolve_ssl_mode("3"), (True, "existing"))
+        self.assertEqual(deployplan.resolve_ssl_mode("0"), (False, ""))
+
+    def test_admin_password_required(self):
+        self.assertTrue(deployplan.admin_password_required("secret"))
+        self.assertFalse(deployplan.admin_password_required(""))
+
 
 class DeployPostTests(unittest.TestCase):
 
