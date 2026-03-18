@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import appfiles, appservice, bootstraphub, cpuplan, deploybackups, deploycore, deploydeps, deployenv, deploynginx, deploypost, deployssl, deploysudo, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
+from shared import appfiles, appservice, bootstraphub, cpuplan, deploybackups, deploycore, deploydeps, deployenv, deploynginx, deployplan, deploypost, deployssl, deploysudo, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -532,6 +532,48 @@ class DeployCoreTests(unittest.TestCase):
             self.assertIn('INSTANCE_ID="minecraft2"', captured["cfg_text"])
             self.assertIn('APP_DIR="/home/vhserver/game-commander-minecraft2"', captured["cfg_text"])
             self.assertIn('SERVER_PASSWORD="testtest01"', captured["cfg_text"])
+
+
+class DeployPlanTests(unittest.TestCase):
+
+    def test_apply_instance_defaults_uses_expected_paths(self):
+        payload = deployplan.apply_instance_defaults(
+            game_id="valheim",
+            instance_id="",
+            home_dir="/home/vhserver",
+            src_dir="/home/vhserver/gc",
+        )
+        self.assertEqual(payload["INSTANCE_ID"], "valheim")
+        self.assertEqual(payload["SERVER_DIR"], "/home/vhserver/valheim_server")
+        self.assertEqual(payload["DATA_DIR"], "/home/vhserver/valheim_data")
+        self.assertEqual(payload["APP_DIR"], "/home/vhserver/game-commander-valheim")
+        self.assertEqual(payload["GAME_SERVICE"], "valheim-server-valheim")
+
+    def test_apply_instance_defaults_enshrouded_uses_server_dir_for_data(self):
+        payload = deployplan.apply_instance_defaults(
+            game_id="enshrouded",
+            instance_id="enshrouded2",
+            home_dir="/home/vhserver",
+            src_dir="/home/vhserver/gc",
+        )
+        self.assertEqual(payload["DATA_DIR"], "/home/vhserver/enshrouded2_server")
+
+    def test_suggest_free_port_group_shifts_satisfactory_ports(self):
+        with mock.patch.object(deployplan, "first_port_group_conflict", side_effect=[
+            ("SERVER_PORT", "t", "Port de jeu (TCP)", 7777),
+            ("SERVER_PORT", "t", "Port de jeu (TCP)", 7778),
+            None,
+        ]):
+            payload = deployplan.suggest_free_port_group(
+                game_id="satisfactory",
+                server_port=7777,
+                query_port=8888,
+                echo_port=0,
+                game_service="",
+            )
+        self.assertEqual(payload["SERVER_PORT"], "7779")
+        self.assertEqual(payload["QUERY_PORT"], "8890")
+        self.assertEqual(payload["CONFLICT_PORT"], "7777")
 
 
 class DeployPostTests(unittest.TestCase):

@@ -94,8 +94,8 @@ test_attach_mode_present() {
     grep -q 'DEPLOY_MODE="managed"' "$helpers_file" || return 1
     grep -q 'deploy_configure_mode()' "$configure_file" || return 1
     grep -q 'Mode sélectionné :' "$configure_file" || return 1
-    grep -q 'prev_server_dir' "$configure_file" || return 1
-    grep -q 'if \[\[ "\$DEPLOY_MODE" != "attach" \]\] && conflict=' "$configure_file" || return 1
+    grep -q 'shared/deployplan.py" instance-defaults' "$configure_file" || return 1
+    grep -q 'shared/deployplan.py" suggest-ports' "$configure_file" || return 1
     grep -q '\[\[ "\$DEPLOY_MODE" != "attach" \]\] && deploy_warn_port_group_conflicts' "$configure_file" || return 1
     grep -q -- '--attach\|--existing-server' "$deploy_file" || return 1
     grep -q '\[\[ "\$DEPLOY_MODE" == "attach" \]\]' "$steps_file" || return 1

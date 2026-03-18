@@ -222,26 +222,18 @@ deploy_configure_user() {
 }
 
 deploy_prepare_instance_defaults() {
-    if [[ -z "$INSTANCE_ID" ]]; then
-        _base="${GAME_ID}"
-        _candidate="${_base}"
-        _n=2
-        while [[ -d "$HOME_DIR/game-commander-${_candidate}" ]] \
-           || systemctl list-units --full --all 2>/dev/null | grep -q "game-commander-${_candidate}\.service"; do
-            _candidate="${_base}${_n}"
-            (( _n++ ))
-        done
-        INSTANCE_ID="$_candidate"
-    fi
-
-    [[ -z "$SERVER_DIR" ]] && SERVER_DIR="$HOME_DIR/${INSTANCE_ID}_server"
-    [[ -z "$DATA_DIR"   ]] && DATA_DIR="$HOME_DIR/${INSTANCE_ID}_data"
-    [[ -z "$BACKUP_DIR" ]] && BACKUP_DIR="$HOME_DIR/gamebackups"
-    [[ -z "$APP_DIR"    ]] && APP_DIR="$HOME_DIR/game-commander-${INSTANCE_ID}"
-    [[ -z "$SRC_DIR"    ]] && SRC_DIR="$SCRIPT_DIR"
-
-    [[ -z "$GAME_SERVICE" ]] && GAME_SERVICE="${GAME_ID}-server-${INSTANCE_ID}"
-    GC_SERVICE="game-commander-${INSTANCE_ID}"
+    source <(
+        python3 "$SCRIPT_DIR/shared/deployplan.py" instance-defaults \
+            --game-id "$GAME_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --home-dir "$HOME_DIR" \
+            --src-dir "$SCRIPT_DIR" \
+            --server-dir "$SERVER_DIR" \
+            --data-dir "$DATA_DIR" \
+            --backup-dir "$BACKUP_DIR" \
+            --app-dir "$APP_DIR" \
+            --game-service "$GAME_SERVICE"
+    )
 }
 
 deploy_configure_paths() {
@@ -312,10 +304,18 @@ deploy_configure_server() {
     prompt_secret "Mot de passe (vide = public)" "${SERVER_PASSWORD}"
     SERVER_PASSWORD="$REPLY"
 
-    if [[ "$DEPLOY_MODE" != "attach" ]] && conflict="$(deploy_first_port_group_conflict)"; then
-        IFS='|' read -r spec proto label port <<< "$conflict"
-        deploy_suggest_port_group
-        warn "${label} ${port}/$([[ "$proto" == "t" ]] && echo TCP || echo UDP) déjà utilisé — groupe de ports suggéré mis à jour"
+    if [[ "$DEPLOY_MODE" != "attach" ]]; then
+        source <(
+            python3 "$SCRIPT_DIR/shared/deployplan.py" suggest-ports \
+                --game-id "$GAME_ID" \
+                --server-port "${SERVER_PORT:-0}" \
+                --query-port "${QUERY_PORT:-0}" \
+                --echo-port "${ECHO_PORT:-0}" \
+                --game-service "$GAME_SERVICE"
+        )
+        if [[ -n "${CONFLICT_LABEL:-}" ]]; then
+            warn "${CONFLICT_LABEL} ${CONFLICT_PORT}/$([[ "$CONFLICT_PROTO" == "t" ]] && echo TCP || echo UDP) déjà utilisé — groupe de ports suggéré mis à jour"
+        fi
     fi
 
     prompt "Port principal" "${SERVER_PORT}"
