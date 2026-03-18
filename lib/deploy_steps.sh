@@ -957,7 +957,43 @@ deploy_step_save_config() {
     # Compat modularization markers:
     # echo "DEPLOY_MODE=\"${DEPLOY_MODE}\""
     # echo "GAME_SERVICE=\"${GAME_SERVICE}\""
-    python3 "$SCRIPT_DIR/shared/deploypost.py" save --config "$CONFIG_SAVE" >/dev/null 2>&1 \
+    env \
+        GAME_ID="$GAME_ID" \
+        DEPLOY_MODE="$DEPLOY_MODE" \
+        INSTANCE_ID="$INSTANCE_ID" \
+        SYS_USER="$SYS_USER" \
+        SERVER_DIR="$SERVER_DIR" \
+        DATA_DIR="$DATA_DIR" \
+        BACKUP_DIR="$BACKUP_DIR" \
+        APP_DIR="$APP_DIR" \
+        SRC_DIR="$SRC_DIR" \
+        GAME_SERVICE="$GAME_SERVICE" \
+        SERVER_NAME="$SERVER_NAME" \
+        SERVER_PASSWORD="${SERVER_PASSWORD:-}" \
+        SERVER_ADMIN_PASSWORD="${SERVER_ADMIN_PASSWORD:-}" \
+        SERVER_PORT="$SERVER_PORT" \
+        QUERY_PORT="${QUERY_PORT:-}" \
+        ECHO_PORT="${ECHO_PORT:-}" \
+        MAX_PLAYERS="$MAX_PLAYERS" \
+        SERVER_MODE="${SERVER_MODE:-}" \
+        BACKUP_ENABLED="${BACKUP_ENABLED:-}" \
+        SAVING_ENABLED="${SAVING_ENABLED:-}" \
+        BACKUP_INTERVAL="${BACKUP_INTERVAL:-}" \
+        WORLD_NAME="${WORLD_NAME:-}" \
+        CROSSPLAY="${CROSSPLAY:-}" \
+        BEPINEX="${BEPINEX:-}" \
+        DOMAIN="$DOMAIN" \
+        URL_PREFIX="$URL_PREFIX" \
+        FLASK_PORT="$FLASK_PORT" \
+        SSL_MODE="$SSL_MODE" \
+        ADMIN_LOGIN="$ADMIN_LOGIN" \
+        ADMIN_PASSWORD="${ADMIN_PASSWORD:-}" \
+        AUTO_INSTALL_DEPS="${AUTO_INSTALL_DEPS:-true}" \
+        AUTO_INSTALL_STEAMCMD="${AUTO_INSTALL_STEAMCMD:-true}" \
+        AUTO_INSTALL_BEPINEX="${AUTO_INSTALL_BEPINEX:-true}" \
+        AUTO_UPDATE_SERVER="${AUTO_UPDATE_SERVER:-false}" \
+        AUTO_CONFIRM="${AUTO_CONFIRM:-true}" \
+        python3 "$SCRIPT_DIR/shared/deploypost.py" save-values --config "$CONFIG_SAVE" >/dev/null 2>&1 \
         || die "Échec sauvegarde config : $CONFIG_SAVE"
     ok "Config sauvegardée : $CONFIG_SAVE"
 

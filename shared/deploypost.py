@@ -106,6 +106,20 @@ def save_deploy_config(env: dict[str, str], config_path: str | Path) -> tuple[bo
     return True, f"Config sauvegardée : {config_path}"
 
 
+def save_deploy_config_from_process_env(config_path: str | Path) -> tuple[bool, str]:
+    env = dict(deployenv.BASE_DEFAULTS)
+    for key in deployenv.BASE_DEFAULTS:
+        value = os.environ.get(key)
+        if value is not None:
+            env[key] = value
+    game_id = env.get("GAME_ID", "")
+    if game_id in deployenv.GAME_DEFAULTS:
+        for key, value in deployenv.GAME_DEFAULTS[game_id].items():
+            if not env.get(key):
+                env[key] = value
+    return save_deploy_config(env, config_path)
+
+
 def _service_active(service: str) -> bool:
     return subprocess.run(["systemctl", "is-active", "--quiet", service], check=False).returncode == 0
 
@@ -190,6 +204,15 @@ def _cmd_save(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_save_values(args: argparse.Namespace) -> int:
+    ok, message = save_deploy_config_from_process_env(args.config)
+    if not ok:
+        print(message)
+        return 1
+    print(message)
+    return 0
+
+
 def _cmd_validate(args: argparse.Namespace) -> int:
     env = deployenv.normalize_deploy_env(args.config)
     for line in validation_lines(env, args.config):
@@ -203,6 +226,9 @@ def build_parser() -> argparse.ArgumentParser:
     save = sub.add_parser("save")
     save.add_argument("--config", required=True)
     save.set_defaults(func=_cmd_save)
+    save_values = sub.add_parser("save-values")
+    save_values.add_argument("--config", required=True)
+    save_values.set_defaults(func=_cmd_save_values)
     validate = sub.add_parser("validate")
     validate.add_argument("--config", required=True)
     validate.set_defaults(func=_cmd_validate)
