@@ -451,6 +451,19 @@ class DeployEnvTests(unittest.TestCase):
         self.assertEqual(env["URL_PREFIX"], "/enshrouded2")
         self.assertEqual(env["FLASK_PORT"], "5003")
 
+    def test_fill_defaults_from_process_env_applies_game_defaults(self):
+        with mock.patch.dict("os.environ", {"GAME_ID": "terraria", "SERVER_PORT": "", "FLASK_PORT": ""}, clear=False):
+            env = deployenv.fill_defaults_from_process_env()
+        self.assertEqual(env["SERVER_PORT"], "7777")
+        self.assertEqual(env["URL_PREFIX"], "/terraria")
+        self.assertEqual(env["FLASK_PORT"], "5006")
+
+    def test_render_template_contains_expected_game_list(self):
+        template = deployenv.render_template()
+        self.assertIn('GAME_ID="valheim"', template)
+        self.assertIn("minecraft-fabric", template)
+        self.assertIn('AUTO_CONFIRM=true', template)
+
 
 class RedeployCoreTests(unittest.TestCase):
 

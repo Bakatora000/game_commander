@@ -45,63 +45,8 @@ deploy_handle_special_args() {
     local outfile="${1:-env/deploy_config.env}"
 
     [[ "$outfile" == --* ]] && outfile="env/deploy_config.env"
-    cat > "$outfile" << 'CFGTPL'
-# ═══════════════════════════════════════════════════════════════════════════════
-#  Game Commander — Fichier de configuration de déploiement
-#  Usage : sudo bash game_commander.sh deploy --config env/deploy_config.env
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# Jeu : valheim | enshrouded | minecraft | minecraft-fabric | terraria | soulmask | satisfactory
-GAME_ID="valheim"
-
-# Mode de déploiement : managed | attach
-DEPLOY_MODE="managed"
-
-# Utilisateur système
-SYS_USER="gameserver"
-
-# Chemins (laisser vide = valeur par défaut basée sur le home de SYS_USER)
-INSTANCE_ID=""      # identifiant unique (ex. valheim2, mc-skyblock)
-SERVER_DIR=""
-DATA_DIR=""
-BACKUP_DIR=""
-APP_DIR=""
-SRC_DIR=""          # racine du projet Game Commander ou dossier runtime
-GAME_SERVICE=""     # vide = nom par défaut, utile en mode attach
-
-# Configuration du serveur de jeu
-SERVER_NAME="Mon Serveur Valheim"
-SERVER_PASSWORD=""
-SERVER_ADMIN_PASSWORD=""
-SERVER_PORT=""          # vide = défaut du jeu
-QUERY_PORT=""           # Soulmask / Satisfactory
-ECHO_PORT=""            # Soulmask uniquement
-MAX_PLAYERS=""
-SERVER_MODE="pve"       # Soulmask : pve | pvp
-BACKUP_ENABLED=true     # Soulmask
-SAVING_ENABLED=true     # Soulmask
-BACKUP_INTERVAL="7200"  # Soulmask, en secondes
-WORLD_NAME="Monde1"     # Valheim uniquement
-CROSSPLAY=false
-BEPINEX=true
-
-# Interface web Game Commander
-DOMAIN="monserveur.example.com"
-URL_PREFIX=""           # vide = défaut du jeu
-FLASK_PORT=""
-SSL_MODE="existing"     # certbot | none | existing
-
-# Compte administrateur
-ADMIN_LOGIN="admin"
-ADMIN_PASSWORD=""       # OBLIGATOIRE — renseigner ici ou laisser vide pour prompt
-
-# Automatisation
-AUTO_INSTALL_DEPS=true
-AUTO_INSTALL_STEAMCMD=true
-AUTO_INSTALL_BEPINEX=true
-AUTO_UPDATE_SERVER=false
-AUTO_CONFIRM=true
-CFGTPL
+    python3 "$SCRIPT_DIR/shared/deployenv.py" template --out "$outfile" >/dev/null \
+        || die "Échec génération du modèle de configuration"
     echo -e "${GREEN}  ✓  Modèle généré : $outfile${RESET}"
     echo -e "${CYAN}  →  Éditez puis lancez :${RESET}"
     echo -e "      sudo bash game_commander.sh deploy --config $outfile"
@@ -128,62 +73,19 @@ deploy_has_runtime_sources() {
 }
 
 set_game_defaults() {
-    case "$GAME_ID" in
-        valheim)
-            SERVER_PORT="${SERVER_PORT:-2456}"
-            MAX_PLAYERS="${MAX_PLAYERS:-10}"
-            URL_PREFIX="${URL_PREFIX:-/valheim}"
-            FLASK_PORT="${FLASK_PORT:-5002}"
-            SERVER_NAME="${SERVER_NAME:-Mon Serveur Valheim}"
-            ;;
-        enshrouded)
-            SERVER_PORT="${SERVER_PORT:-15636}"
-            MAX_PLAYERS="${MAX_PLAYERS:-16}"
-            URL_PREFIX="${URL_PREFIX:-/enshrouded}"
-            FLASK_PORT="${FLASK_PORT:-5003}"
-            SERVER_NAME="${SERVER_NAME:-Mon Serveur Enshrouded}"
-            ;;
-        minecraft)
-            SERVER_PORT="${SERVER_PORT:-25565}"
-            MAX_PLAYERS="${MAX_PLAYERS:-20}"
-            URL_PREFIX="${URL_PREFIX:-/minecraft}"
-            FLASK_PORT="${FLASK_PORT:-5004}"
-            SERVER_NAME="${SERVER_NAME:-Mon Serveur Minecraft Java}"
-            ;;
-        minecraft-fabric)
-            SERVER_PORT="${SERVER_PORT:-25565}"
-            MAX_PLAYERS="${MAX_PLAYERS:-20}"
-            URL_PREFIX="${URL_PREFIX:-/minecraft-fabric}"
-            FLASK_PORT="${FLASK_PORT:-5005}"
-            SERVER_NAME="${SERVER_NAME:-Mon Serveur Minecraft Fabric}"
-            ;;
-        terraria)
-            SERVER_PORT="${SERVER_PORT:-7777}"
-            MAX_PLAYERS="${MAX_PLAYERS:-8}"
-            URL_PREFIX="${URL_PREFIX:-/terraria}"
-            FLASK_PORT="${FLASK_PORT:-5006}"
-            SERVER_NAME="${SERVER_NAME:-Mon Serveur Terraria}"
-            ;;
-        satisfactory)
-            SERVER_PORT="${SERVER_PORT:-7777}"
-            QUERY_PORT="${QUERY_PORT:-8888}"
-            MAX_PLAYERS="${MAX_PLAYERS:-8}"
-            URL_PREFIX="${URL_PREFIX:-/satisfactory}"
-            FLASK_PORT="${FLASK_PORT:-5007}"
-            SERVER_NAME="${SERVER_NAME:-Mon Serveur Satisfactory}"
-            ;;
-        soulmask)
-            SERVER_PORT="${SERVER_PORT:-8777}"
-            QUERY_PORT="${QUERY_PORT:-27015}"
-            ECHO_PORT="${ECHO_PORT:-18888}"
-            MAX_PLAYERS="${MAX_PLAYERS:-50}"
-            URL_PREFIX="${URL_PREFIX:-/soulmask}"
-            FLASK_PORT="${FLASK_PORT:-5011}"
-            SERVER_NAME="${SERVER_NAME:-Mon Serveur Soulmask}"
-            SERVER_MODE="${SERVER_MODE:-pve}"
-            BACKUP_INTERVAL="${BACKUP_INTERVAL:-7200}"
-            ;;
-    esac
+    source <(
+        GAME_ID="$GAME_ID" \
+        SERVER_PORT="$SERVER_PORT" \
+        QUERY_PORT="$QUERY_PORT" \
+        ECHO_PORT="$ECHO_PORT" \
+        MAX_PLAYERS="$MAX_PLAYERS" \
+        URL_PREFIX="$URL_PREFIX" \
+        FLASK_PORT="$FLASK_PORT" \
+        SERVER_NAME="$SERVER_NAME" \
+        SERVER_MODE="$SERVER_MODE" \
+        BACKUP_INTERVAL="$BACKUP_INTERVAL" \
+        python3 "$SCRIPT_DIR/shared/deployenv.py" fill-defaults
+    )
 }
 
 deploy_load_config_file() {

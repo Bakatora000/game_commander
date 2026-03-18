@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import shlex
 import sys
 from pathlib import Path
@@ -111,6 +112,63 @@ GAME_DEFAULTS: dict[str, dict[str, str]] = {
     },
 }
 
+TEMPLATE_TEXT = """# ═══════════════════════════════════════════════════════════════════════════════
+#  Game Commander — Fichier de configuration de déploiement
+#  Usage : sudo bash game_commander.sh deploy --config env/deploy_config.env
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Jeu : valheim | enshrouded | minecraft | minecraft-fabric | terraria | soulmask | satisfactory
+GAME_ID="valheim"
+
+# Mode de déploiement : managed | attach
+DEPLOY_MODE="managed"
+
+# Utilisateur système
+SYS_USER="gameserver"
+
+# Chemins (laisser vide = valeur par défaut basée sur le home de SYS_USER)
+INSTANCE_ID=""      # identifiant unique (ex. valheim2, mc-skyblock)
+SERVER_DIR=""
+DATA_DIR=""
+BACKUP_DIR=""
+APP_DIR=""
+SRC_DIR=""          # racine du projet Game Commander ou dossier runtime
+GAME_SERVICE=""     # vide = nom par défaut, utile en mode attach
+
+# Configuration du serveur de jeu
+SERVER_NAME="Mon Serveur Valheim"
+SERVER_PASSWORD=""
+SERVER_ADMIN_PASSWORD=""
+SERVER_PORT=""          # vide = défaut du jeu
+QUERY_PORT=""           # Soulmask / Satisfactory
+ECHO_PORT=""            # Soulmask uniquement
+MAX_PLAYERS=""
+SERVER_MODE="pve"       # Soulmask : pve | pvp
+BACKUP_ENABLED=true     # Soulmask
+SAVING_ENABLED=true     # Soulmask
+BACKUP_INTERVAL="7200"  # Soulmask, en secondes
+WORLD_NAME="Monde1"     # Valheim uniquement
+CROSSPLAY=false
+BEPINEX=true
+
+# Interface web Game Commander
+DOMAIN="monserveur.example.com"
+URL_PREFIX=""           # vide = défaut du jeu
+FLASK_PORT=""
+SSL_MODE="existing"     # certbot | none | existing
+
+# Compte administrateur
+ADMIN_LOGIN="admin"
+ADMIN_PASSWORD=""       # OBLIGATOIRE — renseigner ici ou laisser vide pour prompt
+
+# Automatisation
+AUTO_INSTALL_DEPS=true
+AUTO_INSTALL_STEAMCMD=true
+AUTO_INSTALL_BEPINEX=true
+AUTO_UPDATE_SERVER=false
+AUTO_CONFIRM=true
+"""
+
 
 def apply_game_defaults(env: dict[str, str]) -> dict[str, str]:
     merged = dict(BASE_DEFAULTS)
@@ -121,6 +179,15 @@ def apply_game_defaults(env: dict[str, str]) -> dict[str, str]:
             if not merged.get(key):
                 merged[key] = value
     return merged
+
+
+def fill_defaults_from_process_env() -> dict[str, str]:
+    env = {key: os.environ.get(key, "") for key in BASE_DEFAULTS}
+    return apply_game_defaults(env)
+
+
+def render_template() -> str:
+    return TEMPLATE_TEXT
 
 
 def prepare_managed_instance_env(
@@ -192,12 +259,30 @@ def _cmd_exports(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_fill_defaults(_args: argparse.Namespace) -> int:
+    print(to_shell_exports(fill_defaults_from_process_env()), end="")
+    return 0
+
+
+def _cmd_template(args: argparse.Namespace) -> int:
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(render_template(), encoding="utf-8")
+    print(out)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Game Commander deploy env helper")
     sub = parser.add_subparsers(dest="command", required=True)
     exports = sub.add_parser("exports")
     exports.add_argument("--config", required=True)
     exports.set_defaults(func=_cmd_exports)
+    fill_defaults = sub.add_parser("fill-defaults")
+    fill_defaults.set_defaults(func=_cmd_fill_defaults)
+    template = sub.add_parser("template")
+    template.add_argument("--out", required=True)
+    template.set_defaults(func=_cmd_template)
     return parser
 
 
