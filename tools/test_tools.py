@@ -432,6 +432,25 @@ class DeployEnvTests(unittest.TestCase):
             self.assertEqual(env["URL_PREFIX"], "/satisfactory")
             self.assertEqual(env["FLASK_PORT"], "5007")
 
+    def test_prepare_managed_instance_env_builds_expected_paths(self):
+        env = deployenv.prepare_managed_instance_env(
+            game_id="enshrouded",
+            instance_id="enshrouded2",
+            sys_user="vhserver",
+            repo_root="/home/vhserver/gc",
+            domain="gaming.example.com",
+            admin_login="admin",
+            admin_password="secret123",
+            url_prefix="/enshrouded2",
+        )
+        self.assertEqual(env["DEPLOY_MODE"], "managed")
+        self.assertEqual(env["SERVER_DIR"], "/home/vhserver/enshrouded2_server")
+        self.assertEqual(env["DATA_DIR"], "/home/vhserver/enshrouded2_server")
+        self.assertEqual(env["APP_DIR"], "/home/vhserver/game-commander-enshrouded2")
+        self.assertEqual(env["GAME_SERVICE"], "enshrouded-server-enshrouded2")
+        self.assertEqual(env["URL_PREFIX"], "/enshrouded2")
+        self.assertEqual(env["FLASK_PORT"], "5003")
+
 
 class RedeployCoreTests(unittest.TestCase):
 

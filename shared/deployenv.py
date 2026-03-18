@@ -112,15 +112,69 @@ GAME_DEFAULTS: dict[str, dict[str, str]] = {
 }
 
 
-def normalize_deploy_env(path: str | Path) -> dict[str, str]:
-    env = dict(BASE_DEFAULTS)
-    env.update(instanceenv.parse_env_file(path))
-    game_id = env.get("GAME_ID", "")
+def apply_game_defaults(env: dict[str, str]) -> dict[str, str]:
+    merged = dict(BASE_DEFAULTS)
+    merged.update(env)
+    game_id = merged.get("GAME_ID", "")
     if game_id in GAME_DEFAULTS:
         for key, value in GAME_DEFAULTS[game_id].items():
-            if not env.get(key):
-                env[key] = value
+            if not merged.get(key):
+                merged[key] = value
+    return merged
+
+
+def prepare_managed_instance_env(
+    *,
+    game_id: str,
+    instance_id: str,
+    sys_user: str,
+    repo_root: str | Path,
+    domain: str,
+    admin_login: str,
+    admin_password: str,
+    url_prefix: str = "",
+    server_name: str = "",
+    server_password: str = "",
+    server_port: str = "",
+    max_players: str = "",
+) -> dict[str, str]:
+    repo_path = Path(repo_root).resolve()
+    home_dir = Path.home() if not sys_user else Path(f"~{sys_user}").expanduser()
+    env = apply_game_defaults(
+        {
+            "GAME_ID": game_id,
+            "DEPLOY_MODE": "managed",
+            "INSTANCE_ID": instance_id,
+            "SYS_USER": sys_user,
+            "DOMAIN": domain,
+            "ADMIN_LOGIN": admin_login or "admin",
+            "ADMIN_PASSWORD": admin_password,
+            "AUTO_CONFIRM": "true",
+        }
+    )
+    env["SERVER_DIR"] = str(home_dir / f"{instance_id}_server")
+    env["DATA_DIR"] = str(home_dir / f"{instance_id}_data")
+    if game_id == "enshrouded":
+        env["DATA_DIR"] = env["SERVER_DIR"]
+    env["BACKUP_DIR"] = str(home_dir / "gamebackups")
+    env["APP_DIR"] = str(home_dir / f"game-commander-{instance_id}")
+    env["SRC_DIR"] = str(repo_path)
+    env["GAME_SERVICE"] = f"{game_id}-server-{instance_id}"
+    if url_prefix:
+        env["URL_PREFIX"] = url_prefix
+    if server_name:
+        env["SERVER_NAME"] = server_name
+    if server_password:
+        env["SERVER_PASSWORD"] = server_password
+    if server_port:
+        env["SERVER_PORT"] = str(server_port)
+    if max_players:
+        env["MAX_PLAYERS"] = str(max_players)
     return env
+
+
+def normalize_deploy_env(path: str | Path) -> dict[str, str]:
+    return apply_game_defaults(instanceenv.parse_env_file(path))
 
 
 def to_shell_exports(env: dict[str, str]) -> str:

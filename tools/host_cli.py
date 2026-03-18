@@ -97,24 +97,20 @@ def _write_temp_deploy_config(env: dict[str, str]) -> Path:
 
 def cmd_deploy_instance(args: argparse.Namespace) -> int:
     main_script = Path(args.main_script).resolve()
-    env = dict(deployenv.BASE_DEFAULTS)
-    env["GAME_ID"] = args.game_id
-    env.update(deployenv.GAME_DEFAULTS.get(args.game_id, {}))
-    env["INSTANCE_ID"] = args.instance
-    env["DOMAIN"] = args.domain
-    if args.url_prefix:
-        env["URL_PREFIX"] = args.url_prefix
-    env["ADMIN_LOGIN"] = args.admin_login or "admin"
-    env["ADMIN_PASSWORD"] = args.admin_password
-    env["SYS_USER"] = args.sys_user or _default_sys_user(main_script)
-    env["SERVER_NAME"] = args.server_name or env.get("SERVER_NAME", "Mon Serveur")
-    if args.server_password:
-        env["SERVER_PASSWORD"] = args.server_password
-    if args.server_port:
-        env["SERVER_PORT"] = str(args.server_port)
-    if args.max_players:
-        env["MAX_PLAYERS"] = str(args.max_players)
-    env["AUTO_CONFIRM"] = "true"
+    env = deployenv.prepare_managed_instance_env(
+        game_id=args.game_id,
+        instance_id=args.instance,
+        sys_user=args.sys_user or _default_sys_user(main_script),
+        repo_root=main_script.parent,
+        domain=args.domain,
+        url_prefix=args.url_prefix,
+        admin_login=args.admin_login or "admin",
+        admin_password=args.admin_password,
+        server_name=args.server_name,
+        server_password=args.server_password,
+        server_port=str(args.server_port or ""),
+        max_players=str(args.max_players or ""),
+    )
 
     temp_config = _write_temp_deploy_config(env)
     try:
