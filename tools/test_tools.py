@@ -581,6 +581,17 @@ class StartScriptsTests(unittest.TestCase):
         self.assertIn('cd "/srv/enshrouded"', content)
         self.assertIn("exec xvfb-run --auto-servernum wine64 ./enshrouded_server.exe", content)
 
+    def test_render_terraria_start_script_uses_serverconfig(self):
+        content = startscripts.render_terraria_start_script(server_dir="/srv/terraria")
+        self.assertIn('cd "/srv/terraria"', content)
+        self.assertIn('CFG="/srv/terraria/serverconfig.txt"', content)
+        self.assertIn('mkdir -p "$WORLDPATH" "/srv/terraria/logs"', content)
+        self.assertIn('exec ./TerrariaServer.bin.x86_64 "${ARGS[@]}"', content)
+
+    def test_render_terraria_wrapper_script_uses_script_wrapper(self):
+        content = startscripts.render_terraria_wrapper_script(start_script="/srv/terraria/start_server.sh")
+        self.assertIn('exec /usr/bin/script -qefc "/srv/terraria/start_server.sh" /dev/null', content)
+
     def test_render_valheim_start_script_standard(self):
         content = startscripts.render_valheim_start_script(
             server_dir="/srv/valheim",
@@ -1613,6 +1624,51 @@ class DeployHelpersTests(unittest.TestCase):
 
             self.assertIn("Serveur Enshrouded téléchargé", messages)
             self.assertIn("Binaire enshrouded_server.exe vérifié", messages)
+
+    def test_install_terraria_downloads_server_and_generates_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            server_dir = Path(tmp) / "server"
+            data_dir = Path(tmp) / "data"
+            script_dir = Path(tmp) / "repo"
+            (script_dir / "tools").mkdir(parents=True)
+
+            archive = Path(tmp) / "terraria.zip"
+            with zipfile.ZipFile(archive, "w") as zf:
+                zf.writestr("TerrariaServer/TerrariaServer.bin.x86_64", "bin")
+
+            def fake_urlopen(req, timeout=20):
+                url = req.full_url if hasattr(req, "full_url") else str(req)
+                if url == "https://terraria.org/":
+                    return io.BytesIO(
+                        b'<a href="/api/download/pc-dedicated-server/terraria-server-1459.zip">download</a>'
+                    )
+                if url.endswith("terraria-server-1459.zip"):
+                    return io.BytesIO(archive.read_bytes())
+                raise AssertionError(url)
+
+            def fake_run(cmd, **kwargs):
+                if isinstance(cmd, list) and len(cmd) >= 4 and cmd[2].endswith("config_gen.py") and cmd[3] == "terraria-cfg":
+                    out = Path(cmd[cmd.index("--out") + 1])
+                    out.write_text("world=/tmp/world.wld\nworldpath=/tmp\nworldname=terraria2\n", encoding="utf-8")
+                return mock.Mock(returncode=0, stdout="", stderr="")
+
+            with mock.patch("shared.gameinstall.urllib.request.urlopen", side_effect=fake_urlopen), \
+                 mock.patch("shared.gameinstall.subprocess.run", side_effect=fake_run):
+                messages = gameinstall.install_terraria(
+                    script_dir=str(script_dir),
+                    server_dir=str(server_dir),
+                    data_dir=str(data_dir),
+                    sys_user="vhserver",
+                    server_name="Serveur Terraria",
+                    server_port="7777",
+                    max_players="8",
+                    instance_id="terraria2",
+                )
+
+            self.assertIn("Serveur Terraria téléchargé", messages[0])
+            self.assertIn("serverconfig.txt généré", messages)
+            self.assertTrue((server_dir / "TerrariaServer.bin.x86_64").is_file())
+            self.assertTrue((server_dir / "serverconfig.txt").is_file())
 
 
 class ConfigGenUsersJsonTests(unittest.TestCase):

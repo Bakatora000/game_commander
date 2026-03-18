@@ -87,6 +87,48 @@ def render_enshrouded_start_script(*, server_dir: str, home_dir: str) -> str:
     )
 
 
+def render_terraria_start_script(*, server_dir: str) -> str:
+    return (
+        "#!/usr/bin/env bash\n"
+        f'cd "{server_dir}"\n'
+        f'CFG="{server_dir}/serverconfig.txt"\n'
+        "cfg_get() {\n"
+        '    local key="$1"\n'
+        '    sed -n "s/^${key}=//p" "$CFG" | head -1\n'
+        "}\n"
+        'WORLD="$(cfg_get world)"\n'
+        'WORLDPATH="$(cfg_get worldpath)"\n'
+        'WORLDNAME="$(cfg_get worldname)"\n'
+        'AUTOCREATE="$(cfg_get autocreate)"\n'
+        'DIFFICULTY="$(cfg_get difficulty)"\n'
+        'PORT="$(cfg_get port)"\n'
+        'MAXPLAYERS="$(cfg_get maxplayers)"\n'
+        'PASSWORD="$(cfg_get password)"\n'
+        'MOTD="$(cfg_get motd)"\n'
+        f'[[ -z "$WORLD" && -n "$WORLDPATH" && -n "$WORLDNAME" ]] && WORLD="$WORLDPATH/$WORLDNAME.wld"\n'
+        f'mkdir -p "$WORLDPATH" "{server_dir}/logs"\n'
+        "ARGS=(\n"
+        '    -world "$WORLD"\n'
+        '    -autocreate "${AUTOCREATE:-2}"\n'
+        '    -worldname "$WORLDNAME"\n'
+        '    -difficulty "${DIFFICULTY:-0}"\n'
+        '    -port "${PORT:-7777}"\n'
+        '    -maxplayers "${MAXPLAYERS:-8}"\n'
+        '    -motd "$MOTD"\n'
+        f'    -logpath "{server_dir}/logs"\n'
+        ")\n"
+        '[[ -n "$PASSWORD" ]] && ARGS+=(-password "$PASSWORD")\n'
+        'exec ./TerrariaServer.bin.x86_64 "${ARGS[@]}"\n'
+    )
+
+
+def render_terraria_wrapper_script(*, start_script: str) -> str:
+    return (
+        "#!/usr/bin/env bash\n"
+        f'exec /usr/bin/script -qefc "{start_script}" /dev/null\n'
+    )
+
+
 def write_start_script(*, out_path: str, content: str, sys_user: str) -> None:
     path = Path(out_path)
     path.write_text(content, encoding="utf-8")
@@ -141,6 +183,16 @@ def _cmd_enshrouded(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_terraria(args: argparse.Namespace) -> int:
+    content = render_terraria_start_script(server_dir=args.server_dir)
+    write_start_script(out_path=args.out, content=content, sys_user=args.sys_user)
+    if args.wrapper_out:
+        wrapper = render_terraria_wrapper_script(start_script=args.out)
+        write_start_script(out_path=args.wrapper_out, content=wrapper, sys_user=args.sys_user)
+    print(args.out)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Génération de scripts de démarrage Game Commander")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -167,6 +219,13 @@ def build_parser() -> argparse.ArgumentParser:
     enshrouded.add_argument("--home-dir", required=True)
     enshrouded.add_argument("--sys-user", required=True)
     enshrouded.set_defaults(func=_cmd_enshrouded)
+
+    terraria = sub.add_parser("terraria")
+    terraria.add_argument("--out", required=True)
+    terraria.add_argument("--wrapper-out")
+    terraria.add_argument("--server-dir", required=True)
+    terraria.add_argument("--sys-user", required=True)
+    terraria.set_defaults(func=_cmd_terraria)
 
     valheim = sub.add_parser("valheim")
     valheim.add_argument("--out", required=True)

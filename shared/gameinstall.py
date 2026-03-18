@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urllib.parse
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -295,6 +296,132 @@ def install_enshrouded(
     return messages
 
 
+def install_terraria(
+    *,
+    script_dir: str,
+    server_dir: str,
+    data_dir: str,
+    sys_user: str,
+    server_name: str,
+    server_port: str,
+    max_players: str,
+    instance_id: str,
+) -> list[str]:
+    messages: list[str] = []
+    server_path = Path(server_dir)
+    data_path = Path(data_dir)
+    server_path.mkdir(parents=True, exist_ok=True)
+    data_path.mkdir(parents=True, exist_ok=True)
+    _chown_tree(sys_user, server_path)
+    _chown_tree(sys_user, data_path)
+
+    binary_path = server_path / "TerrariaServer.bin.x86_64"
+    if binary_path.is_file():
+        messages.append("Serveur Terraria déjà présent")
+    else:
+        home_url = "https://terraria.org/"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9,fr;q=0.8",
+        }
+
+        def fetch(url: str, timeout: int = 20, referer: str | None = None):
+            req_headers = dict(headers)
+            if referer:
+                req_headers["Referer"] = referer
+            req = urllib.request.Request(url, headers=req_headers)
+            return urllib.request.urlopen(req, timeout=timeout)
+
+        def latest_zip_url() -> str:
+            with fetch(home_url, timeout=20) as response:
+                html = response.read().decode("utf-8", errors="ignore")
+
+            matches = re.findall(
+                r'href="([^"]*/api/download/pc-dedicated-server/terraria-server-[^"]+\.zip)"',
+                html,
+            )
+            if matches:
+                return urllib.parse.urljoin(home_url, matches[0])
+
+            for compact in (
+                "1459", "1458", "1457", "1456", "1455", "1454", "1453", "1452", "1451", "1450",
+                "1449", "1448", "1447", "1446", "1445", "1444", "1443", "1442", "1441", "1440",
+            ):
+                candidate = f"https://terraria.org/api/download/pc-dedicated-server/terraria-server-{compact}.zip"
+                try:
+                    with fetch(candidate, timeout=20, referer=home_url) as response:
+                        if getattr(response, "status", 200) == 200:
+                            return candidate
+                except Exception:
+                    continue
+            raise RuntimeError("Lien serveur Terraria introuvable sur terraria.org")
+
+        zip_url = latest_zip_url()
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            zip_path = tmp_path / "terraria-server.zip"
+            with fetch(zip_url, timeout=120, referer=home_url) as response, zip_path.open("wb") as fh:
+                fh.write(response.read())
+
+            extract_dir = tmp_path / "extract"
+            with zipfile.ZipFile(zip_path) as zf:
+                zf.extractall(extract_dir)
+
+            candidates = list(extract_dir.rglob("TerrariaServer.bin.x86_64"))
+            if not candidates:
+                raise RuntimeError("Binaire TerrariaServer.bin.x86_64 introuvable dans l'archive")
+
+            linux_dir = candidates[0].parent
+            for entry in linux_dir.iterdir():
+                dest = server_path / entry.name
+                if dest.exists():
+                    if dest.is_dir():
+                        shutil.rmtree(dest)
+                    else:
+                        dest.unlink()
+                if entry.is_dir():
+                    shutil.copytree(entry, dest)
+                else:
+                    shutil.copy2(entry, dest)
+
+        try:
+            binary_path.chmod(binary_path.stat().st_mode | 0o111)
+        except OSError:
+            pass
+        _chown_tree(sys_user, server_path)
+        messages.append(f"Serveur Terraria téléchargé ({zip_url})")
+
+    cfg_path = server_path / "serverconfig.txt"
+    if not cfg_path.is_file():
+        subprocess.run(
+            [
+                "python3",
+                str(Path(script_dir) / "tools" / "config_gen.py"),
+                "terraria-cfg",
+                "--out",
+                str(cfg_path),
+                "--name",
+                server_name,
+                "--port",
+                str(server_port),
+                "--max-players",
+                str(max_players),
+                "--world-path",
+                str(data_path),
+                "--world-name",
+                instance_id,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        _chown_paths(sys_user, cfg_path)
+        messages.append("serverconfig.txt généré")
+
+    return messages
+
+
 def install_valheim(
     *,
     server_dir: str,
@@ -418,6 +545,26 @@ def _cmd_satisfactory(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_terraria(args: argparse.Namespace) -> int:
+    try:
+        messages = install_terraria(
+            script_dir=args.script_dir,
+            server_dir=args.server_dir,
+            data_dir=args.data_dir,
+            sys_user=args.sys_user,
+            server_name=args.server_name,
+            server_port=args.server_port,
+            max_players=args.max_players,
+            instance_id=args.instance_id,
+        )
+    except Exception as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    for line in messages:
+        print(line)
+    return 0
+
+
 def _cmd_valheim(args: argparse.Namespace) -> int:
     try:
         messages = install_valheim(
@@ -483,6 +630,17 @@ def build_parser() -> argparse.ArgumentParser:
     enshrouded.add_argument("--steamcmd-path", required=True)
     enshrouded.add_argument("--steam-appid", required=True)
     enshrouded.set_defaults(func=_cmd_enshrouded)
+
+    terraria = sub.add_parser("terraria")
+    terraria.add_argument("--script-dir", required=True)
+    terraria.add_argument("--server-dir", required=True)
+    terraria.add_argument("--data-dir", required=True)
+    terraria.add_argument("--sys-user", required=True)
+    terraria.add_argument("--server-name", required=True)
+    terraria.add_argument("--server-port", required=True)
+    terraria.add_argument("--max-players", required=True)
+    terraria.add_argument("--instance-id", required=True)
+    terraria.set_defaults(func=_cmd_terraria)
 
     valheim = sub.add_parser("valheim")
     valheim.add_argument("--server-dir", required=True)

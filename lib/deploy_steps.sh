@@ -253,106 +253,24 @@ deploy_step_game_install() {
         mkdir -p "$SERVER_DIR" "$DATA_DIR"
         chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR" "$DATA_DIR"
 
-        if [[ -f "$SERVER_DIR/TerrariaServer.bin.x86_64" ]]; then
-            ok "Serveur Terraria déjà présent"
+        local terr_out=""
+        if terr_out="$(python3 "$SCRIPT_DIR/shared/gameinstall.py" terraria \
+            --script-dir "$SCRIPT_DIR" \
+            --server-dir "$SERVER_DIR" \
+            --data-dir "$DATA_DIR" \
+            --sys-user "$SYS_USER" \
+            --server-name "$SERVER_NAME" \
+            --server-port "$SERVER_PORT" \
+            --max-players "$MAX_PLAYERS" \
+            --instance-id "$INSTANCE_ID" 2>&1)"; then
+            while IFS= read -r _line; do
+                [[ -n "$_line" ]] && ok "$_line"
+            done <<< "$terr_out"
         else
-            info "Téléchargement du serveur dédié officiel Terraria..."
-            python3 - "$SERVER_DIR" <<'PYEOF' || die "Échec téléchargement serveur Terraria"
-import re
-import shutil
-import sys
-import tempfile
-import urllib.parse
-import urllib.request
-import zipfile
-from pathlib import Path
-
-server_dir = Path(sys.argv[1])
-home_url = "https://terraria.org/"
-headers = {
-    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.9,fr;q=0.8",
-}
-
-def fetch(url, timeout=20, referer=None):
-    req_headers = dict(headers)
-    if referer:
-        req_headers["Referer"] = referer
-    req = urllib.request.Request(url, headers=req_headers)
-    return urllib.request.urlopen(req, timeout=timeout)
-
-def latest_zip_url():
-    with fetch(home_url, timeout=20) as r:
-        html = r.read().decode("utf-8", errors="ignore")
-
-    matches = re.findall(r'href="([^"]*/api/download/pc-dedicated-server/terraria-server-[^"]+\.zip)"', html)
-    if matches:
-        return urllib.parse.urljoin(home_url, matches[0])
-
-    # Fallback pragmatique : terraria.org suit le schéma
-    # terraria-server-<version_sans_points>.zip.
-    # On teste d'abord les versions récentes plausibles.
-    for compact in (
-        "1459", "1458", "1457", "1456", "1455", "1454", "1453", "1452", "1451", "1450",
-        "1449", "1448", "1447", "1446", "1445", "1444", "1443", "1442", "1441", "1440",
-    ):
-        candidate = f"https://terraria.org/api/download/pc-dedicated-server/terraria-server-{compact}.zip"
-        try:
-            with fetch(candidate, timeout=20, referer=home_url) as r:
-                if getattr(r, "status", 200) == 200:
-                    return candidate
-        except Exception:
-            continue
-
-    raise SystemExit("Lien serveur Terraria introuvable sur terraria.org")
-
-zip_url = latest_zip_url()
-with tempfile.TemporaryDirectory() as tmp:
-    tmp_path = Path(tmp)
-    zip_path = tmp_path / "terraria-server.zip"
-    with fetch(zip_url, timeout=120, referer=home_url) as r, open(zip_path, "wb") as f:
-        f.write(r.read())
-
-    extract_dir = tmp_path / "extract"
-    with zipfile.ZipFile(zip_path) as zf:
-        zf.extractall(extract_dir)
-
-    candidates = list(extract_dir.rglob("TerrariaServer.bin.x86_64"))
-    if not candidates:
-        raise SystemExit("Binaire TerrariaServer.bin.x86_64 introuvable dans l'archive")
-
-    linux_dir = candidates[0].parent
-    for entry in linux_dir.iterdir():
-        dest = server_dir / entry.name
-        if dest.exists():
-            if dest.is_dir():
-                shutil.rmtree(dest)
-            else:
-                dest.unlink()
-        if entry.is_dir():
-            shutil.copytree(entry, dest)
-        else:
-            shutil.copy2(entry, dest)
-
-print(f"[terraria] serveur dédié téléchargé depuis : {zip_url}")
-PYEOF
-            chown -R "$SYS_USER:$SYS_USER" "$SERVER_DIR"
-            chmod +x "$SERVER_DIR/TerrariaServer.bin.x86_64" 2>/dev/null || true
-            ok "Serveur Terraria téléchargé"
-        fi
-
-        if [[ ! -f "$SERVER_DIR/serverconfig.txt" ]]; then
-            python3 "$SCRIPT_DIR/tools/config_gen.py" terraria-cfg \
-                --out "$SERVER_DIR/serverconfig.txt" \
-                --name "$SERVER_NAME" \
-                --port "$SERVER_PORT" \
-                --max-players "$MAX_PLAYERS" \
-                --world-path "$DATA_DIR" \
-                --world-name "$INSTANCE_ID" \
-            || die "Échec génération serverconfig.txt"
-            chown "$SYS_USER:$SYS_USER" "$SERVER_DIR/serverconfig.txt"
-            ok "serverconfig.txt généré"
+            [[ -n "$terr_out" ]] && while IFS= read -r _line; do
+                [[ -n "$_line" ]] && warn "$_line"
+            done <<< "$terr_out"
+            die "Échec installation serveur Terraria"
         fi
         return
     fi
@@ -637,49 +555,13 @@ deploy_step_game_service() {
         START_SCRIPT="$SERVER_DIR/start_server.sh"
         WRAPPER_SCRIPT="$SERVER_DIR/start_server_service.sh"
         mkdir -p "$SERVER_DIR/logs"
-        cat > "$START_SCRIPT" << 'STARTEOF'
-#!/usr/bin/env bash
-cd "__SERVER_DIR__"
-CFG="__SERVER_DIR__/serverconfig.txt"
-cfg_get() {
-    local key="$1"
-    sed -n "s/^${key}=//p" "$CFG" | head -1
-}
-WORLD="$(cfg_get world)"
-WORLDPATH="$(cfg_get worldpath)"
-WORLDNAME="$(cfg_get worldname)"
-AUTOCREATE="$(cfg_get autocreate)"
-DIFFICULTY="$(cfg_get difficulty)"
-PORT="$(cfg_get port)"
-MAXPLAYERS="$(cfg_get maxplayers)"
-PASSWORD="$(cfg_get password)"
-MOTD="$(cfg_get motd)"
-[[ -z "$WORLD" && -n "$WORLDPATH" && -n "$WORLDNAME" ]] && WORLD="$WORLDPATH/$WORLDNAME.wld"
-mkdir -p "$WORLDPATH" "__SERVER_DIR__/logs"
-ARGS=(
-    -world "$WORLD"
-    -autocreate "${AUTOCREATE:-2}"
-    -worldname "$WORLDNAME"
-    -difficulty "${DIFFICULTY:-0}"
-    -port "${PORT:-7777}"
-    -maxplayers "${MAXPLAYERS:-8}"
-    -motd "$MOTD"
-    -logpath "__SERVER_DIR__/logs"
-)
-[[ -n "$PASSWORD" ]] && ARGS+=(-password "$PASSWORD")
-exec ./TerrariaServer.bin.x86_64 "${ARGS[@]}"
-STARTEOF
-        sed -i "s|__SERVER_DIR__|${SERVER_DIR}|g" "$START_SCRIPT"
-        chmod +x "$START_SCRIPT"
-        chown "$SYS_USER:$SYS_USER" "$START_SCRIPT"
+        python3 "$SCRIPT_DIR/shared/startscripts.py" terraria \
+            --out "$START_SCRIPT" \
+            --wrapper-out "$WRAPPER_SCRIPT" \
+            --server-dir "$SERVER_DIR" \
+            --sys-user "$SYS_USER" \
+        || die "Échec génération start_server.sh Terraria"
         ok "Script de démarrage : $START_SCRIPT"
-
-        cat > "$WRAPPER_SCRIPT" << WRAPEOF
-#!/usr/bin/env bash
-exec /usr/bin/script -qefc "${START_SCRIPT}" /dev/null
-WRAPEOF
-        chmod +x "$WRAPPER_SCRIPT"
-        chown "$SYS_USER:$SYS_USER" "$WRAPPER_SCRIPT"
         ok "Wrapper service : $WRAPPER_SCRIPT"
 
         install_game_service_unit "$WRAPPER_SCRIPT"
