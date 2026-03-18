@@ -836,6 +836,30 @@ Conséquence produit validée :
 - `enshrouded2` désinstallée proprement ensuite
 - Hub Admin + console globale + actions hôte = base désormais suffisamment robuste pour reprendre la refacto du `deploy` le lendemain
 
+## Bootstrap Hub Admin sur serveur vierge
+
+Lot poussé :
+- `bootstrap-hub` a été ajouté comme point d'entrée explicite pour installer seulement le Hub Admin
+- un script `install_hub.sh` a aussi été ajouté pour préparer un futur flux `curl | bash`
+- le README documente maintenant ce bootstrap minimal côté Ubuntu
+
+Validation actuelle :
+- syntaxe shell OK
+- helpers Python OK
+- suite `tools/test_tools.py` OK
+- suite `tools/test_modularization.sh` OK
+
+Note d'exploitation importante :
+- le Hub Admin reste singleton par machine
+- un test de bootstrap avec un autre utilisateur système sur le même serveur (ex. `codex` au lieu de `vhserver`) n'est pas une cohabitation parallèle
+- cela remappe les mêmes ressources globales :
+  - service `game-commander-hub`
+  - sudoers du Hub
+  - intégration nginx partagée
+- donc le vrai test `curl | bash` doit se faire :
+  - soit sur une machine vierge
+  - soit en acceptant de remplacer temporairement le Hub déjà en place
+
 Prochaines priorités après ce gel :
 - refactoriser les actions hôte (`deploy`, `attach`, `update`, `uninstall`, `rebalance`) pour réduire la logique shell
 - documenter et stabiliser le contrat commun par jeu

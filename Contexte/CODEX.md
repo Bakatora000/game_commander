@@ -259,6 +259,19 @@ Validated `v3.0` status update after the first real Hub deploy tests:
   - partial instances left by an interrupted/failed Hub deploy can now be removed cleanly from the Hub even when `deploy_config.env` is missing or invalid
   - Hub action logs now strip ANSI color sequences before writing to the global console
 
+Validated bootstrap note:
+- a new `bootstrap-hub` entrypoint now exists for Ubuntu hosts
+- it is available both through `sudo bash game_commander.sh bootstrap-hub ...` and through the repository bootstrap script `install_hub.sh`
+- the intended end-state is a simple `curl | bash` installation path for the Hub Admin on a fresh server
+
+Operational constraint:
+- the Hub Admin is still singleton per machine
+- bootstraping it for another system user on the same host rewires the same shared resources:
+  - `game-commander-hub.service`
+  - `/etc/sudoers.d/game-commander-hub`
+  - shared Game Commander nginx files
+- so a second bootstrap on the same host is a replacement/repointing operation, not a parallel multi-user Hub install
+
 Operational note:
 - during the first real Hub deploy validation, a partial `minecraft2` instance was created and then successfully removed through the Hub cleanup path
 - this validated the partial-instance uninstall fallback and confirmed that existing managed instances such as `valheim-main` were not overwritten by that failed deploy path
