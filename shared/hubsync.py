@@ -118,6 +118,7 @@ def _write_hub_sudoers(repo_root: Path, sys_user: str) -> None:
         "# Game Commander — Hub actions\n"
         f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} service-action --service * --action *\n"
         f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} update-instance --main-script * --instance *\n"
+        f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} deploy-instance --main-script * --game-id * --instance * --domain * --admin-login * --admin-password * --sys-user *\n"
         f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} redeploy-instance --main-script * --config *\n"
         f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} uninstall-instance --main-script * --instance *\n"
         f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} rebalance --main-script *\n"

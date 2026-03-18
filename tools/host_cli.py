@@ -108,8 +108,11 @@ def cmd_deploy_instance(args: argparse.Namespace) -> int:
 
     temp_config = _write_temp_deploy_config(env)
     try:
+        deploy_cmd = ["/bin/bash", str(main_script), "deploy", "--config", str(temp_config)]
+        if os.geteuid() != 0:
+            deploy_cmd.insert(0, "sudo")
         result = subprocess.run(
-            ["sudo", "/bin/bash", str(main_script), "deploy", "--config", str(temp_config)],
+            deploy_cmd,
             capture_output=True,
             text=True,
             env={**os.environ, "PYTHONUNBUFFERED": "1", "GC_SKIP_HUB_SERVICE": "1"},
