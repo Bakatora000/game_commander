@@ -359,7 +359,6 @@
                   <label class="field-label" for="deployMaxPlayers">Joueurs max</label>
                   <input class="field-input" id="deployMaxPlayers" placeholder="laisser vide = défaut">
                   <button class="primary-btn" type="button" id="btnDeployInstance">Lancer le déploiement</button>
-                  <div class="feedback" id="deployFeedback"></div>
                 </section>
               </div>
             </div>
@@ -563,15 +562,16 @@
         max_players: document.getElementById('deployMaxPlayers').value.trim(),
       };
       if (!payload.instance || !payload.domain || !payload.admin_password) {
-        setFeedback('deployFeedback', 'Identifiant, domaine et mot de passe admin requis', false);
+        window.alert('Identifiant, domaine et mot de passe admin requis');
         return;
       }
       if (!window.confirm(`Déployer ${payload.instance} (${payload.game_id}) ?`)) {
         return;
       }
       const button = document.getElementById('btnDeployInstance');
+      const previousLabel = button.textContent;
       button.disabled = true;
-      setFeedback('deployFeedback', 'Déploiement en cours…', true);
+      button.textContent = 'Déploiement en cours…';
       try {
         const response = await fetch('{{ prefix }}/api/deploy', {
           method: 'POST',
@@ -580,17 +580,21 @@
           body: JSON.stringify(payload),
         });
         const data = await response.json().catch(() => ({}));
-        setFeedback('deployFeedback', data.message || (response.ok ? 'Instance déployée' : 'Erreur'), response.ok);
         if (!document.getElementById('globalConsolePanel').hidden) {
           await loadGlobalConsole();
         }
         if (response.ok) {
           setTimeout(load, 2000);
+        } else if (data.message) {
+          window.alert(data.message);
+        } else {
+          window.alert('Erreur pendant le déploiement');
         }
       } catch (_err) {
-        setFeedback('deployFeedback', 'Erreur réseau ou Hub indisponible', false);
+        window.alert('Erreur réseau ou Hub indisponible');
       } finally {
         button.disabled = false;
+        button.textContent = previousLabel;
       }
     }
     function setFeedback(id, message, ok = false) {

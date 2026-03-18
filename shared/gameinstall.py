@@ -44,7 +44,14 @@ def latest_fabric_server_meta(fetch_json=_fetch_json) -> dict[str, str]:
 
 
 def _download_file(url: str, output_path: Path) -> None:
-    with urllib.request.urlopen(url, timeout=60) as response, output_path.open("wb") as fh:
+    req = urllib.request.Request(
+        url,
+        headers={
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0 Safari/537.36",
+            "Accept": "*/*",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=60) as response, output_path.open("wb") as fh:
         fh.write(response.read())
 
 
