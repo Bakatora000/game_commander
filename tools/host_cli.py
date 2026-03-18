@@ -3,19 +3,16 @@
 from __future__ import annotations
 
 import argparse
-import os
 import pwd
 import socket
-import subprocess
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from shared import bootstraphub, cpuplan, deployenv, hostctl, hostops, hubsync, redeploycore, uninstallcore, updatecore, updatehooks
+from shared import bootstraphub, cpuplan, deploycore, hostctl, hostops, hubsync, redeploycore, uninstallcore, updatecore, updatehooks
 
 
 def _existing_path(value: str) -> Path:
@@ -86,51 +83,28 @@ def _default_domain() -> str:
         return "localhost"
 
 
-def _write_temp_deploy_config(env: dict[str, str]) -> Path:
-    fd, path_str = tempfile.mkstemp(prefix="gc-hub-deploy-", suffix=".env")
-    path = Path(path_str)
-    with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        for key, value in env.items():
-            fh.write(f'{key}="{str(value).replace(chr(34), r"\"")}"\n')
-    return path
-
-
 def cmd_deploy_instance(args: argparse.Namespace) -> int:
     main_script = Path(args.main_script).resolve()
-    env = deployenv.prepare_managed_instance_env(
+    ok, result = deploycore.run_deploy_instance(
+        main_script=main_script,
         game_id=args.game_id,
-        instance_id=args.instance,
         sys_user=args.sys_user or _default_sys_user(main_script),
         repo_root=main_script.parent,
         domain=args.domain,
+        instance_id=args.instance,
         url_prefix=args.url_prefix,
         admin_login=args.admin_login or "admin",
         admin_password=args.admin_password,
         server_name=args.server_name,
-        server_password=args.server_password,
+        server_password=str(args.server_password or ""),
         server_port=str(args.server_port or ""),
         max_players=str(args.max_players or ""),
     )
-
-    temp_config = _write_temp_deploy_config(env)
-    try:
-        deploy_cmd = ["/bin/bash", str(main_script), "deploy", "--config", str(temp_config)]
-        if os.geteuid() != 0:
-            deploy_cmd.insert(0, "sudo")
-        result = subprocess.run(
-            deploy_cmd,
-            capture_output=True,
-            text=True,
-            env={**os.environ, "PYTHONUNBUFFERED": "1", "GC_SKIP_HUB_SERVICE": "1"},
-        )
-    finally:
-        temp_config.unlink(missing_ok=True)
-    if result.returncode != 0:
-        print((result.stderr or result.stdout or "Déploiement échoué").strip(), file=sys.stderr)
+    if not ok:
+        print(result, file=sys.stderr)
         return 1
-    output = (result.stdout or "").strip()
-    if output:
-        print(output)
+    for line in result:
+        print(line)
     return 0
 
 

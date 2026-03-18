@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import appfiles, appservice, bootstraphub, cpuplan, deploybackups, deploydeps, deployenv, deploynginx, deploypost, deployssl, deploysudo, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
+from shared import appfiles, appservice, bootstraphub, cpuplan, deploybackups, deploycore, deploydeps, deployenv, deploynginx, deploypost, deployssl, deploysudo, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -461,6 +461,48 @@ class RedeployCoreTests(unittest.TestCase):
             ok, message = redeploycore.run_redeploy(cfg, ROOT_DIR / "game_commander.sh")
             self.assertFalse(ok)
             self.assertIn("Config de déploiement incomplète", message)
+
+
+class DeployCoreTests(unittest.TestCase):
+
+    def test_run_deploy_instance_writes_temp_config_and_runs_shell_deploy(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            script = root / "game_commander.sh"
+            script.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            captured = {}
+
+            def fake_run(cmd, timeout=300):
+                self.assertIn("deploy", cmd)
+                cfg = Path(cmd[-1])
+                captured["cmd"] = cmd
+                captured["cfg_text"] = cfg.read_text(encoding="utf-8")
+                return True, "Déploiement terminé"
+
+            with mock.patch.object(hostops, "run_command", side_effect=fake_run):
+                ok, result = deploycore.run_deploy_instance(
+                    main_script=script,
+                    game_id="minecraft",
+                    instance_id="minecraft2",
+                    sys_user="vhserver",
+                    repo_root=root,
+                    domain="gaming.example.com",
+                    admin_login="admin",
+                    admin_password="secret123",
+                    url_prefix="/minecraft2",
+                    server_name="Mon_serveur",
+                    server_password="testtest01",
+                    server_port="25565",
+                    max_players="20",
+                )
+
+            self.assertTrue(ok)
+            self.assertIn("Déploiement terminé", result[0])
+            self.assertEqual(captured["cmd"][:3], ["/bin/bash", str(script.resolve()), "deploy"])
+            self.assertIn('GAME_ID="minecraft"', captured["cfg_text"])
+            self.assertIn('INSTANCE_ID="minecraft2"', captured["cfg_text"])
+            self.assertIn('APP_DIR="/home/vhserver/game-commander-minecraft2"', captured["cfg_text"])
+            self.assertIn('SERVER_PASSWORD="testtest01"', captured["cfg_text"])
 
 
 class DeployPostTests(unittest.TestCase):
