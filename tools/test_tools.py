@@ -1368,6 +1368,31 @@ class HubHostTests(unittest.TestCase):
                 ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--main-script", str(script_path), "--instance", "valheim2"],
             )
 
+    def test_run_instance_admin_password_reset_updates_users_json(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
+            }), encoding="utf-8")
+            instance_dir = root / "game-commander-valheim2"
+            instance_dir.mkdir()
+            (instance_dir / "deploy_config.env").write_text('ADMIN_LOGIN="adminv2"\nSYS_USER="vhserver"\n', encoding="utf-8")
+            (instance_dir / "game.json").write_text(json.dumps({"permissions": ["manage_config", "console"]}), encoding="utf-8")
+            (instance_dir / "users.json").write_text(json.dumps({
+                "adminv2": {"password_hash": hub_auth.hash_password("oldpass123"), "permissions": ["manage_config", "console"]}
+            }), encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            with app.app_context(), \
+                 mock.patch.object(Path, "home", return_value=root), \
+                 mock.patch.object(hub_host, "get_hub_payload", return_value={"instances": [{"name": "valheim2"}], "monitor": {}}):
+                ok, message, card = hub_host.run_instance_admin_password_reset("valheim2", "newpass123")
+            self.assertTrue(ok)
+            self.assertIn("réinitialisé", message)
+            self.assertEqual(card["name"], "valheim2")
+            users = json.loads((instance_dir / "users.json").read_text(encoding="utf-8"))
+            self.assertTrue(hub_host.bcrypt.checkpw("newpass123".encode(), users["adminv2"]["password_hash"].encode()))
+
     def test_get_hub_payload_reads_cpu_monitor_state(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

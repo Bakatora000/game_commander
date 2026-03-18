@@ -13,6 +13,7 @@ import zipfile
 from datetime import datetime
 from pathlib import Path
 
+import bcrypt
 import requests
 from flask import current_app
 
@@ -137,6 +138,19 @@ def _instance_service(instance_name: str) -> str | None:
     return _load_instance_env(instance_name).get("GAME_SERVICE")
 
 
+def _instance_admin_login(instance_name: str) -> str:
+    env = _load_instance_env(instance_name)
+    return (env.get("ADMIN_LOGIN") or "admin").strip() or "admin"
+
+
+def _instance_users_file(instance_name: str) -> Path:
+    return _instance_app_dir(instance_name) / "users.json"
+
+
+def _instance_game_json(instance_name: str) -> Path:
+    return _instance_app_dir(instance_name) / "game.json"
+
+
 def _default_sys_user() -> str:
     return pwd.getpwuid(_main_script_path().stat().st_uid).pw_name
 
@@ -152,6 +166,7 @@ def _build_instance_card(inst: dict, cpu_monitor: dict, alerts_by_instance: dict
         "name": name,
         "game": inst.get("game", "?"),
         "prefix": prefix,
+        "admin_login": _instance_admin_login(name),
         "state": state,
         "players": players,
         "cpu_alert": alerts_by_instance.get(name),
@@ -358,6 +373,54 @@ def run_instance_deploy(data: dict) -> tuple[bool, str, dict]:
     if ok:
         return True, f"Instance {instance_name} déployée", payload
     return False, message or "Échec déploiement", payload
+
+
+def run_instance_admin_password_reset(instance_name: str, new_password: str) -> tuple[bool, str, dict | None]:
+    instance = _instance_entry(instance_name)
+    if not instance:
+        return False, "Instance introuvable", None
+    new_password = (new_password or "").strip()
+    if len(new_password) < 8:
+        return False, "Le nouveau mot de passe doit contenir au moins 8 caractères", None
+    users_file = _instance_users_file(instance_name)
+    game_file = _instance_game_json(instance_name)
+    if not users_file.is_file():
+        return False, "users.json introuvable pour cette instance", None
+    if not game_file.is_file():
+        return False, "game.json introuvable pour cette instance", None
+
+    try:
+        users = json.loads(users_file.read_text(encoding="utf-8"))
+    except Exception:
+        return False, "users.json illisible", None
+    try:
+        game = json.loads(game_file.read_text(encoding="utf-8"))
+    except Exception:
+        return False, "game.json illisible", None
+
+    admin_login = _instance_admin_login(instance_name)
+    permissions = list((users.get(admin_login) or {}).get("permissions") or game.get("permissions") or [])
+    users[admin_login] = {
+        "password_hash": bcrypt.hashpw(new_password.encode(), bcrypt.gensalt()).decode(),
+        "permissions": permissions,
+    }
+    users_file.write_text(json.dumps(users, indent=2) + "\n", encoding="utf-8")
+    try:
+        uid = pwd.getpwnam((_load_instance_env(instance_name).get("SYS_USER") or "").strip() or _default_sys_user()).pw_uid
+        gid = pwd.getpwnam((_load_instance_env(instance_name).get("SYS_USER") or "").strip() or _default_sys_user()).pw_gid
+        os.chown(users_file, uid, gid)
+    except Exception:
+        pass
+    try:
+        users_file.chmod(0o600)
+    except OSError:
+        pass
+
+    message = f"Mot de passe admin Commander réinitialisé pour {instance_name} ({admin_login})"
+    _append_action_log(instance_name, "admin", True, message)
+    payload = get_hub_payload()
+    card = next((item for item in payload["instances"] if item.get("name") == instance_name), None)
+    return True, message, card
 
 
 def run_rebalance(restart: bool = False) -> tuple[bool, str, dict]:

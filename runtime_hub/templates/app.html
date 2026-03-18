@@ -550,6 +550,15 @@
             <button
               class="secondary-btn is-compact"
               type="button"
+              data-action="instance-admin"
+              data-instance="${inst.name}"
+              data-admin-login="${inst.admin_login || 'admin'}"
+              data-label="Admin"
+              data-confirm="Changer le mot de passe admin Commander de ${inst.name} ?"
+            >Admin</button>
+            <button
+              class="secondary-btn is-compact"
+              type="button"
               data-action="instance-redeploy"
               data-instance="${inst.name}"
               data-label="Redéployer"
@@ -575,6 +584,15 @@
           if (!window.confirm(confirmMessage)) {
             return;
           }
+          let requestBody = null;
+          if (action === 'admin') {
+            const adminLogin = button.dataset.adminLogin || 'admin';
+            const newPassword = window.prompt(`Nouveau mot de passe pour ${adminLogin} (${instance}) :`, '');
+            if (!newPassword) {
+              return;
+            }
+            requestBody = JSON.stringify({ new_password: newPassword });
+          }
           if (action === 'uninstall') {
             const typed = window.prompt(`Confirme la désinstallation de ${instance} en retapant son identifiant :`, '');
             if (typed !== instance) {
@@ -583,6 +601,7 @@
           }
           const endpointByAction = {
             update: `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/update`,
+            admin: `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/admin-password`,
             redeploy: `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/redeploy`,
             uninstall: `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/uninstall`,
           };
@@ -595,6 +614,7 @@
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               credentials: 'same-origin',
+              body: requestBody,
             });
             await response.text();
             if (!document.getElementById('globalConsolePanel').hidden) {

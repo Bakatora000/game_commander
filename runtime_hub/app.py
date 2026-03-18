@@ -181,6 +181,19 @@ def api_instance_update(instance_name):
     return jsonify({"ok": ok, "message": message, "instance": card}), status
 
 
+@app.route(f"{PREFIX}/api/instances/<instance_name>/admin-password", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("manage_instances")
+def api_instance_admin_password(instance_name):
+    data = request.get_json() or {}
+    try:
+        ok, message, card = host.run_instance_admin_password_reset(instance_name, data.get("new_password", ""))
+    except Exception as exc:
+        return jsonify({"ok": False, "message": f"Erreur Hub pendant la réinitialisation admin : {exc}"}), 500
+    status = 200 if ok else 400
+    return jsonify({"ok": ok, "message": message, "instance": card}), status
+
+
 @app.route(f"{PREFIX}/api/instances/<instance_name>/redeploy", methods=["POST"])
 @auth.require_auth
 @auth.require_perm("manage_lifecycle")
