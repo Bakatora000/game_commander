@@ -246,10 +246,6 @@ def run_full_uninstall(config_file: str | Path, repo_root: str | Path) -> tuple[
         _remove_tree_if_owned(data_dir, "Répertoire données", cfg, messages)
     _remove_tree_if_owned(_effective_backup_dir(env), "Répertoire sauvegardes", cfg, messages)
 
-    if sys_user:
-        steamcmd_dir = _home_dir_for_user(sys_user) / "steamcmd"
-        _remove_tree_if_owned(steamcmd_dir, "SteamCMD", cfg, messages)
-
     if cfg.exists():
         try:
             cfg.unlink()
