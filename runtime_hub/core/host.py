@@ -134,6 +134,13 @@ def _instance_entry(instance_name: str) -> dict | None:
     return None
 
 
+def _payload_instance_card(payload: dict, instance_name: str) -> dict | None:
+    for item in payload.get("instances", []):
+        if item.get("name") == instance_name:
+            return item
+    return None
+
+
 def _instance_service(instance_name: str) -> str | None:
     return _load_instance_env(instance_name).get("GAME_SERVICE")
 
@@ -229,6 +236,19 @@ def get_hub_payload() -> dict:
     }
 
 
+def _wait_until_instance_offline(instance_name: str, timeout: int = 180) -> tuple[bool, dict]:
+    deadline = time.time() + timeout
+    last_payload = get_hub_payload()
+    while time.time() < deadline:
+        payload = get_hub_payload()
+        card = _payload_instance_card(payload, instance_name)
+        last_payload = payload
+        if card and int(card.get("state") or 0) == 0:
+            return True, payload
+        time.sleep(2)
+    return False, last_payload
+
+
 def run_instance_service_action(instance_name: str, action: str) -> tuple[bool, str, dict | None]:
     if action not in {"start", "stop", "restart"}:
         return False, "Action service non autorisée", None
@@ -310,6 +330,39 @@ def run_instance_uninstall(instance_name: str) -> tuple[bool, str, dict]:
     host_cli = _host_cli_path()
     if not host_cli.is_file():
         return False, "CLI hôte introuvable", get_hub_payload()
+    initial_payload = get_hub_payload()
+    card = _payload_instance_card(initial_payload, instance_name)
+    if not card:
+        return False, "Instance introuvable", initial_payload
+    connected_players = int(((card.get("players") or {}).get("value")) or 0)
+    if connected_players > 0:
+        message = f"Désinstallation refusée : {connected_players} joueur(s) encore connecté(s). Arrête d'abord le serveur ou attends que tout le monde se déconnecte."
+        _append_action_log(instance_name, "uninstall", False, message)
+        return False, message, initial_payload
+    details: list[str] = []
+    state = int(card.get("state") or 0)
+    if state != 0:
+        service = _instance_service(instance_name)
+        if not service:
+            message = "Service introuvable pour cette instance"
+            _append_action_log(instance_name, "uninstall", False, message)
+            return False, message, initial_payload
+        details.append(f"Serveur encore en ligne (état {state})")
+        details.append(f"Arrêt préalable du service {service}")
+        stop_ok, stop_message = hostops.run_command(
+            ["sudo", "/usr/bin/python3", str(host_cli), "service-action", "--service", service, "--action", "stop"],
+            timeout=180,
+        )
+        if not stop_ok:
+            message = "\n".join(details + [stop_message or f"Échec arrêt préalable de {instance_name}"])
+            _append_action_log(instance_name, "uninstall", False, message)
+            return False, stop_message or f"Échec arrêt préalable de {instance_name}", initial_payload
+        stopped, stopped_payload = _wait_until_instance_offline(instance_name, timeout=180)
+        if not stopped:
+            message = "\n".join(details + ["Le serveur ne s'est pas arrêté dans le délai imparti"])
+            _append_action_log(instance_name, "uninstall", False, message)
+            return False, "Le serveur ne s'est pas arrêté dans le délai imparti", stopped_payload
+        details.append("Serveur arrêté, désinstallation en cours")
     game_label = (instance.get("game") or "").strip()
     game_id = next((gid for gid, meta in instanceenv.GAME_META.items() if meta.get("label") == game_label), "")
     cmd = ["sudo", "/usr/bin/python3", str(host_cli), "uninstall-instance", "--main-script", str(script_path), "--instance", instance_name]
@@ -319,7 +372,8 @@ def run_instance_uninstall(instance_name: str) -> tuple[bool, str, dict]:
         cmd,
         timeout=1200,
     )
-    _append_action_log(instance_name, "uninstall", ok, message or f"Instance {instance_name} désinstallée")
+    log_message = "\n".join(details + ([message] if message else [f"Instance {instance_name} désinstallée"]))
+    _append_action_log(instance_name, "uninstall", ok, log_message)
     payload = get_hub_payload()
     if ok:
         return True, f"Instance {instance_name} désinstallée", payload

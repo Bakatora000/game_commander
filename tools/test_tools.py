@@ -1426,7 +1426,10 @@ class HubHostTests(unittest.TestCase):
             app = self._make_app(root, manifest_path)
             with app.app_context(), \
                  mock.patch.object(hostops, "run_command", return_value=(True, "")) as run_mock, \
-                 mock.patch.object(hub_host, "get_hub_payload", return_value={"instances": [], "monitor": {}}):
+                 mock.patch.object(hub_host, "get_hub_payload", side_effect=[
+                     {"instances": [{"name": "valheim2", "state": 0, "players": {"value": 0, "max": 10}}], "monitor": {}},
+                     {"instances": [], "monitor": {}},
+                 ]):
                 ok, message, payload = hub_host.run_instance_uninstall("valheim2")
             self.assertTrue(ok)
             self.assertIn("désinstallée", message)
@@ -1434,6 +1437,65 @@ class HubHostTests(unittest.TestCase):
             self.assertEqual(
                 run_mock.call_args.args[0],
                 ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--main-script", str(script_path), "--instance", "valheim2"],
+            )
+
+    def test_run_instance_uninstall_refuses_when_players_connected(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "instances": [{"name": "terraria", "prefix": "/terraria", "flask_port": 5007, "game": "terraria"}]
+            }), encoding="utf-8")
+            script_path = root / "game_commander.sh"
+            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            with app.app_context(), \
+                 mock.patch.object(hostops, "run_command") as run_mock, \
+                 mock.patch.object(hub_host, "get_hub_payload", return_value={
+                     "instances": [{"name": "terraria", "state": 20, "players": {"value": 2, "max": 8}}],
+                     "monitor": {},
+                 }):
+                ok, message, payload = hub_host.run_instance_uninstall("terraria")
+            self.assertFalse(ok)
+            self.assertIn("joueur", message)
+            self.assertEqual(payload["instances"][0]["name"], "terraria")
+            run_mock.assert_not_called()
+
+    def test_run_instance_uninstall_stops_service_before_uninstall(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "instances": [{"name": "terraria", "prefix": "/terraria", "flask_port": 5007, "game": "terraria"}]
+            }), encoding="utf-8")
+            script_path = root / "game_commander.sh"
+            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+            instance_dir = root / "game-commander-terraria"
+            instance_dir.mkdir()
+            (instance_dir / "deploy_config.env").write_text('GAME_SERVICE="terraria-server-terraria"\n', encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            with app.app_context(), \
+                 mock.patch.object(Path, "home", return_value=root), \
+                 mock.patch.object(hostops, "run_command", side_effect=[(True, ""), (True, "")]) as run_mock, \
+                 mock.patch.object(hub_host, "get_hub_payload", side_effect=[
+                     {"instances": [{"name": "terraria", "state": 20, "players": {"value": 0, "max": 8}}], "monitor": {}},
+                     {"instances": [{"name": "terraria", "state": 20, "players": {"value": 0, "max": 8}}], "monitor": {}},
+                     {"instances": [{"name": "terraria", "state": 0, "players": {"value": 0, "max": 8}}], "monitor": {}},
+                     {"instances": [], "monitor": {}},
+                 ]):
+                ok, message, payload = hub_host.run_instance_uninstall("terraria")
+            self.assertTrue(ok)
+            self.assertIn("désinstallée", message)
+            self.assertEqual(payload["instances"], [])
+            self.assertEqual(
+                run_mock.call_args_list[0].args[0],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "service-action", "--service", "terraria-server-terraria", "--action", "stop"],
+            )
+            self.assertEqual(
+                run_mock.call_args_list[1].args[0],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--main-script", str(script_path), "--instance", "terraria", "--game-id", "terraria"],
             )
 
     def test_run_instance_admin_password_reset_updates_users_json(self):

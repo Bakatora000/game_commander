@@ -596,7 +596,7 @@
                 data-action="instance-uninstall"
                 data-instance="${inst.name}"
                 data-label="Désinstaller"
-                data-confirm="Désinstaller complètement ${inst.name} ?"
+                data-confirm="${Number(inst.state || 0) === 0 ? `Désinstaller complètement ${inst.name} ?` : `Arrêter puis désinstaller complètement ${inst.name} ?`}"
               >Désinstaller</button>
             </div>
           </div>
@@ -630,6 +630,12 @@
             requestBody = JSON.stringify({ new_password: newPassword });
           }
           if (action === 'uninstall') {
+            const current = HUB_INSTANCES.find((inst) => inst.name === instance) || {};
+            const connectedPlayers = Number(current.players?.value || 0);
+            if (connectedPlayers > 0) {
+              window.alert(`Impossible de désinstaller ${instance} : ${connectedPlayers} joueur(s) sont encore connectés.`);
+              return;
+            }
             const typed = window.prompt(`Confirme la désinstallation de ${instance} en retapant son identifiant :`, '');
             if (typed !== instance) {
               return;
