@@ -202,6 +202,19 @@
       color: #18212a;
       background: #f3f7fa;
     }
+    .deploy-form-panel .field-label {
+      font-weight: 700;
+      margin-top: 1rem;
+    }
+    .deploy-form-panel .field-label:first-child {
+      margin-top: 0;
+    }
+    .deploy-help {
+      margin: -.15rem 0 1.05rem;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: .92rem;
+    }
     .secondary-btn {
       border: 1px solid var(--border);
       background: transparent;
@@ -324,7 +337,7 @@
               <button class="monitor-toggle" type="button" id="btnToggleDeployPanel">Déployer</button>
             </div>
             <div id="deployPanel" hidden>
-              <div class="accounts-grid">
+              <div class="accounts-grid deploy-form-panel">
                 <section class="card">
                   <label class="field-label" for="deployGame">Jeu</label>
                   <select class="field-input" id="deployGame">
@@ -336,23 +349,23 @@
                     <option value="satisfactory">Satisfactory</option>
                     <option value="soulmask">Soulmask</option>
                   </select>
-                  <label class="field-label" for="deployInstance">Identifiant d’instance</label>
+                  <label class="field-label" for="deployInstance">Nom de l’instance</label>
                   <input class="field-input" id="deployInstance" placeholder="minecraft2">
-                  <p class="section-subtitle">Exemple : <code>minecraft2</code>. C’est le nom technique de l’instance : URL <code>/minecraft2</code>, dossier <code>game-commander-minecraft2</code>, services associés. Ce n’est pas l’utilisateur Linux ; le Hub réutilise l’utilisateur système par défaut du serveur.</p>
+                  <p class="deploy-help">Exemple : <code>minecraft2</code>. C’est le nom technique de l’instance : URL <code>/minecraft2</code>, dossier <code>game-commander-minecraft2</code>, services associés. Ce n’est pas l’utilisateur Linux ; le Hub réutilise l’utilisateur système par défaut du serveur.</p>
                   <label class="field-label" for="deployServerName">Nom du serveur</label>
-                  <input class="field-input" id="deployServerName" placeholder="Mon Serveur Minecraft">
-                  <p class="section-subtitle">Nom visible côté jeu quand le jeu le supporte. Ce n’est pas l’identifiant technique de l’instance.</p>
-                  <label class="field-label" for="deployDomain">Domaine</label>
+                  <input class="field-input" id="deployServerName" value="Mon_serveur" placeholder="Mon_serveur">
+                  <p class="deploy-help">Nom visible côté jeu quand le jeu le supporte. Ce n’est pas l’identifiant technique de l’instance.</p>
+                  <label class="field-label" for="deployDomain">URL du Commander</label>
                   <input class="field-input" id="deployDomain" placeholder="gaming.expevay.net">
                 </section>
                 <section class="card">
-                  <label class="field-label" for="deployAdminLogin">Admin instance</label>
+                  <label class="field-label" for="deployAdminLogin">Nom du compte admin Commander</label>
                   <input class="field-input" id="deployAdminLogin" value="admin">
-                  <p class="section-subtitle">Login du compte administrateur du Commander de cette instance, pas de l’utilisateur Linux.</p>
-                  <label class="field-label" for="deployAdminPassword">Mot de passe admin</label>
+                  <p class="deploy-help">Login du compte administrateur du Commander de cette instance, pas de l’utilisateur Linux.</p>
+                  <label class="field-label" for="deployAdminPassword">Mot de passe admin Commander</label>
                   <input class="field-input" id="deployAdminPassword" type="password">
-                  <p class="section-subtitle">Mot de passe du compte <code>Admin instance</code> ci-dessus pour l’interface web de cette instance.</p>
-                  <label class="field-label" for="deployServerPassword">Mot de passe serveur</label>
+                  <p class="deploy-help">Mot de passe du compte admin Commander ci-dessus pour l’interface web de cette instance.</p>
+                  <label class="field-label" for="deployServerPassword">Mot de passe du serveur de jeu</label>
                   <input class="field-input" id="deployServerPassword" type="password" placeholder="optionnel">
                   <label class="field-label" for="deployServerPort">Port jeu</label>
                   <input class="field-input" id="deployServerPort" placeholder="laisser vide = défaut/auto">
@@ -417,7 +430,39 @@
   </main>
   <script>
     const STATE_LABELS = { 0: 'Hors ligne', 10: 'Démarrage', 20: 'En ligne', 30: 'Arrêt', 40: 'Busy' };
+    let HUB_INSTANCES = [];
+    let LAST_AUTO_INSTANCE = '';
     function formatAgeText(meta) { return meta || ''; }
+    function suggestedInstanceName(gameId) {
+      const existing = HUB_INSTANCES
+        .filter((inst) => String(inst.game || '') === gameId)
+        .map((inst) => String(inst.name || ''));
+      if (!existing.length) {
+        return gameId;
+      }
+      let index = 2;
+      while (existing.includes(`${gameId}${index}`)) {
+        index += 1;
+      }
+      return `${gameId}${index}`;
+    }
+    function refreshDeployDefaults(force = false) {
+      const gameId = document.getElementById('deployGame').value;
+      const instanceInput = document.getElementById('deployInstance');
+      const serverNameInput = document.getElementById('deployServerName');
+      const domainInput = document.getElementById('deployDomain');
+      const suggested = suggestedInstanceName(gameId);
+      if (force || !instanceInput.value.trim() || instanceInput.value.trim() === LAST_AUTO_INSTANCE) {
+        instanceInput.value = suggested;
+        LAST_AUTO_INSTANCE = suggested;
+      }
+      if (force || !serverNameInput.value.trim()) {
+        serverNameInput.value = 'Mon_serveur';
+      }
+      if (force || !domainInput.value.trim()) {
+        domainInput.value = window.location.hostname || 'gaming.expevay.net';
+      }
+    }
     function switchView(view) {
       document.querySelectorAll('.view-panel').forEach((panel) => {
         panel.hidden = panel.dataset.view !== view;
@@ -730,7 +775,11 @@
       const hidden = panel.hidden;
       panel.hidden = !hidden;
       document.getElementById('btnToggleDeployPanel').textContent = hidden ? 'Masquer' : 'Déployer';
+      if (hidden) {
+        refreshDeployDefaults(false);
+      }
     });
+    document.getElementById('deployGame').addEventListener('change', () => refreshDeployDefaults(false));
     document.getElementById('btnDeployInstance').addEventListener('click', deployInstance);
     document.getElementById('btnToggleChangePassword').addEventListener('click', () => {
       const panel = document.getElementById('changePasswordPanel');
@@ -797,8 +846,10 @@
         return;
       }
       const data = await instancesResponse.json();
-      renderMonitor(data.monitor || {}, data.instances || []);
-      renderCards(data.instances || []);
+      HUB_INSTANCES = data.instances || [];
+      renderMonitor(data.monitor || {}, HUB_INSTANCES);
+      renderCards(HUB_INSTANCES);
+      refreshDeployDefaults(false);
     }
     document.getElementById('btnChangePassword').addEventListener('click', async () => {
       const current_password = document.getElementById('currentPassword').value;
@@ -817,6 +868,7 @@
       }
     });
     switchView('dashboard');
+    refreshDeployDefaults(true);
     load();
   </script>
 </body>
