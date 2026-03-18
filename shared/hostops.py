@@ -3,8 +3,16 @@
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path
+
+
+ANSI_RE = re.compile(r"\x1B\[[0-?]*[ -/]*[@-~]")
+
+
+def strip_ansi(text: str) -> str:
+    return ANSI_RE.sub("", text or "")
 
 
 def run_command(cmd: list[str], timeout: int = 300) -> tuple[bool, str]:
@@ -19,8 +27,8 @@ def run_command(cmd: list[str], timeout: int = 300) -> tuple[bool, str]:
     except Exception as exc:
         return False, str(exc)
     if result.returncode == 0:
-        return True, (result.stdout or "").strip()
-    message = (result.stderr or result.stdout or "").strip()
+        return True, strip_ansi(result.stdout or "").strip()
+    message = strip_ansi(result.stderr or result.stdout or "").strip()
     return False, message or f"Commande échouée ({result.returncode})"
 
 
@@ -59,4 +67,3 @@ def service_action_success_message(action: str, instance_name: str) -> str:
         "restart": f"Redémarrage lancé pour {instance_name}",
     }
     return labels.get(action, "Action lancée")
-
