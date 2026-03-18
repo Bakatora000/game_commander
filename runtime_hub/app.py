@@ -95,6 +95,24 @@ def api_console():
     return jsonify({"lines": host.get_global_console()})
 
 
+@app.route(f"{PREFIX}/api/console/purge", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("view_hub")
+def api_console_purge():
+    ok, message = host.purge_global_console()
+    status = 200 if ok else 400
+    return jsonify({"ok": ok, "message": message, "lines": host.get_global_console()}), status
+
+
+@app.route(f"{PREFIX}/api/console/archive", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("view_hub")
+def api_console_archive():
+    ok, message = host.archive_global_console()
+    status = 200 if ok else 400
+    return jsonify({"ok": ok, "message": message}), status
+
+
 @app.route(f"{PREFIX}/api/accounts")
 @auth.require_auth
 @auth.require_perm("view_hub")

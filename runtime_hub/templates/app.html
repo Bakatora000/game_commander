@@ -274,8 +274,6 @@
 
     <div class="layout">
       <aside class="sidebar">
-        <h2 class="sidebar-title">Navigation</h2>
-        <p class="sidebar-subtitle">Séparation simple entre vue d’exploitation et gestion des comptes Hub.</p>
         <div class="nav-list">
           <button class="nav-btn is-active" type="button" data-view-target="dashboard">Dashboard</button>
           <button class="nav-btn" type="button" data-view-target="users">Utilisateurs</button>
@@ -371,8 +369,13 @@
                 <h2 class="section-title">Console Hub</h2>
                 <p class="section-subtitle">Trace globale des opérations déclenchées depuis le Hub, tous jeux confondus.</p>
               </div>
-              <button class="monitor-toggle" type="button" id="btnToggleGlobalConsole">Console</button>
+              <div class="inline-actions">
+                <button class="monitor-toggle" type="button" id="btnArchiveGlobalConsole" hidden>Archiver</button>
+                <button class="monitor-toggle" type="button" id="btnPurgeGlobalConsole" hidden>Purge</button>
+                <button class="monitor-toggle" type="button" id="btnToggleGlobalConsole">Console</button>
+              </div>
             </div>
+            <div class="feedback" id="globalConsoleFeedback"></div>
             <div class="console-panel" id="globalConsolePanel" hidden>
               <pre class="console-output" id="globalConsoleOutput">Chargement…</pre>
             </div>
@@ -729,11 +732,51 @@
     });
     document.getElementById('btnToggleGlobalConsole').addEventListener('click', async () => {
       const panel = document.getElementById('globalConsolePanel');
+      const purgeBtn = document.getElementById('btnPurgeGlobalConsole');
+      const archiveBtn = document.getElementById('btnArchiveGlobalConsole');
       const hidden = panel.hidden;
       panel.hidden = !hidden;
       document.getElementById('btnToggleGlobalConsole').textContent = hidden ? 'Masquer' : 'Console';
+      purgeBtn.hidden = !hidden;
+      archiveBtn.hidden = !hidden;
       if (hidden) {
         await loadGlobalConsole();
+      }
+    });
+    document.getElementById('btnPurgeGlobalConsole').addEventListener('click', async () => {
+      if (!window.confirm('Purger la console Hub ?')) {
+        return;
+      }
+      const button = document.getElementById('btnPurgeGlobalConsole');
+      button.disabled = true;
+      try {
+        const response = await fetch('{{ prefix }}/api/console/purge', {
+          method: 'POST',
+          credentials: 'same-origin',
+        });
+        const data = await response.json().catch(() => ({}));
+        setFeedback('globalConsoleFeedback', data.message || (response.ok ? 'Console purgée' : 'Erreur'), response.ok);
+        await loadGlobalConsole();
+      } catch (_err) {
+        setFeedback('globalConsoleFeedback', 'Erreur réseau ou Hub indisponible', false);
+      } finally {
+        button.disabled = false;
+      }
+    });
+    document.getElementById('btnArchiveGlobalConsole').addEventListener('click', async () => {
+      const button = document.getElementById('btnArchiveGlobalConsole');
+      button.disabled = true;
+      try {
+        const response = await fetch('{{ prefix }}/api/console/archive', {
+          method: 'POST',
+          credentials: 'same-origin',
+        });
+        const data = await response.json().catch(() => ({}));
+        setFeedback('globalConsoleFeedback', data.message || (response.ok ? 'Archive créée' : 'Erreur'), response.ok);
+      } catch (_err) {
+        setFeedback('globalConsoleFeedback', 'Erreur réseau ou Hub indisponible', false);
+      } finally {
+        button.disabled = false;
       }
     });
     async function load() {

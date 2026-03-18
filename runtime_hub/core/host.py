@@ -9,6 +9,7 @@ import os
 import pwd
 import sys
 import time
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -66,6 +67,27 @@ def get_global_console(max_lines: int = 240) -> list[str]:
         return []
     lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     return lines[-max_lines:]
+
+
+def purge_global_console() -> tuple[bool, str]:
+    log_dir = _action_log_dir()
+    log_dir.mkdir(parents=True, exist_ok=True)
+    path = _global_log_path()
+    path.write_text("", encoding="utf-8")
+    return True, "Console Hub purgée"
+
+
+def archive_global_console() -> tuple[bool, str]:
+    path = _global_log_path()
+    if not path.is_file() or not path.read_text(encoding="utf-8", errors="replace").strip():
+        return False, "Aucun log Hub à archiver"
+    log_dir = _action_log_dir()
+    log_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    archive_path = log_dir / f"hub-actions_{stamp}.zip"
+    with zipfile.ZipFile(archive_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.write(path, arcname="hub-actions.log")
+    return True, f"Archive créée : {archive_path.name}"
 
 
 def _load_manifest() -> dict:
