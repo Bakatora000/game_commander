@@ -163,6 +163,11 @@
     .card-actions.lifecycle-actions {
       margin-top: .6rem;
     }
+    .card-manage-panel {
+      margin-top: .8rem;
+      padding-top: .8rem;
+      border-top: 1px solid var(--border);
+    }
     .console-panel {
       margin-top: .8rem;
       padding: .8rem;
@@ -508,18 +513,14 @@
         return [
           { key: 'restart', label: 'Redémarrer', progress: 'Redémarrage en cours…', confirm: `Redémarrer ${inst.name} ?` },
           { key: 'stop', label: 'Arrêter', progress: 'Arrêt en cours…', confirm: `Arrêter ${inst.name} ?` },
-          { key: 'update', label: 'Mettre à jour', progress: 'Mise à jour en cours…', confirm: `Mettre à jour ${inst.name} ?` },
         ];
       }
       if (state === 0) {
         return [
           { key: 'start', label: 'Démarrer', progress: 'Démarrage en cours…', confirm: `Démarrer ${inst.name} ?` },
-          { key: 'update', label: 'Mettre à jour', progress: 'Mise à jour en cours…', confirm: `Mettre à jour ${inst.name} ?` },
         ];
       }
-      return [
-        { key: 'update', label: 'Mettre à jour', progress: 'Mise à jour en cours…', confirm: `Mettre à jour ${inst.name} ?` },
-      ];
+      return [];
     }
     function renderCards(instances) {
       const cardsEl = document.getElementById('cards');
@@ -545,36 +546,61 @@
                 data-confirm="${action.confirm}"
               >${action.label}</button>
             `).join('')}
+            <button
+              class="secondary-btn is-compact"
+              type="button"
+              data-action="toggle-manage"
+              data-instance="${inst.name}"
+            >Gérer</button>
           </div>
-          <div class="card-actions lifecycle-actions">
-            <button
-              class="secondary-btn is-compact"
-              type="button"
-              data-action="instance-admin"
-              data-instance="${inst.name}"
-              data-admin-login="${inst.admin_login || 'admin'}"
-              data-label="Admin"
-              data-confirm="Changer le mot de passe admin Commander de ${inst.name} ?"
-            >Admin</button>
-            <button
-              class="secondary-btn is-compact"
-              type="button"
-              data-action="instance-redeploy"
-              data-instance="${inst.name}"
-              data-label="Redéployer"
-              data-confirm="Redéployer ${inst.name} depuis sa configuration sauvegardée ?"
-            >Redéployer</button>
-            <button
-              class="secondary-btn is-compact is-danger"
-              type="button"
-              data-action="instance-uninstall"
-              data-instance="${inst.name}"
-              data-label="Désinstaller"
-              data-confirm="Désinstaller complètement ${inst.name} ?"
-            >Désinstaller</button>
+          <div class="card-manage-panel" id="manage-${inst.name}" hidden>
+            <div class="card-actions lifecycle-actions">
+              <button
+                class="secondary-btn is-compact"
+                type="button"
+                data-action="instance-update"
+                data-instance="${inst.name}"
+                data-label="Mettre à jour"
+                data-confirm="Mettre à jour ${inst.name} ?"
+              >Mettre à jour</button>
+              <button
+                class="secondary-btn is-compact"
+                type="button"
+                data-action="instance-admin"
+                data-instance="${inst.name}"
+                data-admin-login="${inst.admin_login || 'admin'}"
+                data-label="Admin"
+                data-confirm="Changer le mot de passe admin Commander de ${inst.name} ?"
+              >Admin</button>
+              <button
+                class="secondary-btn is-compact"
+                type="button"
+                data-action="instance-redeploy"
+                data-instance="${inst.name}"
+                data-label="Redéployer"
+                data-confirm="Redéployer ${inst.name} depuis sa configuration sauvegardée ?"
+              >Redéployer</button>
+              <button
+                class="secondary-btn is-compact is-danger"
+                type="button"
+                data-action="instance-uninstall"
+                data-instance="${inst.name}"
+                data-label="Désinstaller"
+                data-confirm="Désinstaller complètement ${inst.name} ?"
+              >Désinstaller</button>
+            </div>
           </div>
         </article>
       `).join('');
+      cardsEl.querySelectorAll('[data-action="toggle-manage"]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const instance = button.dataset.instance;
+          const panel = document.getElementById(`manage-${instance}`);
+          const hidden = panel.hidden;
+          panel.hidden = !hidden;
+          button.textContent = hidden ? 'Masquer' : 'Gérer';
+        });
+      });
       cardsEl.querySelectorAll('[data-action^="instance-"]').forEach((button) => {
         button.addEventListener('click', async () => {
           const instance = button.dataset.instance;
