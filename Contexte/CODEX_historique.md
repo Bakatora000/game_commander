@@ -848,6 +848,8 @@ Validation actuelle :
 - helpers Python OK
 - suite `tools/test_tools.py` OK
 - suite `tools/test_modularization.sh` OK
+- le README public n'expose plus de mot de passe statique pour le bootstrap Hub
+- le formulaire de déploiement Hub n'affiche plus de mots de passe par défaut visibles
 
 Note d'exploitation importante :
 - le Hub Admin reste singleton par machine

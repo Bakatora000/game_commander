@@ -263,6 +263,8 @@ Validated bootstrap note:
 - a new `bootstrap-hub` entrypoint now exists for Ubuntu hosts
 - it is available both through `sudo bash game_commander.sh bootstrap-hub ...` and through the repository bootstrap script `install_hub.sh`
 - the intended end-state is a simple `curl | bash` installation path for the Hub Admin on a fresh server
+- public documentation and the Hub deploy form no longer expose static default passwords
+- the documented bootstrap flow now defaults to generating an admin password when none is supplied explicitly
 
 Operational constraint:
 - the Hub Admin is still singleton per machine
