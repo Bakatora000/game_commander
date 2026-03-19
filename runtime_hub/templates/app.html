@@ -312,6 +312,7 @@
                 <div class="monitor-status" data-field="cpu-monitor-status">Chargement…</div>
               </div>
               <div class="inline-actions">
+                <button class="monitor-toggle" type="button" data-action="refresh-monitor">Refresh</button>
                 <button class="monitor-toggle" type="button" data-action="rebalance">Rebalance</button>
                 <button class="monitor-toggle" type="button" data-action="rebalance-restart">Rebalance + restart</button>
                 <button class="monitor-toggle" type="button" data-action="toggle-cpu-monitor" hidden>Voir le détail</button>
@@ -872,6 +873,7 @@
       }).join('');
       toggleBtn.hidden = false;
     }
+    document.querySelector('[data-action="refresh-monitor"]').addEventListener('click', () => { load(); });
     document.querySelector('[data-action="toggle-cpu-monitor"]').addEventListener('click', () => {
       const detailsEl = document.querySelector('[data-field="cpu-monitor-details"]');
       const buttonEl = document.querySelector('[data-action="toggle-cpu-monitor"]');
