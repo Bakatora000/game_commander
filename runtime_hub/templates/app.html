@@ -674,6 +674,7 @@
       });
     }
     let globalConsolePoller = null;
+    let globalConsoleRequestId = 0;
     function startGlobalConsolePolling() {
       if (globalConsolePoller) {
         return;
@@ -694,15 +695,22 @@
     }
     async function loadGlobalConsole() {
       const output = document.getElementById('globalConsoleOutput');
+      const requestId = ++globalConsoleRequestId;
       output.textContent = 'Chargement…';
       try {
         const response = await fetch(`{{ prefix }}/api/console`, {
           credentials: 'same-origin',
         });
         const data = await response.json().catch(() => ({}));
+        if (requestId !== globalConsoleRequestId) {
+          return;
+        }
         const lines = Array.isArray(data.lines) ? data.lines : [];
         output.textContent = lines.length ? lines.join('\n') : 'Aucune trace Hub pour le moment.';
       } catch (_err) {
+        if (requestId !== globalConsoleRequestId) {
+          return;
+        }
         output.textContent = 'Impossible de charger la console du Hub.';
       }
     }
