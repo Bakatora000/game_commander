@@ -551,10 +551,18 @@ def create_discord_channel(instance_name: str) -> tuple[bool, str]:
     guild_id = cfg.get("guild_id", "").strip()
     if not guild_id:
         return False, "guild_id non configuré dans discord.json"
+    # Find game for this instance to pick the right category
+    instances = _load_manifest().get("instances", [])
+    game_id = next((i.get("game", "") for i in instances if i.get("name") == instance_name), "")
+    category_id: str | None = cfg.get("category_id") or None
+    if game_id:
+        ok_cat, _, cat_id = discordnotify.find_or_create_game_category(guild_id, game_id, cfg["bot_token"])
+        if ok_cat:
+            category_id = cat_id
     channel_name = instance_name.lower().replace("_", "-")
     ok, msg, channel_id = discordnotify.create_channel(
         guild_id, channel_name, cfg["bot_token"],
-        category_id=cfg.get("category_id") or None,
+        category_id=category_id,
     )
     if not ok:
         return False, f"Erreur Discord API : {msg}"
@@ -563,7 +571,8 @@ def create_discord_channel(instance_name: str) -> tuple[bool, str]:
     saved, save_msg = _save_discord_cfg(cfg)
     if not saved:
         return False, f"Channel créé ({channel_id}) mais discord.json non mis à jour : {save_msg}"
-    return True, f"Channel #{channel_name} créé (id: {channel_id})"
+    game_label = f" [{game_id}]" if game_id else ""
+    return True, f"Channel #{channel_name} créé (id: {channel_id}){game_label}"
 
 
 def delete_discord_channel(instance_name: str) -> tuple[bool, str]:

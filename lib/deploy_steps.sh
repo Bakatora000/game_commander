@@ -968,7 +968,7 @@ deploy_step_discord_channel() {
     hdr "ÉTAPE 10 : Discord"
     local discord_out=""
     if discord_out="$(python3 "$SCRIPT_DIR/shared/discordnotify.py" create-channel \
-        --instance "$INSTANCE_ID" 2>&1)"; then
+        --instance "$INSTANCE_ID" --game "$GAME_ID" 2>&1)"; then
         ok "$discord_out"
     else
         [[ "$discord_out" == *"guild_id non configuré"* || "$discord_out" == *"Bot token"* ]] \

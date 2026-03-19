@@ -79,6 +79,46 @@ def save_config(cfg: dict, path: str | Path | None = None) -> tuple[bool, str]:
         return False, str(exc)
 
 
+def list_guild_channels(
+    guild_id: str,
+    bot_token: str,
+    *,
+    timeout: int = 10,
+) -> tuple[bool, str, list]:
+    """List all channels in a guild. Returns (ok, message, channels)."""
+    ok, msg, body = _discord_api("GET", f"/guilds/{guild_id}/channels", bot_token, timeout=timeout)
+    if not ok:
+        return False, msg, []
+    return True, "ok", body or []
+
+
+def find_or_create_game_category(
+    guild_id: str,
+    game_id: str,
+    bot_token: str,
+    *,
+    timeout: int = 10,
+) -> tuple[bool, str, str]:
+    """Find existing category for game_id or create it. Returns (ok, message, category_id)."""
+    category_name = game_id.lower().replace("_", "-")
+    ok, msg, channels = list_guild_channels(guild_id, bot_token, timeout=timeout)
+    if not ok:
+        return False, msg, ""
+    for ch in channels:
+        if ch.get("type") == 4 and ch.get("name", "").lower() == category_name:
+            return True, "existing", str(ch["id"])
+    ok2, msg2, body = _discord_api(
+        "POST", f"/guilds/{guild_id}/channels", bot_token,
+        data={"name": category_name, "type": 4}, timeout=timeout,
+    )
+    if not ok2:
+        return False, msg2, ""
+    category_id = str((body or {}).get("id", ""))
+    if not category_id:
+        return False, "no category id in response", ""
+    return True, "created", category_id
+
+
 def create_channel(
     guild_id: str,
     name: str,
@@ -297,7 +337,7 @@ def send_test_message(
     return post_channel_message(str(cfg.get("bot_token", "")), channel_id, content)
 
 
-def _cli_create_channel(instance_id: str) -> int:
+def _cli_create_channel(instance_id: str, game_id: str = "") -> int:
     """CLI entry point for deploy_step_discord_channel."""
     import sys
     cfg = load_config()
@@ -312,10 +352,18 @@ def _cli_create_channel(instance_id: str) -> int:
     if existing:
         print(f"Channel déjà configuré pour {instance_id} ({existing})")
         return 0
+    # Determine category: per-game if game_id provided, fallback to config
+    category_id: str | None = cfg.get("category_id") or None
+    if game_id:
+        ok_cat, msg_cat, cat_id = find_or_create_game_category(guild_id, game_id, cfg["bot_token"])
+        if ok_cat:
+            category_id = cat_id
+        else:
+            print(f"Avertissement: catégorie '{game_id}' non trouvée/créée: {msg_cat}", file=sys.stderr)
     channel_name = instance_id.lower().replace("_", "-")
     ok, msg, channel_id = create_channel(
         guild_id, channel_name, cfg["bot_token"],
-        category_id=cfg.get("category_id") or None,
+        category_id=category_id,
     )
     if not ok:
         print(f"Erreur Discord API : {msg}", file=sys.stderr)
@@ -326,7 +374,8 @@ def _cli_create_channel(instance_id: str) -> int:
         print(f"Channel créé ({channel_id}) mais discord.json non mis à jour : {save_msg}",
               file=sys.stderr)
         return 1
-    print(f"Channel #{channel_name} créé et enregistré (id: {channel_id})")
+    game_label = f" [{game_id}]" if game_id else ""
+    print(f"Channel #{channel_name} créé et enregistré (id: {channel_id}){game_label}")
     return 0
 
 
@@ -336,8 +385,9 @@ if __name__ == "__main__":
     sub = parser.add_subparsers(dest="cmd")
     p = sub.add_parser("create-channel")
     p.add_argument("--instance", required=True)
+    p.add_argument("--game", default="")
     args = parser.parse_args()
     if args.cmd == "create-channel":
-        sys.exit(_cli_create_channel(args.instance))
+        sys.exit(_cli_create_channel(args.instance, args.game))
     parser.print_help()
     sys.exit(1)
