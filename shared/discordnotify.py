@@ -7,6 +7,7 @@ import os
 import socket
 import urllib.error
 import urllib.request
+from datetime import datetime
 from pathlib import Path
 
 
@@ -63,43 +64,21 @@ def format_event_message(
     details: str = "",
 ) -> str:
     subject = instance_id or game_id or service or "Game Commander"
-    content = subject
-    details = (details or "").strip()
-    if not details:
-        success_labels = {
-            "start": "Demarrage lance",
-            "stop": "Arret lance",
-            "restart": "Redemarrage lance",
-            "update": "Mise a jour lancee",
-            "deploy": "Deploiement termine",
-            "redeploy": "Redeploiement termine",
-            "uninstall": "Desinstallation terminee",
-            "rebalance": "Reequilibrage CPU termine",
-            "bootstrap-hub": "Initialisation du Hub terminee",
-            "discord-test": "Test de notification Discord",
-        }
-        failure_labels = {
-            "start": "Echec du demarrage",
-            "stop": "Echec de l'arret",
-            "restart": "Echec du redemarrage",
-            "update": "Echec de la mise a jour",
-            "deploy": "Echec du deploiement",
-            "redeploy": "Echec du redeploiement",
-            "uninstall": "Echec de la desinstallation",
-            "rebalance": "Echec du reequilibrage CPU",
-            "bootstrap-hub": "Echec de l'initialisation du Hub",
-            "discord-test": "Echec du test Discord",
-        }
-        details = (success_labels if ok else failure_labels).get(
-            event,
-            "Operation terminee" if ok else "Operation en echec",
-        )
-    if details:
-        snippet = details[:1500]
-        if len(details) > 1500:
-            snippet += "\n..."
-        content += f"\n```text\n{snippet}\n```"
-    return content[:1900]
+    labels = {
+        "start": "Demarrage",
+        "stop": "Arret",
+        "restart": "Redemarrage",
+        "update": "Mise a jour",
+        "deploy": "Deploiement",
+        "redeploy": "Redeploiement",
+        "uninstall": "Desinstallation",
+        "rebalance": "Rebalance",
+        "bootstrap-hub": "Initialisation du Hub",
+        "discord-test": "Test Discord",
+    }
+    stamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
+    action = labels.get(event, "Operation")
+    return f"{subject}: {stamp} - {action}"[:1900]
 
 
 def post_channel_message(bot_token: str, channel_id: str, content: str, timeout: int = 10) -> tuple[bool, str]:

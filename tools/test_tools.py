@@ -11,6 +11,7 @@ import json
 import io
 import os
 import pwd
+import re
 import sys
 import tempfile
 import time
@@ -885,9 +886,10 @@ class DiscordNotifyTests(unittest.TestCase):
         self.assertEqual(message, "sent")
         self.assertEqual(post_mock.call_args.args[0], "token")
         self.assertEqual(post_mock.call_args.args[1], "123")
-        self.assertIn("valheim2", post_mock.call_args.args[2])
-        self.assertNotIn("[OK]", post_mock.call_args.args[2])
-        self.assertNotIn("Hôte:", post_mock.call_args.args[2])
+        self.assertRegex(
+            post_mock.call_args.args[2],
+            r"^valheim2: \d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2} - Redemarrage$",
+        )
 
     def test_notify_event_adds_default_action_text_when_no_details(self):
         cfg = {"bot_token": "token", "instance_channels": {"ParkAPouet": "123"}}
@@ -902,8 +904,10 @@ class DiscordNotifyTests(unittest.TestCase):
             )
         self.assertTrue(ok)
         self.assertEqual(message, "sent")
-        self.assertIn("ParkAPouet", post_mock.call_args.args[2])
-        self.assertIn("Arret lance", post_mock.call_args.args[2])
+        self.assertRegex(
+            post_mock.call_args.args[2],
+            r"^ParkAPouet: \d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2} - Arret$",
+        )
 
     def test_send_test_message_uses_notify_event(self):
         with mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")) as notify_mock:
