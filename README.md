@@ -51,13 +51,31 @@ Alternative locale une fois le dépôt présent :
 
 ```bash
 sudo bash game_commander.sh bootstrap-hub --domain gaming.example.com
-
-Notifications Discord :
-- optionnelles, via bot Discord + salons configurés localement
-- fichier de config local recommandé : `/etc/game-commander/discord.json`
-- exemple de structure : [`docs/examples/discord-notify.example.json`](docs/examples/discord-notify.example.json)
-- les actions hôte `start/stop/restart/update/deploy/uninstall/rebalance` peuvent ensuite notifier le salon par instance ou un salon par défaut
 ```
+
+### Intégration Discord (optionnelle)
+
+Le Hub intègre un bot Discord pour les notifications et la gestion des canaux d'instance.
+
+**Configuration minimale** — `/etc/game-commander/discord.json` :
+```json
+{
+  "bot_token": "votre-bot-token",
+  "guild_id": "identifiant-du-serveur-discord",
+  "enabled": true
+}
+```
+
+**Permissions bot requises** : `Manage Channels`, `Send Messages`, `View Channels`
+
+**Fonctionnement automatique** :
+- À chaque déploiement d'instance, le Hub crée une catégorie Discord par jeu (`valheim`, `enshrouded`, `terraria`…) si elle n'existe pas, puis crée un canal texte nommé d'après l'instance dans cette catégorie
+- Les actions hôte `start/stop/restart/update/deploy/uninstall/rebalance` envoient une notification dans le canal de l'instance concernée
+
+**Gestion depuis le Hub** (`/commander` → onglet Discord) :
+- Configuration du Guild ID et du Category ID de fallback
+- Création/suppression manuelle de canal par instance
+- Gestion des droits lecture seule par utilisateur ou rôle Discord
 
 ## Jeux gérés actuellement
 
@@ -252,10 +270,12 @@ sudo bash game_commander.sh update --instance testfabric
 | 6 | Sauvegardes automatiques (cron 3h, 7 jours) |
 | 7 | Copie Game Commander + génération game.json + users.json |
 | 8 | Service systemd Flask |
+| 8B | Synchronisation Hub Admin |
 | 9 | Nginx (manifest + fichier locations généré + include dans le vhost) |
 | 10 | SSL (certbot / existing / none) |
 | 11 | Règles sudoers (systemctl + BepInEx pour Valheim) |
-| 12 | Sauvegarde deploy_config.env |
+| 11B | Sauvegarde deploy_config.env |
+| 12 | Création canal Discord (optionnel, si guild_id configuré) |
 
 Comportement important du mode `attach` :
 - `GAME_SERVICE` est conservé tel que fourni
@@ -335,13 +355,14 @@ Note Hub Admin :
 - authentification séparée
 - vue globale des instances
 - console globale des actions hôte
-- premières actions d'exploitation disponibles :
+- actions d'exploitation disponibles :
   - `start / stop / restart`
   - `update` d'une instance
-  - `rebalance` CPU
+  - `rebalance` CPU (avec ou sans restart)
   - `déployer` une nouvelle instance
   - `redéployer` une instance depuis son `deploy_config.env`
   - `désinstaller` une instance avec confirmation forte
+  - gestion des canaux Discord par instance (onglet Discord)
 
 Note déploiement Hub :
 - le formulaire Hub utilise un `Identifiant d'instance` technique

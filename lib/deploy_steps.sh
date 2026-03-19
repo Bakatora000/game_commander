@@ -965,7 +965,7 @@ deploy_step_save_config() {
 }
 
 deploy_step_discord_channel() {
-    hdr "ÉTAPE 10 : Discord"
+    hdr "ÉTAPE 12 : Discord"
     local discord_out=""
     if discord_out="$(python3 "$SCRIPT_DIR/shared/discordnotify.py" create-channel \
         --instance "$INSTANCE_ID" --game "$GAME_ID" 2>&1)"; then
