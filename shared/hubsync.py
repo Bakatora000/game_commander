@@ -83,8 +83,21 @@ def _write_hub_users(env: dict[str, str], hub_users_file: Path, source_users_fil
     return True
 
 
+def _read_existing_hub_secret() -> str:
+    service_file = Path("/etc/systemd/system/game-commander-hub.service")
+    if service_file.is_file():
+        for line in service_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if "GAME_COMMANDER_HUB_SECRET=" in line:
+                # Environment="GAME_COMMANDER_HUB_SECRET=<value>"
+                value = line.split("GAME_COMMANDER_HUB_SECRET=", 1)[1].rstrip('"')
+                if value:
+                    return value
+    return secrets.token_hex(32)
+
+
 def _write_hub_service(repo_root: Path, hub_app_dir: Path, sys_user: str) -> None:
-    hub_secret = secrets.token_hex(32)
+    hub_secret = _read_existing_hub_secret()
     service_file = Path("/etc/systemd/system/game-commander-hub.service")
     service_file.write_text(
         "[Unit]\n"
@@ -153,11 +166,26 @@ def _sync_hub_from_env(env: dict[str, str], repo_root: str | Path) -> tuple[bool
             "--exclude=__pycache__",
             "--exclude=*.pyc",
             "--exclude=users.json",
+            "--exclude=shared",
             f"{runtime_hub_src}/",
             f"{hub_app_dir}/",
         ],
         check=True,
     )
+    shared_src = repo_root / "shared"
+    if shared_src.is_dir():
+        subprocess.run(
+            [
+                "rsync",
+                "-a",
+                "--delete",
+                "--exclude=__pycache__",
+                "--exclude=*.pyc",
+                f"{shared_src}/",
+                f"{hub_app_dir}/shared/",
+            ],
+            check=True,
+        )
     _write_hub_users(env, hub_users_file, source_users_file)
     _write_hub_service(repo_root, hub_app_dir, sys_user)
     _write_hub_sudoers(repo_root, sys_user)
