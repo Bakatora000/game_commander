@@ -974,6 +974,7 @@ class HostCliTests(unittest.TestCase):
                     "--main-script", str(ROOT_DIR / "game_commander.sh"),
                     "--instance", "minecraft-fabric",
                     "--skip-hub-sync",
+                    "--source", "Hub",
                 ])
             self.assertEqual(rc, 0)
             self.assertFalse(sync_hub.called)
@@ -984,7 +985,7 @@ class HostCliTests(unittest.TestCase):
         with mock.patch.object(hostops, "run_command", return_value=(True, "ok")), \
              mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")) as notify_mock, \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
-            rc = host_cli.main(["service-action", "--service", "valheim-server-valheim2", "--action", "restart"])
+            rc = host_cli.main(["service-action", "--service", "valheim-server-valheim2", "--action", "restart", "--source", "Hub"])
         self.assertEqual(rc, 0)
         self.assertEqual(notify_mock.call_args.kwargs["event"], "restart")
         self.assertEqual(notify_mock.call_args.kwargs["instance_id"], "valheim2")
@@ -1003,6 +1004,7 @@ class HostCliTests(unittest.TestCase):
                 "--instance", "minecraft2",
                 "--domain", "gaming.example.com",
                 "--admin-password", "secret123",
+                "--source", "Hub",
             ])
         self.assertEqual(rc, 0)
         self.assertEqual(notify_mock.call_args.kwargs["event"], "deploy")

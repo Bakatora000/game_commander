@@ -27,35 +27,35 @@ def cmd_service_action(args: argparse.Namespace) -> int:
         hostops.service_action_cmd(args.service, args.action),
         timeout=120,
     )
-    discord_status = _notify(args.action, ok, instance_id=_service_instance(args.service), service=args.service, details=message)
+    discord_status = _notify(args.action, ok, instance_id=_service_instance(args.service), service=args.service, source=args.source, details=message)
     if not ok and message:
-        print(f"Discord : {discord_status}")
+        _print_discord_status(discord_status)
         print(message, file=sys.stderr)
         return 1
     if message:
         print(message)
-    print(f"Discord : {discord_status}")
+    _print_discord_status(discord_status)
     return 0
 
 
 def cmd_update_instance(args: argparse.Namespace) -> int:
     config_file = hostctl.resolve_instance_config(args.instance)
     if not config_file:
-        _print_discord_status(_notify("update", False, instance_id=args.instance, details="Configuration d'instance introuvable"))
+        _print_discord_status(_notify("update", False, instance_id=args.instance, source=args.source, details="Configuration d'instance introuvable"))
         print("Configuration d'instance introuvable", file=sys.stderr)
         return 1
     env = hostctl.parse_env_file(config_file)
     game_id = env.get("GAME_ID", "")
     ok, result = updatecore.run_core_update(config_file, Path(args.main_script).resolve().parent)
     if not ok:
-        print(f"Discord : {_notify('update', False, instance_id=args.instance, game_id=game_id, details=_details_text(result))}")
+        _print_discord_status(_notify('update', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_details_text(result)))
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
     ok, hooks = updatehooks.run_post_update_hooks(config_file, Path(args.main_script).resolve().parent)
     if not ok:
-        print(f"Discord : {_notify('update', False, instance_id=args.instance, game_id=game_id, details=_details_text(hooks))}")
+        _print_discord_status(_notify('update', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_details_text(hooks)))
         print(hooks, file=sys.stderr)
         return 1
     for line in hooks:
@@ -63,12 +63,12 @@ def cmd_update_instance(args: argparse.Namespace) -> int:
     if not args.skip_hub_sync:
         ok, hub = hubsync.sync_hub_service(config_file, Path(args.main_script).resolve().parent)
         if not ok:
-            print(f"Discord : {_notify('update', False, instance_id=args.instance, game_id=game_id, details=_details_text(hub))}")
+            _print_discord_status(_notify('update', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_details_text(hub)))
             print(hub, file=sys.stderr)
             return 1
         for line in hub:
             print(line)
-    print(f"Discord : {_notify('update', True, instance_id=args.instance, game_id=game_id, details=_details_text(result + hooks))}")
+    _print_discord_status(_notify('update', True, instance_id=args.instance, game_id=game_id, source=args.source, details=_details_text(result + hooks)))
     return 0
 
 
@@ -78,12 +78,12 @@ def cmd_redeploy_instance(args: argparse.Namespace) -> int:
     game_id = env.get("GAME_ID", "")
     ok, result = redeploycore.run_redeploy(args.config, args.main_script)
     if not ok:
-        print(f"Discord : {_notify('redeploy', False, instance_id=instance_id, game_id=game_id, details=_details_text(result))}")
+        _print_discord_status(_notify('redeploy', False, instance_id=instance_id, game_id=game_id, source=args.source, details=_details_text(result)))
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
-    print(f"Discord : {_notify('redeploy', True, instance_id=instance_id, game_id=game_id, details=_details_text(result))}")
+    _print_discord_status(_notify('redeploy', True, instance_id=instance_id, game_id=game_id, source=args.source, details=_details_text(result)))
     return 0
 
 
@@ -104,8 +104,11 @@ def _details_text(result: str | list[str]) -> str:
     return str(result or "")
 
 
-def _print_discord_status(status: str, *, stream=sys.stdout) -> None:
-    print(f"Discord : {status}", file=stream)
+def _print_discord_status(status: str, *, stream=None) -> None:
+    if status:
+        if stream is None:
+            stream = sys.stdout
+        print(f"Discord : {status}", file=stream)
 
 
 def _service_instance(service: str) -> str:
@@ -116,7 +119,9 @@ def _service_instance(service: str) -> str:
     return service
 
 
-def _notify(event: str, ok: bool, *, instance_id: str = "", game_id: str = "", service: str = "", source: str = "Hub", details: str = "") -> str:
+def _notify(event: str, ok: bool, *, instance_id: str = "", game_id: str = "", service: str = "", source: str = "", details: str = "") -> str:
+    if not source:
+        return ""
     try:
         sent, status = discordnotify.notify_event(
             event=event,
@@ -150,12 +155,12 @@ def cmd_deploy_instance(args: argparse.Namespace) -> int:
         max_players=str(args.max_players or ""),
     )
     if not ok:
-        print(f"Discord : {_notify('deploy', False, instance_id=args.instance, game_id=args.game_id, details=_details_text(result))}")
+        _print_discord_status(_notify('deploy', False, instance_id=args.instance, game_id=args.game_id, source=args.source, details=_details_text(result)))
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
-    print(f"Discord : {_notify('deploy', True, instance_id=args.instance, game_id=args.game_id, details=_details_text(result))}")
+    _print_discord_status(_notify('deploy', True, instance_id=args.instance, game_id=args.game_id, source=args.source, details=_details_text(result)))
     return 0
 
 
@@ -168,30 +173,30 @@ def cmd_uninstall_instance(args: argparse.Namespace) -> int:
         ok, result = uninstallcore.run_full_uninstall(config_file, repo_root)
     else:
         if not args.game_id:
-            _print_discord_status(_notify("uninstall", False, instance_id=args.instance, details="Configuration d'instance introuvable"))
+            _print_discord_status(_notify("uninstall", False, instance_id=args.instance, source=args.source, details="Configuration d'instance introuvable"))
             print("Configuration d'instance introuvable", file=sys.stderr)
             return 1
         game_id = args.game_id
         ok, result = uninstallcore.run_partial_uninstall(args.instance, args.game_id, repo_root)
     if not ok:
-        print(f"Discord : {_notify('uninstall', False, instance_id=args.instance, game_id=game_id, details=_details_text(result))}")
+        _print_discord_status(_notify('uninstall', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_details_text(result)))
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
-    print(f"Discord : {_notify('uninstall', True, instance_id=args.instance, game_id=game_id, details=_details_text(result))}")
+    _print_discord_status(_notify('uninstall', True, instance_id=args.instance, game_id=game_id, source=args.source, details=_details_text(result)))
     return 0
 
 
 def cmd_rebalance(args: argparse.Namespace) -> int:
     core_groups = cpuplan.detect_core_groups()
     if not core_groups:
-        print(f"Discord : {_notify('rebalance', False, details='Topologie CPU introuvable')}")
+        _print_discord_status(_notify('rebalance', False, source=args.source, details='Topologie CPU introuvable'))
         print("Topologie CPU introuvable", file=sys.stderr)
         return 1
     instances = cpuplan.collect_managed_instances()
     if not instances:
-        print(f"Discord : {_notify('rebalance', False, details='Aucune instance gérée trouvée')}")
+        _print_discord_status(_notify('rebalance', False, source=args.source, details='Aucune instance gérée trouvée'))
         print("Aucune instance gérée trouvée", file=sys.stderr)
         return 1
     plan = cpuplan.plan_instances(instances, core_groups)
@@ -199,7 +204,7 @@ def cmd_rebalance(args: argparse.Namespace) -> int:
     for message in messages:
         print(message)
     print("Répartition CPU recalculée")
-    print(f"Discord : {_notify('rebalance', True, details=_details_text(messages + ['Répartition CPU recalculée']))}")
+    _print_discord_status(_notify('rebalance', True, source=args.source, details=_details_text(messages + ['Répartition CPU recalculée'])))
     return 0
 
 
@@ -218,7 +223,7 @@ def cmd_bootstrap_hub(args: argparse.Namespace) -> int:
     else:
         for line in result:
             print(line, file=stream)
-    print(f"Discord : {_notify('bootstrap-hub', ok, details=_details_text(result))}", file=stream)
+    _print_discord_status(_notify('bootstrap-hub', ok, source=args.source, details=_details_text(result)), stream=stream)
     return 0 if ok else 1
 
 
@@ -268,17 +273,20 @@ def build_parser() -> argparse.ArgumentParser:
     service = sub.add_parser("service-action")
     service.add_argument("--service", required=True)
     service.add_argument("--action", choices=["start", "stop", "restart"], required=True)
+    service.add_argument("--source", default="")
     service.set_defaults(func=cmd_service_action)
 
     update = sub.add_parser("update-instance")
     update.add_argument("--main-script", required=True, type=_existing_path)
     update.add_argument("--instance", required=True)
     update.add_argument("--skip-hub-sync", action="store_true")
+    update.add_argument("--source", default="")
     update.set_defaults(func=cmd_update_instance)
 
     redeploy = sub.add_parser("redeploy-instance")
     redeploy.add_argument("--main-script", required=True, type=_existing_path)
     redeploy.add_argument("--config", required=True, type=_existing_path)
+    redeploy.add_argument("--source", default="")
     redeploy.set_defaults(func=cmd_redeploy_instance)
 
     deploy = sub.add_parser("deploy-instance")
@@ -294,17 +302,20 @@ def build_parser() -> argparse.ArgumentParser:
     deploy.add_argument("--server-password", default="")
     deploy.add_argument("--server-port", default="")
     deploy.add_argument("--max-players", default="")
+    deploy.add_argument("--source", default="")
     deploy.set_defaults(func=cmd_deploy_instance)
 
     uninstall = sub.add_parser("uninstall-instance")
     uninstall.add_argument("--main-script", required=True, type=_existing_path)
     uninstall.add_argument("--instance", required=True)
     uninstall.add_argument("--game-id", default="")
+    uninstall.add_argument("--source", default="")
     uninstall.set_defaults(func=cmd_uninstall_instance)
 
     rebalance = sub.add_parser("rebalance")
     rebalance.add_argument("--main-script", required=True, type=_existing_path)
     rebalance.add_argument("--restart", action="store_true")
+    rebalance.add_argument("--source", default="")
     rebalance.set_defaults(func=cmd_rebalance)
 
     bootstrap = sub.add_parser("bootstrap-hub")
@@ -314,6 +325,7 @@ def build_parser() -> argparse.ArgumentParser:
     bootstrap.add_argument("--admin-login", default="admin")
     bootstrap.add_argument("--admin-password", default="")
     bootstrap.add_argument("--ssl-mode", default="none", choices=["none", "existing", "certbot"])
+    bootstrap.add_argument("--source", default="")
     bootstrap.set_defaults(func=cmd_bootstrap_hub)
 
     list_configs = sub.add_parser("list-configs")

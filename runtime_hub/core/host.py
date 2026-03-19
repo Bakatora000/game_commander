@@ -275,7 +275,7 @@ def run_instance_service_action(instance_name: str, action: str) -> tuple[bool, 
     if not host_cli.is_file():
         return False, "CLI hôte introuvable", None
     ok, message = hostops.run_command(
-        ["sudo", "/usr/bin/python3", str(host_cli), "service-action", "--service", service, "--action", action],
+        ["sudo", "/usr/bin/python3", str(host_cli), "service-action", "--service", service, "--action", action, "--source", "Hub"],
         timeout=120,
     )
     _append_action_log(instance_name, action, ok, message or hostops.service_action_success_message(action, instance_name))
@@ -297,7 +297,7 @@ def run_instance_update(instance_name: str) -> tuple[bool, str, dict | None]:
     if not host_cli.is_file():
         return False, "CLI hôte introuvable", None
     ok, message = hostops.run_command(
-        ["sudo", "/usr/bin/python3", str(host_cli), "update-instance", "--main-script", str(script_path), "--instance", instance_name, "--skip-hub-sync"],
+        ["sudo", "/usr/bin/python3", str(host_cli), "update-instance", "--main-script", str(script_path), "--instance", instance_name, "--skip-hub-sync", "--source", "Hub"],
         timeout=900,
     )
     _append_action_log(instance_name, "update", ok, message or f"Instance {instance_name} mise à jour")
@@ -322,7 +322,7 @@ def run_instance_redeploy(instance_name: str) -> tuple[bool, str, dict | None]:
     if not config_file.is_file():
         return False, "deploy_config.env introuvable pour cette instance", None
     ok, message = hostops.run_command(
-        ["sudo", "/usr/bin/python3", str(host_cli), "redeploy-instance", "--main-script", str(script_path), "--config", str(config_file)],
+        ["sudo", "/usr/bin/python3", str(host_cli), "redeploy-instance", "--main-script", str(script_path), "--config", str(config_file), "--source", "Hub"],
         timeout=1200,
     )
     _append_action_log(instance_name, "redeploy", ok, message or f"Instance {instance_name} redéployée")
@@ -363,7 +363,7 @@ def run_instance_uninstall(instance_name: str) -> tuple[bool, str, dict]:
         details.append(f"Serveur encore en ligne (état {state})")
         details.append(f"Arrêt préalable du service {service}")
         stop_ok, stop_message = hostops.run_command(
-            ["sudo", "/usr/bin/python3", str(host_cli), "service-action", "--service", service, "--action", "stop"],
+            ["sudo", "/usr/bin/python3", str(host_cli), "service-action", "--service", service, "--action", "stop", "--source", "Hub"],
             timeout=180,
         )
         if not stop_ok:
@@ -378,7 +378,7 @@ def run_instance_uninstall(instance_name: str) -> tuple[bool, str, dict]:
         details.append("Serveur arrêté, désinstallation en cours")
     game_label = (instance.get("game") or "").strip()
     game_id = next((gid for gid, meta in instanceenv.GAME_META.items() if meta.get("label") == game_label), "")
-    cmd = ["sudo", "/usr/bin/python3", str(host_cli), "uninstall-instance", "--main-script", str(script_path), "--instance", instance_name]
+    cmd = ["sudo", "/usr/bin/python3", str(host_cli), "uninstall-instance", "--main-script", str(script_path), "--instance", instance_name, "--source", "Hub"]
     if game_id:
         cmd.extend(["--game-id", game_id])
     ok, message = hostops.run_command(
@@ -423,6 +423,7 @@ def run_instance_deploy(data: dict) -> tuple[bool, str, dict]:
         "--admin-login", (data.get("admin_login") or "admin").strip() or "admin",
         "--admin-password", admin_password,
         "--sys-user", (data.get("sys_user") or _default_sys_user()).strip() or _default_sys_user(),
+        "--source", "Hub",
     ]
     if url_prefix:
         cmd.extend(["--url-prefix", normalized_prefix])
@@ -497,7 +498,7 @@ def run_rebalance(restart: bool = False) -> tuple[bool, str, dict]:
     host_cli = _host_cli_path()
     if not host_cli.is_file():
         return False, "CLI hôte introuvable", get_hub_payload()
-    cmd = ["sudo", "/usr/bin/python3", str(host_cli), "rebalance", "--main-script", str(script_path)]
+    cmd = ["sudo", "/usr/bin/python3", str(host_cli), "rebalance", "--main-script", str(script_path), "--source", "Hub"]
     if restart:
         cmd.append("--restart")
     ok, message = hostops.run_command(cmd, timeout=900)
