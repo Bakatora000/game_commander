@@ -889,6 +889,22 @@ class DiscordNotifyTests(unittest.TestCase):
         self.assertNotIn("[OK]", post_mock.call_args.args[2])
         self.assertNotIn("Hôte:", post_mock.call_args.args[2])
 
+    def test_notify_event_adds_default_action_text_when_no_details(self):
+        cfg = {"bot_token": "token", "instance_channels": {"ParkAPouet": "123"}}
+        with mock.patch.object(discordnotify, "post_channel_message", return_value=(True, "sent")) as post_mock:
+            ok, message = discordnotify.notify_event(
+                event="stop",
+                ok=True,
+                instance_id="ParkAPouet",
+                game_id="valheim",
+                details="",
+                config=cfg,
+            )
+        self.assertTrue(ok)
+        self.assertEqual(message, "sent")
+        self.assertIn("ParkAPouet", post_mock.call_args.args[2])
+        self.assertIn("Arret lance", post_mock.call_args.args[2])
+
     def test_send_test_message_uses_notify_event(self):
         with mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")) as notify_mock:
             ok, message = discordnotify.send_test_message(instance_id="valheim2", game_id="valheim")

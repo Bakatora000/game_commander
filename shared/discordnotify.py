@@ -65,6 +65,35 @@ def format_event_message(
     subject = instance_id or game_id or service or "Game Commander"
     content = subject
     details = (details or "").strip()
+    if not details:
+        success_labels = {
+            "start": "Demarrage lance",
+            "stop": "Arret lance",
+            "restart": "Redemarrage lance",
+            "update": "Mise a jour lancee",
+            "deploy": "Deploiement termine",
+            "redeploy": "Redeploiement termine",
+            "uninstall": "Desinstallation terminee",
+            "rebalance": "Reequilibrage CPU termine",
+            "bootstrap-hub": "Initialisation du Hub terminee",
+            "discord-test": "Test de notification Discord",
+        }
+        failure_labels = {
+            "start": "Echec du demarrage",
+            "stop": "Echec de l'arret",
+            "restart": "Echec du redemarrage",
+            "update": "Echec de la mise a jour",
+            "deploy": "Echec du deploiement",
+            "redeploy": "Echec du redeploiement",
+            "uninstall": "Echec de la desinstallation",
+            "rebalance": "Echec du reequilibrage CPU",
+            "bootstrap-hub": "Echec de l'initialisation du Hub",
+            "discord-test": "Echec du test Discord",
+        }
+        details = (success_labels if ok else failure_labels).get(
+            event,
+            "Operation terminee" if ok else "Operation en echec",
+        )
     if details:
         snippet = details[:1500]
         if len(details) > 1500:
