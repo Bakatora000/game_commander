@@ -873,7 +873,12 @@
       }).join('');
       toggleBtn.hidden = false;
     }
-    document.querySelector('[data-action="refresh-monitor"]').addEventListener('click', () => { load(); });
+    document.querySelector('[data-action="refresh-monitor"]').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      await load();
+      btn.disabled = false;
+    });
     document.querySelector('[data-action="toggle-cpu-monitor"]').addEventListener('click', () => {
       const detailsEl = document.querySelector('[data-field="cpu-monitor-details"]');
       const buttonEl = document.querySelector('[data-action="toggle-cpu-monitor"]');
