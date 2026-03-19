@@ -1051,6 +1051,7 @@ class HostCliTests(unittest.TestCase):
                  mock.patch.object(updatecore, "run_core_update", return_value=(True, ["core ok"])), \
                  mock.patch.object(updatehooks, "run_post_update_hooks", return_value=(True, ["hooks ok"])), \
                  mock.patch.object(hubsync, "sync_hub_service") as sync_hub, \
+                 mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")), \
                  mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
                 rc = host_cli.main([
                     "update-instance",
