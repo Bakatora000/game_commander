@@ -49,14 +49,15 @@ def _global_log_path() -> Path:
     return _action_log_dir() / "hub-actions.log"
 
 
-def _append_action_log(instance_name: str, action: str, ok: bool, message: str) -> None:
+def _append_action_log(instance_name: str, action: str, ok: bool, message: str, source: str = "Hub") -> None:
     log_dir = _action_log_dir()
     log_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     status = "OK" if ok else "ERR"
+    origin = f" [{source}]" if source else ""
     content = (message or "").strip() or "(aucun détail)"
     with _global_log_path().open("a", encoding="utf-8") as fh:
-        fh.write(f"[{timestamp}] {status} {instance_name} {action}\n")
+        fh.write(f"[{timestamp}] {status}{origin} {instance_name} {action}\n")
         for line in content.splitlines():
             fh.write(f"  {line}\n")
         fh.write("\n")

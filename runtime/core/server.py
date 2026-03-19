@@ -64,7 +64,7 @@ def _discordnotify_module():
         return None
 
 def _notify_action(event: str, ok: bool, details: str = "") -> None:
-    _append_hub_action_log(event, ok, details)
+    _append_hub_action_log(event, ok, details, source="Commander")
     discordnotify = _discordnotify_module()
     if not discordnotify:
         return
@@ -75,6 +75,7 @@ def _notify_action(event: str, ok: bool, details: str = "") -> None:
             instance_id=_instance_id(),
             game_id=_game().get("id", ""),
             service=_game().get("server", {}).get("service", ""),
+            source="Commander",
             details=(details or "").strip(),
         )
     except Exception:
@@ -102,7 +103,7 @@ def _action_log_text(event: str, ok: bool, details: str = "") -> str:
         "Operation terminee" if ok else "Operation en echec",
     )
 
-def _append_hub_action_log(event: str, ok: bool, details: str = "") -> None:
+def _append_hub_action_log(event: str, ok: bool, details: str = "", source: str = "") -> None:
     path = _hub_log_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -110,8 +111,9 @@ def _append_hub_action_log(event: str, ok: bool, details: str = "") -> None:
         status = "OK" if ok else "ERR"
         instance_id = _instance_id() or _game().get("id", "") or "instance"
         content = _action_log_text(event, ok, details)
+        origin = f" [{source}]" if source else ""
         with path.open("a", encoding="utf-8") as fh:
-            fh.write(f"[{timestamp}] {status} {instance_id} {event}\n")
+            fh.write(f"[{timestamp}] {status}{origin} {instance_id} {event}\n")
             for line in content.splitlines():
                 fh.write(f"  {line}\n")
             fh.write("\n")

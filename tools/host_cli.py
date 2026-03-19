@@ -116,7 +116,7 @@ def _service_instance(service: str) -> str:
     return service
 
 
-def _notify(event: str, ok: bool, *, instance_id: str = "", game_id: str = "", service: str = "", details: str = "") -> str:
+def _notify(event: str, ok: bool, *, instance_id: str = "", game_id: str = "", service: str = "", source: str = "Hub", details: str = "") -> str:
     try:
         sent, status = discordnotify.notify_event(
             event=event,
@@ -124,6 +124,7 @@ def _notify(event: str, ok: bool, *, instance_id: str = "", game_id: str = "", s
             instance_id=instance_id,
             game_id=game_id,
             service=service,
+            source=source,
             details=details,
         )
         return "notification envoyee" if sent else status
@@ -248,6 +249,7 @@ def cmd_discord_test(args: argparse.Namespace) -> int:
         event=args.event,
         instance_id=args.instance,
         game_id=args.game_id,
+        source="Hub",
         details=args.message,
     )
     stream = sys.stdout if ok else sys.stderr

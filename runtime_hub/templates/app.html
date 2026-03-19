@@ -673,6 +673,25 @@
         });
       });
     }
+    let globalConsolePoller = null;
+    function startGlobalConsolePolling() {
+      if (globalConsolePoller) {
+        return;
+      }
+      globalConsolePoller = window.setInterval(() => {
+        const panel = document.getElementById('globalConsolePanel');
+        if (!panel.hidden) {
+          loadGlobalConsole();
+        }
+      }, 5000);
+    }
+    function stopGlobalConsolePolling() {
+      if (!globalConsolePoller) {
+        return;
+      }
+      window.clearInterval(globalConsolePoller);
+      globalConsolePoller = null;
+    }
     async function loadGlobalConsole() {
       const output = document.getElementById('globalConsoleOutput');
       output.textContent = 'Chargement…';
@@ -891,7 +910,10 @@
       purgeBtn.hidden = !hidden;
       archiveBtn.hidden = !hidden;
       if (hidden) {
+        startGlobalConsolePolling();
         await loadGlobalConsole();
+      } else {
+        stopGlobalConsolePolling();
       }
     });
     document.getElementById('btnPurgeGlobalConsole').addEventListener('click', async () => {

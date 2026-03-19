@@ -915,6 +915,7 @@ class DiscordNotifyTests(unittest.TestCase):
         self.assertTrue(ok)
         self.assertEqual(message, "sent")
         self.assertEqual(notify_mock.call_args.kwargs["event"], "discord-test")
+        self.assertEqual(notify_mock.call_args.kwargs["source"], "Hub")
 
 
 class HostCliTests(unittest.TestCase):
@@ -1520,9 +1521,10 @@ class ServerDiscordTests(unittest.TestCase):
             discord_module.notify_event.assert_called_once()
             self.assertEqual(discord_module.notify_event.call_args.kwargs["event"], "start")
             self.assertEqual(discord_module.notify_event.call_args.kwargs["instance_id"], "ParkAPouet")
+            self.assertEqual(discord_module.notify_event.call_args.kwargs["source"], "Commander")
             log_path = Path(d) / "game-commander-hub" / "action-logs" / "hub-actions.log"
             content = log_path.read_text(encoding="utf-8")
-            self.assertIn("OK ParkAPouet start", content)
+            self.assertIn("OK [Commander] ParkAPouet start", content)
             self.assertIn("Demarrage lance", content)
 
 

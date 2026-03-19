@@ -61,6 +61,7 @@ def format_event_message(
     instance_id: str = "",
     game_id: str = "",
     service: str = "",
+    source: str = "",
     details: str = "",
 ) -> str:
     subject = instance_id or game_id or service or "Game Commander"
@@ -78,7 +79,8 @@ def format_event_message(
     }
     stamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     action = labels.get(event, "Operation")
-    return f"{subject}: {stamp} - {action}"[:1900]
+    origin = f" [{source}]" if source else ""
+    return f"{subject}: {stamp} - {action}{origin}"[:1900]
 
 
 def post_channel_message(bot_token: str, channel_id: str, content: str, timeout: int = 10) -> tuple[bool, str]:
@@ -110,6 +112,7 @@ def notify_event(
     instance_id: str = "",
     game_id: str = "",
     service: str = "",
+    source: str = "",
     details: str = "",
     config: dict | None = None,
 ) -> tuple[bool, str]:
@@ -125,6 +128,7 @@ def notify_event(
         instance_id=instance_id,
         game_id=game_id,
         service=service,
+        source=source,
         details=details,
     )
     return post_channel_message(str(cfg.get("bot_token", "")), channel_id, content)
@@ -135,6 +139,7 @@ def send_test_message(
     event: str = "discord-test",
     instance_id: str = "",
     game_id: str = "",
+    source: str = "Hub",
     details: str = "Test de notification Discord Game Commander",
     config: dict | None = None,
 ) -> tuple[bool, str]:
@@ -143,6 +148,7 @@ def send_test_message(
         ok=True,
         instance_id=instance_id,
         game_id=game_id,
+        source=source,
         details=details,
         config=config,
     )
