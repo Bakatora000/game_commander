@@ -43,6 +43,52 @@
   - ✅ `send_test_message` préfixe désormais `[TEST]` sur tous les messages de test, quel que soit l'event
 - **Régression connue :** ne pas modifier `send_test_message` pour qu'il délègue à nouveau à `notify_event` sans le préfixe `[TEST]` — les messages de test doivent toujours être distinguables en lecture.
 
+### [26] Deploy Hub — Hub restart pendant le déploiement tue le pipeline (SIGPIPE)
+- **Statut :** Résolu
+- **Composant :** `lib/deploy_steps.sh` + `shared/hubsync.py`
+- **Instance(s) affectée(s) :** toutes (symptôme apparu sur `minecraft-fabric`)
+- **Symptôme :**
+  - le déploiement s'arrête silencieusement après l'étape 8B (Hub Admin)
+  - les étapes Nginx, SSL, sudoers, save_config, Discord ne s'exécutent jamais
+  - popup Hub "erreur pendant le déploiement" sans détail
+- **Cause racine :**
+  - `deploy_step_hub_service` appelait hubsync sans `--no-restart`
+  - `systemctl restart game-commander-hub` tuait le process Hub Flask
+  - Hub est le parent du `subprocess.run(host_cli.py deploy-instance)` qui utilise `capture_output=True`
+  - Le pipe stdout entre bash et tee est romptu → tee reçoit SIGPIPE → bash meurt
+- **Solutions essayées :**
+  - ❌ `subprocess.Popen(..., start_new_session=True)` insuffisant (deploy ≈5s, Hub redémarre trop vite)
+  - ✅ `--no-restart` dans `deploy_step_hub_service` : le Hub ne redémarre jamais pendant un deploy d'instance
+  - ✅ Le Hub découvre les instances dynamiquement (manifest, deploy_config.env) — pas besoin de restart
+- **Régression connue :** Ne jamais relancer le Hub pendant un deploy d'instance. `--no-restart` doit rester en place dans `deploy_step_hub_service`.
+
+### [25] Deploy — `set_game_defaults` écrasait les valeurs de config avec des chaînes vides
+- **Statut :** Résolu
+- **Composant :** `lib/deploy_helpers.sh` + `shared/deployenv.py`
+- **Instance(s) affectée(s) :** `minecraft-fabric` (premier symptôme : "Mot de passe admin obligatoire")
+- **Symptôme :**
+  - déploiement Hub échoue avec "Mot de passe admin obligatoire" malgré `--admin-password` passé
+  - les valeurs chargées depuis `deploy_config.env` étaient écrasées par des chaînes vides
+- **Cause racine :**
+  - `set_game_defaults` ne passait qu'une dizaine de variables bash à `deployenv.py fill-defaults`
+  - les autres variables (ADMIN_PASSWORD, ADMIN_LOGIN, SYS_USER, DOMAIN…) arrivaient comme `""` dans l'environnement subprocess et écrasaient les valeurs déjà chargées
+- **Solutions essayées :**
+  - ✅ Passer explicitement toutes les variables bash nécessaires comme env vars au subprocess Python
+- **Régression connue :** Toute nouvelle variable de déploiement ajoutée dans bash doit aussi être passée explicitement au subprocess `fill-defaults`.
+
+### [24] Uninstall — répertoires drop-in systemd non supprimés
+- **Statut :** Résolu
+- **Composant :** `shared/uninstallcore.py`
+- **Instance(s) affectée(s) :** toutes (symptôme visible après désinstallation d'une instance avec CPU affinity)
+- **Symptôme :**
+  - après désinstallation, le répertoire `/etc/systemd/system/<unit>.service.d/` restait sur le disque
+  - le fichier `10-cpu-affinity.conf` à l'intérieur persistait
+- **Cause racine :**
+  - `_stop_disable_remove_service()` ne supprimait que le fichier `.service`, pas le répertoire `.service.d/`
+- **Solutions essayées :**
+  - ✅ `shutil.rmtree(dropin_dir)` sur le répertoire `.service.d/` s'il existe
+- **Régression connue :** S'assurer que `shutil` est importé dans `uninstallcore.py` si ce code est modifié.
+
 ### [19] Satisfactory — connexion impossible tant que le `ReliablePort` n'était pas correctement modélisé
 - **Statut :** Résolu
 - **Composant :** `lib/deploy_steps.sh` + support `satisfactory`

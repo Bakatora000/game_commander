@@ -23,6 +23,31 @@ not only the base game port. With a firewall range limited to `15636-15639`, use
 Operational note: orphan-process detection during uninstall must ignore any process still
 attached to a systemd service cgroup. This is required for Wine-based Enshrouded servers.
 
+Operational note: systemd drop-in directories (`/etc/systemd/system/<unit>.service.d/`) are
+created by cpu_affinity.sh for CPU pinning. `_stop_disable_remove_service()` in
+`shared/uninstallcore.py` now removes the drop-in directory with `shutil.rmtree` on uninstall.
+
+Operational note: the Hub Admin must NOT restart during an instance deploy. Restarting the
+Hub Flask process (parent of the `subprocess.run(host_cli.py deploy-instance)` chain) breaks
+the stdout pipe → tee gets SIGPIPE → bash deploy process dies → all steps after 8B are skipped.
+Fix: `deploy_step_hub_service` calls hubsync with `--no-restart`; Hub only restarts during
+`bootstrap-hub`, never during instance deploy.
+
+Discord integration note: `shared/discordnotify.py` provides all Discord API functions
+(notifications, channel management, permission overwrites). Config lives at
+`/etc/game-commander/discord.json` (owned `root:vhserver`, `rw-r-----`). Run
+`sudo chmod g+w /etc/game-commander/discord.json` so the Hub (vhserver) can write channel IDs.
+
+Discord channel creation (on deploy and from Hub): `find_or_create_game_category()` scans
+the guild channels for an existing category named after the game (`valheim`, `enshrouded`,
+`terraria`…), creates it if absent, then creates the instance text channel inside it.
+`send_test_message()` always prefixes `[TEST]` to distinguish test messages from real ones.
+
+Hub Discord panel (`/commander` → Discord tab):
+- configures guild_id and category_id (fallback) from the UI
+- shows all instances with their channel status (create/delete buttons)
+- manages read-only permissions per channel (by Discord user ID or role ID)
+
 Operational note: an intermittent phantom Discord notification
 `minecraft-fabric: ... - Mise a jour [Hub]` was observed even though no such instance
 exists anymore on the host. From user observation, it appears only during some `git`
