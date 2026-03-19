@@ -77,8 +77,10 @@ def _remove_tree_if_owned(path: Path | None, label: str, current_cfg: Path, mess
 
 
 def _stop_disable_remove_service(service: str, messages: list[str]) -> None:
+    import shutil
     unit = f"{service}.service"
     unit_file = Path("/etc/systemd/system") / unit
+    dropin_dir = Path("/etc/systemd/system") / f"{unit}.d"
     _run(["systemctl", "stop", service])
     _run(["systemctl", "disable", service])
     if unit_file.exists():
@@ -86,6 +88,9 @@ def _stop_disable_remove_service(service: str, messages: list[str]) -> None:
         messages.append(f"Service supprimé : {service}")
     else:
         messages.append(f"Service absent : {service}")
+    if dropin_dir.is_dir():
+        shutil.rmtree(dropin_dir)
+        messages.append(f"Drop-ins supprimés : {dropin_dir.name}")
     _run(["systemctl", "daemon-reload"])
 
 
