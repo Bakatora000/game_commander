@@ -960,18 +960,19 @@ class HostCliTests(unittest.TestCase):
         from tools import host_cli
         with mock.patch.object(hostops, "run_command", return_value=(True, "ok")), \
              mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")) as notify_mock, \
-             mock.patch("sys.stdout", new_callable=io.StringIO):
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             rc = host_cli.main(["service-action", "--service", "valheim-server-valheim2", "--action", "restart"])
         self.assertEqual(rc, 0)
         self.assertEqual(notify_mock.call_args.kwargs["event"], "restart")
         self.assertEqual(notify_mock.call_args.kwargs["instance_id"], "valheim2")
+        self.assertIn("Discord : notification envoyee", stdout.getvalue())
 
     def test_deploy_instance_notifies_discord(self):
         from tools import host_cli
         with mock.patch.object(deploycore, "run_deploy_instance", return_value=(True, ["done"])), \
              mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")) as notify_mock, \
              mock.patch("pwd.getpwuid", return_value=types.SimpleNamespace(pw_name="vhserver")), \
-             mock.patch("sys.stdout", new_callable=io.StringIO):
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             rc = host_cli.main([
                 "deploy-instance",
                 "--main-script", str(ROOT_DIR / "game_commander.sh"),
@@ -983,6 +984,7 @@ class HostCliTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(notify_mock.call_args.kwargs["event"], "deploy")
         self.assertEqual(notify_mock.call_args.kwargs["instance_id"], "minecraft2")
+        self.assertIn("Discord : notification envoyee", stdout.getvalue())
 
     def test_discord_test_command(self):
         from tools import host_cli

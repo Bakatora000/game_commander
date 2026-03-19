@@ -27,33 +27,35 @@ def cmd_service_action(args: argparse.Namespace) -> int:
         hostops.service_action_cmd(args.service, args.action),
         timeout=120,
     )
-    _notify(args.action, ok, instance_id=_service_instance(args.service), service=args.service, details=message)
+    discord_status = _notify(args.action, ok, instance_id=_service_instance(args.service), service=args.service, details=message)
     if not ok and message:
+        print(f"Discord : {discord_status}")
         print(message, file=sys.stderr)
         return 1
     if message:
         print(message)
+    print(f"Discord : {discord_status}")
     return 0
 
 
 def cmd_update_instance(args: argparse.Namespace) -> int:
     config_file = hostctl.resolve_instance_config(args.instance)
     if not config_file:
-        _notify("update", False, instance_id=args.instance, details="Configuration d'instance introuvable")
+        _print_discord_status(_notify("update", False, instance_id=args.instance, details="Configuration d'instance introuvable"))
         print("Configuration d'instance introuvable", file=sys.stderr)
         return 1
     env = hostctl.parse_env_file(config_file)
     game_id = env.get("GAME_ID", "")
     ok, result = updatecore.run_core_update(config_file, Path(args.main_script).resolve().parent)
     if not ok:
-        _notify("update", False, instance_id=args.instance, game_id=game_id, details=_details_text(result))
+        print(f"Discord : {_notify('update', False, instance_id=args.instance, game_id=game_id, details=_details_text(result))}")
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
     ok, hooks = updatehooks.run_post_update_hooks(config_file, Path(args.main_script).resolve().parent)
     if not ok:
-        _notify("update", False, instance_id=args.instance, game_id=game_id, details=_details_text(hooks))
+        print(f"Discord : {_notify('update', False, instance_id=args.instance, game_id=game_id, details=_details_text(hooks))}")
         print(hooks, file=sys.stderr)
         return 1
     for line in hooks:
@@ -61,12 +63,12 @@ def cmd_update_instance(args: argparse.Namespace) -> int:
     if not args.skip_hub_sync:
         ok, hub = hubsync.sync_hub_service(config_file, Path(args.main_script).resolve().parent)
         if not ok:
-            _notify("update", False, instance_id=args.instance, game_id=game_id, details=_details_text(hub))
+            print(f"Discord : {_notify('update', False, instance_id=args.instance, game_id=game_id, details=_details_text(hub))}")
             print(hub, file=sys.stderr)
             return 1
         for line in hub:
             print(line)
-    _notify("update", True, instance_id=args.instance, game_id=game_id, details=_details_text(result + hooks))
+    print(f"Discord : {_notify('update', True, instance_id=args.instance, game_id=game_id, details=_details_text(result + hooks))}")
     return 0
 
 
@@ -76,12 +78,12 @@ def cmd_redeploy_instance(args: argparse.Namespace) -> int:
     game_id = env.get("GAME_ID", "")
     ok, result = redeploycore.run_redeploy(args.config, args.main_script)
     if not ok:
-        _notify("redeploy", False, instance_id=instance_id, game_id=game_id, details=_details_text(result))
+        print(f"Discord : {_notify('redeploy', False, instance_id=instance_id, game_id=game_id, details=_details_text(result))}")
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
-    _notify("redeploy", True, instance_id=instance_id, game_id=game_id, details=_details_text(result))
+    print(f"Discord : {_notify('redeploy', True, instance_id=instance_id, game_id=game_id, details=_details_text(result))}")
     return 0
 
 
@@ -102,6 +104,10 @@ def _details_text(result: str | list[str]) -> str:
     return str(result or "")
 
 
+def _print_discord_status(status: str, *, stream=sys.stdout) -> None:
+    print(f"Discord : {status}", file=stream)
+
+
 def _service_instance(service: str) -> str:
     if service.startswith("game-commander-"):
         return service.removeprefix("game-commander-")
@@ -110,9 +116,9 @@ def _service_instance(service: str) -> str:
     return service
 
 
-def _notify(event: str, ok: bool, *, instance_id: str = "", game_id: str = "", service: str = "", details: str = "") -> None:
+def _notify(event: str, ok: bool, *, instance_id: str = "", game_id: str = "", service: str = "", details: str = "") -> str:
     try:
-        discordnotify.notify_event(
+        sent, status = discordnotify.notify_event(
             event=event,
             ok=ok,
             instance_id=instance_id,
@@ -120,8 +126,9 @@ def _notify(event: str, ok: bool, *, instance_id: str = "", game_id: str = "", s
             service=service,
             details=details,
         )
+        return "notification envoyee" if sent else status
     except Exception:
-        pass
+        return "erreur"
 
 
 def cmd_deploy_instance(args: argparse.Namespace) -> int:
@@ -142,12 +149,12 @@ def cmd_deploy_instance(args: argparse.Namespace) -> int:
         max_players=str(args.max_players or ""),
     )
     if not ok:
-        _notify("deploy", False, instance_id=args.instance, game_id=args.game_id, details=_details_text(result))
+        print(f"Discord : {_notify('deploy', False, instance_id=args.instance, game_id=args.game_id, details=_details_text(result))}")
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
-    _notify("deploy", True, instance_id=args.instance, game_id=args.game_id, details=_details_text(result))
+    print(f"Discord : {_notify('deploy', True, instance_id=args.instance, game_id=args.game_id, details=_details_text(result))}")
     return 0
 
 
@@ -160,30 +167,30 @@ def cmd_uninstall_instance(args: argparse.Namespace) -> int:
         ok, result = uninstallcore.run_full_uninstall(config_file, repo_root)
     else:
         if not args.game_id:
-            _notify("uninstall", False, instance_id=args.instance, details="Configuration d'instance introuvable")
+            _print_discord_status(_notify("uninstall", False, instance_id=args.instance, details="Configuration d'instance introuvable"))
             print("Configuration d'instance introuvable", file=sys.stderr)
             return 1
         game_id = args.game_id
         ok, result = uninstallcore.run_partial_uninstall(args.instance, args.game_id, repo_root)
     if not ok:
-        _notify("uninstall", False, instance_id=args.instance, game_id=game_id, details=_details_text(result))
+        print(f"Discord : {_notify('uninstall', False, instance_id=args.instance, game_id=game_id, details=_details_text(result))}")
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
-    _notify("uninstall", True, instance_id=args.instance, game_id=game_id, details=_details_text(result))
+    print(f"Discord : {_notify('uninstall', True, instance_id=args.instance, game_id=game_id, details=_details_text(result))}")
     return 0
 
 
 def cmd_rebalance(args: argparse.Namespace) -> int:
     core_groups = cpuplan.detect_core_groups()
     if not core_groups:
-        _notify("rebalance", False, details="Topologie CPU introuvable")
+        print(f"Discord : {_notify('rebalance', False, details='Topologie CPU introuvable')}")
         print("Topologie CPU introuvable", file=sys.stderr)
         return 1
     instances = cpuplan.collect_managed_instances()
     if not instances:
-        _notify("rebalance", False, details="Aucune instance gérée trouvée")
+        print(f"Discord : {_notify('rebalance', False, details='Aucune instance gérée trouvée')}")
         print("Aucune instance gérée trouvée", file=sys.stderr)
         return 1
     plan = cpuplan.plan_instances(instances, core_groups)
@@ -191,7 +198,7 @@ def cmd_rebalance(args: argparse.Namespace) -> int:
     for message in messages:
         print(message)
     print("Répartition CPU recalculée")
-    _notify("rebalance", True, details=_details_text(messages + ["Répartition CPU recalculée"]))
+    print(f"Discord : {_notify('rebalance', True, details=_details_text(messages + ['Répartition CPU recalculée']))}")
     return 0
 
 
@@ -210,7 +217,7 @@ def cmd_bootstrap_hub(args: argparse.Namespace) -> int:
     else:
         for line in result:
             print(line, file=stream)
-    _notify("bootstrap-hub", ok, details=_details_text(result))
+    print(f"Discord : {_notify('bootstrap-hub', ok, details=_details_text(result))}", file=stream)
     return 0 if ok else 1
 
 
