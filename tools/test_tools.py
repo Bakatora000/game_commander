@@ -1494,22 +1494,32 @@ class ServerCpuMonitorTests(unittest.TestCase):
 class ServerDiscordTests(unittest.TestCase):
 
     def test_start_notifies_discord_for_commander_actions(self):
-        app = Flask(__name__)
-        app.config["GAME"] = {
-            "id": "valheim",
-            "server": {
-                "service": "valheim-server-ParkAPouet",
-                "install_dir": "/tmp/server",
-            },
-        }
-        with app.app_context(), \
-             mock.patch.object(core_server, "_systemctl", return_value=(True, "")), \
-             mock.patch.object(core_server, "_notify_action") as notify_mock:
-            ok, err = core_server.start(wait=False)
-        self.assertTrue(ok)
-        self.assertEqual(err, "")
-        self.assertEqual(notify_mock.call_args.args[0], "start")
-        self.assertTrue(notify_mock.call_args.args[1])
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d) / "game-commander-ParkAPouet"
+            root.mkdir(parents=True)
+            (root / "deploy_config.env").write_text('INSTANCE_ID="ParkAPouet"\n', encoding="utf-8")
+            app = Flask(__name__, root_path=str(root))
+            app.config["GAME"] = {
+                "id": "valheim",
+                "server": {
+                    "service": "valheim-server-ParkAPouet",
+                    "install_dir": "/tmp/server",
+                },
+            }
+            discord_module = types.SimpleNamespace(notify_event=mock.Mock(return_value=(True, "sent")))
+            with app.app_context(), \
+                 mock.patch.object(core_server, "_systemctl", return_value=(True, "")), \
+                 mock.patch.object(core_server, "_discordnotify_module", return_value=discord_module):
+                ok, err = core_server.start(wait=False)
+            self.assertTrue(ok)
+            self.assertEqual(err, "")
+            discord_module.notify_event.assert_called_once()
+            self.assertEqual(discord_module.notify_event.call_args.kwargs["event"], "start")
+            self.assertEqual(discord_module.notify_event.call_args.kwargs["instance_id"], "ParkAPouet")
+            log_path = Path(d) / "game-commander-hub" / "action-logs" / "hub-actions.log"
+            content = log_path.read_text(encoding="utf-8")
+            self.assertIn("OK ParkAPouet start", content)
+            self.assertIn("Demarrage lance", content)
 
 
 class HubAuthTests(unittest.TestCase):

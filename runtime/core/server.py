@@ -8,6 +8,7 @@ import re
 import subprocess, time
 import importlib
 import sys
+from datetime import datetime
 from pathlib import Path
 import psutil
 from flask import current_app
@@ -63,6 +64,7 @@ def _discordnotify_module():
         return None
 
 def _notify_action(event: str, ok: bool, details: str = "") -> None:
+    _append_hub_action_log(event, ok, details)
     discordnotify = _discordnotify_module()
     if not discordnotify:
         return
@@ -75,6 +77,44 @@ def _notify_action(event: str, ok: bool, details: str = "") -> None:
             service=_game().get("server", {}).get("service", ""),
             details=(details or "").strip(),
         )
+    except Exception:
+        pass
+
+def _hub_log_path() -> Path:
+    return _app_dir().parent / "game-commander-hub" / "action-logs" / "hub-actions.log"
+
+def _action_log_text(event: str, ok: bool, details: str = "") -> str:
+    details = (details or "").strip()
+    if details:
+        return details
+    success_labels = {
+        "start": "Demarrage lance",
+        "stop": "Arret lance",
+        "restart": "Redemarrage lance",
+    }
+    failure_labels = {
+        "start": "Echec du demarrage",
+        "stop": "Echec de l'arret",
+        "restart": "Echec du redemarrage",
+    }
+    return (success_labels if ok else failure_labels).get(
+        event,
+        "Operation terminee" if ok else "Operation en echec",
+    )
+
+def _append_hub_action_log(event: str, ok: bool, details: str = "") -> None:
+    path = _hub_log_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        status = "OK" if ok else "ERR"
+        instance_id = _instance_id() or _game().get("id", "") or "instance"
+        content = _action_log_text(event, ok, details)
+        with path.open("a", encoding="utf-8") as fh:
+            fh.write(f"[{timestamp}] {status} {instance_id} {event}\n")
+            for line in content.splitlines():
+                fh.write(f"  {line}\n")
+            fh.write("\n")
     except Exception:
         pass
 
