@@ -143,12 +143,18 @@ def send_test_message(
     details: str = "Test de notification Discord Game Commander",
     config: dict | None = None,
 ) -> tuple[bool, str]:
-    return notify_event(
+    cfg = config if config is not None else load_config()
+    if not notifications_enabled(cfg):
+        return False, "disabled"
+    channel_id = resolve_channel_id(cfg, instance_id=instance_id, game_id=game_id, event=event)
+    if not channel_id:
+        return False, "no-route"
+    content = "[TEST] " + format_event_message(
         event=event,
         ok=True,
         instance_id=instance_id,
         game_id=game_id,
         source=source,
         details=details,
-        config=config,
     )
+    return post_channel_message(str(cfg.get("bot_token", "")), channel_id, content)

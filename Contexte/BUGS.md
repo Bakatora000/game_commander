@@ -23,24 +23,25 @@
 
 ## Bugs résolus
 
-### [23] Discord — notification fantôme `minecraft-fabric` observée pendant certaines commandes `git`
-- **Statut :** En cours
-- **Composant :** notifications Discord / orchestration hôte
-- **Instance(s) affectée(s) :** aucune instance active correspondante ; symptôme vu avec `minecraft-fabric`
+### [23] Discord — notifications de test `discord-test` indiscernables des vraies notifications
+- **Statut :** Résolu
+- **Composant :** `shared/discordnotify.py` — `send_test_message`
+- **Instance(s) affectée(s) :** aucune instance active ; symptôme vu avec `minecraft-fabric`
 - **Symptôme :**
-  - émission sporadique d'un message Discord du type :
-    - `minecraft-fabric: 19-03-2026 21:18:31 - Mise a jour [Hub]`
-  - alors qu'aucune instance `minecraft-fabric` n'existe sur la machine
-  - d'après l'observation utilisateur, le symptôme apparaît seulement pendant certaines commandes `git`
+  - émission de messages Discord du type :
+    - `minecraft-fabric: 19-03-2026 21:22:00 - Mise a jour [Hub]`
+  - alors qu'aucune instance `minecraft-fabric` n'existe et qu'aucune vraie action Hub correspondante n'est tracée
+  - apparaît pendant des commandes `git` ou des tests manuels de configuration Discord
 - **Cause racine :**
-  - non confirmée
-  - l'état live vérifié côté Hub/`host_cli` ne suffit plus à expliquer ce message dans le flux UI normal
-  - hypothèse actuelle : ancien process ou chemin technique encore vivant au moment de certaines opérations `git`
+  - `send_test_message` passait `event=args.event` directement à `notify_event`
+  - avec `--event update`, le message produit était identique à une vraie notification de mise à jour
+  - les tests Discord (lancés avant des `git push` lors de vérifications de config) étaient invisibles en tant que tels
 - **Solutions essayées :**
   - ✅ restreindre les notifications Discord aux seules actions UI (`Hub` / `Commander`)
-  - ✅ vérifier qu'aucune instance `minecraft-fabric` active n'existe encore (`deploy_config.env`, systemd, découverte host)
-  - ❌ considérer le problème comme entièrement éliminé : une réapparition a encore été observée pendant un push
-- **Régression connue :** si le symptôme revient, tracer immédiatement le process émetteur au moment exact de l'envoi au lieu d'inférer à partir du seul code live.
+  - ✅ vérifier qu'aucune instance `minecraft-fabric` active n'existe encore
+  - ✅ investigation complète : aucun process fantôme, aucun appel Hub non tracé — les "fantômes" étaient des tests de config
+  - ✅ `send_test_message` préfixe désormais `[TEST]` sur tous les messages de test, quel que soit l'event
+- **Régression connue :** ne pas modifier `send_test_message` pour qu'il délègue à nouveau à `notify_event` sans le préfixe `[TEST]` — les messages de test doivent toujours être distinguables en lecture.
 
 ### [19] Satisfactory — connexion impossible tant que le `ReliablePort` n'était pas correctement modélisé
 - **Statut :** Résolu
