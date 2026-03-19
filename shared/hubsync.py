@@ -142,7 +142,7 @@ def _write_hub_sudoers(repo_root: Path, sys_user: str) -> None:
     subprocess.run(["visudo", "-cf", str(sudoers_file)], check=True, capture_output=True, text=True)
 
 
-def _sync_hub_from_env(env: dict[str, str], repo_root: str | Path) -> tuple[bool, list[str] | str]:
+def _sync_hub_from_env(env: dict[str, str], repo_root: str | Path, *, restart: bool = True) -> tuple[bool, list[str] | str]:
     sys_user = env.get("SYS_USER", "").strip()
     if not sys_user:
         return False, "SYS_USER manquant pour la synchro Hub"
@@ -192,20 +192,15 @@ def _sync_hub_from_env(env: dict[str, str], repo_root: str | Path) -> tuple[bool
     _chown_tree(hub_app_dir, sys_user)
     subprocess.run(["systemctl", "daemon-reload"], check=False)
     subprocess.run(["systemctl", "enable", "game-commander-hub"], check=False, capture_output=True, text=True)
-    # Restart detached so the caller's stdout pipe is not broken mid-deploy.
-    # The Hub may be the parent of the process that called hubsync; restarting
-    # it synchronously would kill the pipe and stop the bash deploy script.
-    subprocess.Popen(
-        ["systemctl", "restart", "game-commander-hub"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        start_new_session=True,
-    )
-    return True, [f"Hub Admin synchronisé : {hub_app_dir}", "Service game-commander-hub redémarré"]
+    messages = [f"Hub Admin synchronisé : {hub_app_dir}"]
+    if restart:
+        subprocess.run(["systemctl", "restart", "game-commander-hub"], check=True)
+        messages.append("Service game-commander-hub redémarré")
+    return True, messages
 
 
-def sync_hub_service(config_file: str | Path, repo_root: str | Path) -> tuple[bool, list[str] | str]:
-    return _sync_hub_from_env(instanceenv.parse_env_file(config_file), repo_root)
+def sync_hub_service(config_file: str | Path, repo_root: str | Path, *, restart: bool = True) -> tuple[bool, list[str] | str]:
+    return _sync_hub_from_env(instanceenv.parse_env_file(config_file), repo_root, restart=restart)
 
 
 def sync_hub_service_from_values(
@@ -215,6 +210,7 @@ def sync_hub_service_from_values(
     admin_login: str,
     admin_password: str = "",
     repo_root: str | Path,
+    restart: bool = True,
 ) -> tuple[bool, list[str] | str]:
     env = {
         "SYS_USER": sys_user,
@@ -222,7 +218,7 @@ def sync_hub_service_from_values(
         "ADMIN_LOGIN": admin_login,
         "ADMIN_PASSWORD": admin_password,
     }
-    return _sync_hub_from_env(env, repo_root)
+    return _sync_hub_from_env(env, repo_root, restart=restart)
 
 
 def _cmd_sync_from_config(args: argparse.Namespace) -> int:
@@ -242,6 +238,7 @@ def _cmd_sync_from_values(args: argparse.Namespace) -> int:
         admin_login=args.admin_login,
         admin_password=args.admin_password,
         repo_root=args.repo_root,
+        restart=not args.no_restart,
     )
     if not ok:
         print(result)
@@ -266,6 +263,7 @@ def build_parser() -> argparse.ArgumentParser:
     sync_values.add_argument("--admin-login", required=True)
     sync_values.add_argument("--admin-password", default="")
     sync_values.add_argument("--repo-root", required=True)
+    sync_values.add_argument("--no-restart", action="store_true", default=False)
     sync_values.set_defaults(func=_cmd_sync_from_values)
     return parser
 

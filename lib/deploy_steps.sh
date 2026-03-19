@@ -844,7 +844,8 @@ deploy_step_hub_service() {
         --app-dir "$APP_DIR" \
         --admin-login "$ADMIN_LOGIN" \
         --admin-password "$ADMIN_PASSWORD" \
-        --repo-root "$SCRIPT_DIR" 2>&1)"; then
+        --repo-root "$SCRIPT_DIR" \
+        --no-restart 2>&1)"; then
         while IFS= read -r _line; do
             [[ -n "$_line" ]] && ok "$_line"
         done <<< "$hub_out"
