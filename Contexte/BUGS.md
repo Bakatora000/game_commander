@@ -23,6 +23,25 @@
 
 ## Bugs résolus
 
+### [23] Discord — notification fantôme `minecraft-fabric` observée pendant certaines commandes `git`
+- **Statut :** En cours
+- **Composant :** notifications Discord / orchestration hôte
+- **Instance(s) affectée(s) :** aucune instance active correspondante ; symptôme vu avec `minecraft-fabric`
+- **Symptôme :**
+  - émission sporadique d'un message Discord du type :
+    - `minecraft-fabric: 19-03-2026 21:18:31 - Mise a jour [Hub]`
+  - alors qu'aucune instance `minecraft-fabric` n'existe sur la machine
+  - d'après l'observation utilisateur, le symptôme apparaît seulement pendant certaines commandes `git`
+- **Cause racine :**
+  - non confirmée
+  - l'état live vérifié côté Hub/`host_cli` ne suffit plus à expliquer ce message dans le flux UI normal
+  - hypothèse actuelle : ancien process ou chemin technique encore vivant au moment de certaines opérations `git`
+- **Solutions essayées :**
+  - ✅ restreindre les notifications Discord aux seules actions UI (`Hub` / `Commander`)
+  - ✅ vérifier qu'aucune instance `minecraft-fabric` active n'existe encore (`deploy_config.env`, systemd, découverte host)
+  - ❌ considérer le problème comme entièrement éliminé : une réapparition a encore été observée pendant un push
+- **Régression connue :** si le symptôme revient, tracer immédiatement le process émetteur au moment exact de l'envoi au lieu d'inférer à partir du seul code live.
+
 ### [19] Satisfactory — connexion impossible tant que le `ReliablePort` n'était pas correctement modélisé
 - **Statut :** Résolu
 - **Composant :** `lib/deploy_steps.sh` + support `satisfactory`

@@ -76,6 +76,22 @@ gc/
 
 ## Bugs résolus — NE PAS RÉINTRODUIRE
 
+### [2026-03-19] Observation Discord encore à surveiller
+- Une notification Discord fantôme a encore été observée sous la forme :
+  - `minecraft-fabric: 19-03-2026 ... - Mise a jour [Hub]`
+- Contexte important :
+  - aucune instance `minecraft-fabric` n'existe plus sur l'hôte
+  - le symptôme n'a pas été revu pendant les actions normales Hub/Commander après
+    resynchronisation
+  - d'après l'observation utilisateur, il apparaît surtout pendant certaines commandes `git`
+- Hypothèse retenue pour l'instant :
+  - reliquat d'un ancien process ou d'un chemin non UI encore vivant au moment des pushes
+- Décision de contexte :
+  - ne pas considérer le bug comme reproduit de façon stable tant qu'il n'apparaît pas hors
+    de ce contexte `git`
+  - si le symptôme revient, tracer en priorité le process émetteur au moment exact de
+    l'envoi Discord
+
 ### [2026-03-14] Session de validation Soulmask / attach / sauvegardes
 **État général validé :**
 - Le mode `attach` est validé en réel sur Soulmask :

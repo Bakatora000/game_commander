@@ -23,6 +23,13 @@ not only the base game port. With a firewall range limited to `15636-15639`, use
 Operational note: orphan-process detection during uninstall must ignore any process still
 attached to a systemd service cgroup. This is required for Wine-based Enshrouded servers.
 
+Operational note: an intermittent phantom Discord notification
+`minecraft-fabric: ... - Mise a jour [Hub]` was observed even though no such instance
+exists anymore on the host. From user observation, it appears only during some `git`
+commands run while development work is in progress, not during normal Hub/Commander UI
+actions. The current hypothesis is a stale/background process rather than the live
+`host_cli` / Hub notification path, but this remains to be revalidated if it reappears.
+
 Validated deployment note: Minecraft Java support provisions a vanilla `server.jar`,
 `eula.txt`, `server.properties`, a Java systemd service, and the Game Commander UI.
 The player client version must match the downloaded server version.
