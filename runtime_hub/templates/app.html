@@ -693,10 +693,14 @@
       window.clearInterval(globalConsolePoller);
       globalConsolePoller = null;
     }
-    async function loadGlobalConsole() {
+    async function loadGlobalConsole(showLoading = false) {
       const output = document.getElementById('globalConsoleOutput');
       const requestId = ++globalConsoleRequestId;
-      output.textContent = 'Chargement…';
+      if (showLoading && !output.textContent.trim()) {
+        output.textContent = 'Chargement…';
+      }
+      const previousText = output.textContent;
+      const wasNearBottom = (output.scrollHeight - output.scrollTop - output.clientHeight) < 24;
       try {
         const response = await fetch(`{{ prefix }}/api/console`, {
           credentials: 'same-origin',
@@ -706,12 +710,20 @@
           return;
         }
         const lines = Array.isArray(data.lines) ? data.lines : [];
-        output.textContent = lines.length ? lines.join('\n') : 'Aucune trace Hub pour le moment.';
+        const nextText = lines.length ? lines.join('\n') : 'Aucune trace Hub pour le moment.';
+        if (nextText !== previousText) {
+          output.textContent = nextText;
+          if (wasNearBottom) {
+            output.scrollTop = output.scrollHeight;
+          }
+        }
       } catch (_err) {
         if (requestId !== globalConsoleRequestId) {
           return;
         }
-        output.textContent = 'Impossible de charger la console du Hub.';
+        if (previousText !== 'Impossible de charger la console du Hub.') {
+          output.textContent = 'Impossible de charger la console du Hub.';
+        }
       }
     }
     async function deployInstance() {
@@ -919,7 +931,7 @@
       archiveBtn.hidden = !hidden;
       if (hidden) {
         startGlobalConsolePolling();
-        await loadGlobalConsole();
+        await loadGlobalConsole(true);
       } else {
         stopGlobalConsolePolling();
       }
