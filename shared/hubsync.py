@@ -192,7 +192,15 @@ def _sync_hub_from_env(env: dict[str, str], repo_root: str | Path) -> tuple[bool
     _chown_tree(hub_app_dir, sys_user)
     subprocess.run(["systemctl", "daemon-reload"], check=False)
     subprocess.run(["systemctl", "enable", "game-commander-hub"], check=False, capture_output=True, text=True)
-    subprocess.run(["systemctl", "restart", "game-commander-hub"], check=True)
+    # Restart detached so the caller's stdout pipe is not broken mid-deploy.
+    # The Hub may be the parent of the process that called hubsync; restarting
+    # it synchronously would kill the pipe and stop the bash deploy script.
+    subprocess.Popen(
+        ["systemctl", "restart", "game-commander-hub"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
     return True, [f"Hub Admin synchronisé : {hub_app_dir}", "Service game-commander-hub redémarré"]
 
 
