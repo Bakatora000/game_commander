@@ -251,5 +251,64 @@ def api_deploy():
     return jsonify({"ok": ok, "message": message, "payload": payload}), status
 
 
+@app.route(f"{PREFIX}/api/discord", methods=["GET"])
+@auth.require_auth
+@auth.require_perm("manage_lifecycle")
+def api_discord_get():
+    return jsonify(host.get_discord_status()), 200
+
+
+@app.route(f"{PREFIX}/api/discord/config", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("manage_lifecycle")
+def api_discord_config():
+    data = request.get_json() or {}
+    ok, message = host.set_discord_config(data)
+    return jsonify({"ok": ok, "message": message}), (200 if ok else 400)
+
+
+@app.route(f"{PREFIX}/api/discord/channels/<instance_name>", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("manage_lifecycle")
+def api_discord_create_channel(instance_name):
+    ok, message = host.create_discord_channel(instance_name)
+    return jsonify({"ok": ok, "message": message}), (200 if ok else 400)
+
+
+@app.route(f"{PREFIX}/api/discord/channels/<instance_name>", methods=["DELETE"])
+@auth.require_auth
+@auth.require_perm("manage_lifecycle")
+def api_discord_delete_channel(instance_name):
+    ok, message = host.delete_discord_channel(instance_name)
+    return jsonify({"ok": ok, "message": message}), (200 if ok else 400)
+
+
+@app.route(f"{PREFIX}/api/discord/channels/<instance_name>/permissions", methods=["GET"])
+@auth.require_auth
+@auth.require_perm("manage_lifecycle")
+def api_discord_get_permissions(instance_name):
+    ok, message, overwrites = host.get_discord_permissions(instance_name)
+    if not ok:
+        return jsonify({"ok": False, "message": message}), 400
+    return jsonify({"ok": True, "overwrites": overwrites}), 200
+
+
+@app.route(f"{PREFIX}/api/discord/channels/<instance_name>/permissions", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("manage_lifecycle")
+def api_discord_add_permission(instance_name):
+    data = request.get_json() or {}
+    ok, message = host.add_discord_permission(instance_name, data)
+    return jsonify({"ok": ok, "message": message}), (200 if ok else 400)
+
+
+@app.route(f"{PREFIX}/api/discord/channels/<instance_name>/permissions/<target_id>", methods=["DELETE"])
+@auth.require_auth
+@auth.require_perm("manage_lifecycle")
+def api_discord_remove_permission(instance_name, target_id):
+    ok, message = host.remove_discord_permission(instance_name, target_id)
+    return jsonify({"ok": ok, "message": message}), (200 if ok else 400)
+
+
 if __name__ == "__main__":
     app.run(host="127.0.0.1", port=int(os.environ.get("GC_HUB_PORT", "5090")))

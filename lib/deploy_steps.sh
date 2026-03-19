@@ -964,6 +964,19 @@ deploy_step_save_config() {
     cpu_affinity_apply_all false
 }
 
+deploy_step_discord_channel() {
+    hdr "ÉTAPE 10 : Discord"
+    local discord_out=""
+    if discord_out="$(python3 "$SCRIPT_DIR/shared/discordnotify.py" create-channel \
+        --instance "$INSTANCE_ID" 2>&1)"; then
+        ok "$discord_out"
+    else
+        [[ "$discord_out" == *"guild_id non configuré"* || "$discord_out" == *"Bot token"* ]] \
+            && info "Discord non configuré — channel non créé" \
+            || warn "Discord : $discord_out"
+    fi
+}
+
 deploy_step_validation() {
     hdr "VALIDATION FINALE"
     echo ""

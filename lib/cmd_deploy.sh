@@ -52,5 +52,6 @@ cmd_deploy() {
     deploy_step_ssl
     deploy_step_sudoers
     deploy_step_save_config
+    deploy_step_discord_channel
     deploy_step_validation
 }

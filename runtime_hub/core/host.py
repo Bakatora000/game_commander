@@ -491,6 +491,146 @@ def run_instance_admin_password_reset(instance_name: str, new_password: str) -> 
     return True, message, card
 
 
+# ── Discord channel management ───────────────────────────────────────────────
+
+def _discord_cfg_path() -> Path:
+    env = os.environ.get("GC_DISCORD_CONFIG")
+    if env:
+        return Path(env)
+    from shared import discordnotify
+    for p in discordnotify.DEFAULT_CONFIG_PATHS:
+        if Path(p).is_file():
+            return Path(p)
+    return Path(discordnotify.DEFAULT_CONFIG_PATHS[0])
+
+
+def _load_discord_cfg() -> dict:
+    from shared import discordnotify
+    return discordnotify.load_config()
+
+
+def _save_discord_cfg(cfg: dict) -> tuple[bool, str]:
+    from shared import discordnotify
+    return discordnotify.save_config(cfg, _discord_cfg_path())
+
+
+def get_discord_status() -> dict:
+    cfg = _load_discord_cfg()
+    instances = _load_manifest().get("instances", [])
+    instance_channels = cfg.get("instance_channels") or {}
+    result = []
+    for inst in instances:
+        name = inst.get("name", "")
+        result.append({
+            "name": name,
+            "game": inst.get("game", ""),
+            "channel_id": instance_channels.get(name, ""),
+        })
+    return {
+        "configured": bool(cfg.get("bot_token")),
+        "guild_id": cfg.get("guild_id", ""),
+        "category_id": cfg.get("category_id", ""),
+        "instances": result,
+    }
+
+
+def set_discord_config(data: dict) -> tuple[bool, str]:
+    cfg = _load_discord_cfg()
+    if "guild_id" in data:
+        cfg["guild_id"] = str(data["guild_id"]).strip()
+    if "category_id" in data:
+        cfg["category_id"] = str(data["category_id"]).strip()
+    return _save_discord_cfg(cfg)
+
+
+def create_discord_channel(instance_name: str) -> tuple[bool, str]:
+    from shared import discordnotify
+    cfg = _load_discord_cfg()
+    if not cfg.get("bot_token"):
+        return False, "Bot token non configuré"
+    guild_id = cfg.get("guild_id", "").strip()
+    if not guild_id:
+        return False, "guild_id non configuré dans discord.json"
+    channel_name = instance_name.lower().replace("_", "-")
+    ok, msg, channel_id = discordnotify.create_channel(
+        guild_id, channel_name, cfg["bot_token"],
+        category_id=cfg.get("category_id") or None,
+    )
+    if not ok:
+        return False, f"Erreur Discord API : {msg}"
+    instance_channels = cfg.setdefault("instance_channels", {})
+    instance_channels[instance_name] = channel_id
+    saved, save_msg = _save_discord_cfg(cfg)
+    if not saved:
+        return False, f"Channel créé ({channel_id}) mais discord.json non mis à jour : {save_msg}"
+    return True, f"Channel #{channel_name} créé (id: {channel_id})"
+
+
+def delete_discord_channel(instance_name: str) -> tuple[bool, str]:
+    from shared import discordnotify
+    cfg = _load_discord_cfg()
+    if not cfg.get("bot_token"):
+        return False, "Bot token non configuré"
+    channel_id = (cfg.get("instance_channels") or {}).get(instance_name, "")
+    if not channel_id:
+        return False, "Aucun channel Discord associé à cette instance"
+    ok, msg = discordnotify.delete_channel(channel_id, cfg["bot_token"])
+    if not ok:
+        return False, f"Erreur Discord API : {msg}"
+    cfg.get("instance_channels", {}).pop(instance_name, None)
+    _save_discord_cfg(cfg)
+    return True, f"Channel supprimé"
+
+
+def get_discord_permissions(instance_name: str) -> tuple[bool, str, list]:
+    from shared import discordnotify
+    cfg = _load_discord_cfg()
+    if not cfg.get("bot_token"):
+        return False, "Bot token non configuré", []
+    channel_id = (cfg.get("instance_channels") or {}).get(instance_name, "")
+    if not channel_id:
+        return False, "Aucun channel Discord associé à cette instance", []
+    ok, msg, overwrites = discordnotify.get_channel_overwrites(channel_id, cfg["bot_token"])
+    return ok, msg, overwrites
+
+
+def add_discord_permission(instance_name: str, data: dict) -> tuple[bool, str]:
+    from shared import discordnotify
+    cfg = _load_discord_cfg()
+    if not cfg.get("bot_token"):
+        return False, "Bot token non configuré"
+    channel_id = (cfg.get("instance_channels") or {}).get(instance_name, "")
+    if not channel_id:
+        return False, "Aucun channel Discord associé à cette instance"
+    target_id = str(data.get("target_id", "")).strip()
+    target_type = data.get("target_type", "member")
+    if not target_id:
+        return False, "target_id requis"
+    if target_type not in ("member", "role"):
+        return False, "target_type doit être 'member' ou 'role'"
+    ok, msg = discordnotify.set_permission_overwrite(
+        channel_id, target_id, target_type, cfg["bot_token"],
+        allow=discordnotify.PERM_READ_ALLOW, deny=0,
+    )
+    if not ok:
+        return False, f"Erreur Discord API : {msg}"
+    return True, f"Accès accordé à {target_id}"
+
+
+def remove_discord_permission(instance_name: str, target_id: str) -> tuple[bool, str]:
+    from shared import discordnotify
+    cfg = _load_discord_cfg()
+    if not cfg.get("bot_token"):
+        return False, "Bot token non configuré"
+    channel_id = (cfg.get("instance_channels") or {}).get(instance_name, "")
+    if not channel_id:
+        return False, "Aucun channel Discord associé à cette instance"
+    ok, msg = discordnotify.remove_permission_overwrite(channel_id, target_id, cfg["bot_token"])
+    if not ok:
+        return False, f"Erreur Discord API : {msg}"
+    return True, "Accès retiré"
+
+
 def run_rebalance(restart: bool = False) -> tuple[bool, str, dict]:
     script_path = _main_script_path()
     if not script_path.is_file():

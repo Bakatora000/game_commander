@@ -300,6 +300,7 @@
         <div class="nav-list">
           <button class="nav-btn is-active" type="button" data-view-target="dashboard">Dashboard</button>
           <button class="nav-btn" type="button" data-view-target="users">Utilisateurs</button>
+          <button class="nav-btn" type="button" data-view-target="discord">Discord</button>
         </div>
       </aside>
 
@@ -405,6 +406,76 @@
             <div class="feedback" id="globalConsoleFeedback"></div>
             <div class="console-panel" id="globalConsolePanel" hidden>
               <pre class="console-output" id="globalConsoleOutput">Chargement…</pre>
+            </div>
+          </section>
+        </section>
+
+        <section class="view-panel" data-view="discord" hidden>
+          <section class="accounts-panel">
+            <div class="monitor-head">
+              <div>
+                <h2 class="section-title">Intégration Discord</h2>
+                <p class="section-subtitle">Canaux Discord associés aux instances. Le bot token se configure dans <code>/etc/game-commander/discord.json</code>.</p>
+              </div>
+              <button class="monitor-toggle" type="button" id="btnRefreshDiscord">Actualiser</button>
+            </div>
+            <div class="feedback" id="discordConfigFeedback"></div>
+            <div class="accounts-grid">
+              <section class="card">
+                <h3 class="section-title">Configuration</h3>
+                <label class="field-label" for="discordGuildId">Guild ID</label>
+                <input class="field-input" id="discordGuildId" placeholder="123456789012345678">
+                <label class="field-label" for="discordCategoryId">Category ID (optionnel)</label>
+                <input class="field-input" id="discordCategoryId" placeholder="123456789012345678">
+                <button class="primary-btn" type="button" id="btnSaveDiscordConfig">Enregistrer</button>
+              </section>
+            </div>
+          </section>
+
+          <section class="accounts-panel" style="margin-top:16px">
+            <h2 class="section-title">Canaux d'instances</h2>
+            <p class="section-subtitle">Un canal Discord peut être associé à chaque instance.</p>
+            <div class="feedback" id="discordChannelFeedback"></div>
+            <table class="monitor-table" style="width:100%">
+              <thead>
+                <tr>
+                  <th>Instance</th>
+                  <th>Jeu</th>
+                  <th>Canal</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="discordInstancesBody"></tbody>
+            </table>
+          </section>
+
+          <section class="accounts-panel" id="discordPermissionsPanel" style="margin-top:16px" hidden>
+            <div class="monitor-head">
+              <div>
+                <h2 class="section-title">Droits : <span id="discordPermInstanceName"></span></h2>
+                <p class="section-subtitle">Accès lecture seule (voir + historique). Pas d'envoi de message.</p>
+              </div>
+              <button class="monitor-toggle" type="button" id="btnCloseDiscordPerms">Fermer</button>
+            </div>
+            <div class="feedback" id="discordPermsFeedback"></div>
+            <div class="accounts-grid">
+              <section class="card">
+                <label class="field-label" for="discordTargetId">ID Discord (utilisateur ou rôle)</label>
+                <input class="field-input" id="discordTargetId" placeholder="123456789012345678">
+                <div style="display:flex;gap:1.2rem;margin:.6rem 0 1rem">
+                  <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+                    <input type="radio" name="discordTargetType" value="member" checked> Utilisateur
+                  </label>
+                  <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
+                    <input type="radio" name="discordTargetType" value="role"> Rôle
+                  </label>
+                </div>
+                <button class="primary-btn" type="button" id="btnAddDiscordPerm">Accorder l'accès</button>
+              </section>
+              <section class="card">
+                <h3 class="section-title">Accès actuels</h3>
+                <div id="discordPermsList">—</div>
+              </section>
             </div>
           </section>
         </section>
@@ -1012,6 +1083,131 @@
     });
     document.getElementById('deployDomain').addEventListener('input', refreshDeployPrefixHelp);
     document.getElementById('deployUrlPrefix').addEventListener('input', refreshDeployPrefixHelp);
+    // ── Discord panel ────────────────────────────────────────────────────────
+    let DISCORD_CURRENT_INSTANCE = '';
+    async function loadDiscord() {
+      const r = await fetch('{{ prefix }}/api/discord', { credentials: 'same-origin' });
+      if (!r.ok) { setFeedback('discordConfigFeedback', 'Erreur chargement Discord', false); return; }
+      const d = await r.json();
+      document.getElementById('discordGuildId').value = d.guild_id || '';
+      document.getElementById('discordCategoryId').value = d.category_id || '';
+      renderDiscordInstances(d.instances || [], d.configured);
+    }
+    function renderDiscordInstances(instances, configured) {
+      const tbody = document.getElementById('discordInstancesBody');
+      if (!instances.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Aucune instance déployée</td></tr>';
+        return;
+      }
+      tbody.innerHTML = instances.map((inst) => {
+        const hasChannel = !!inst.channel_id;
+        const channelLabel = hasChannel ? `<code>#${inst.name.toLowerCase().replace(/_/g,'-')}</code> (${inst.channel_id})` : '<span style="color:var(--muted)">—</span>';
+        const createBtn = !hasChannel && configured ? `<button class="monitor-toggle" type="button" data-discord-action="create" data-instance="${esc(inst.name)}">Créer</button>` : '';
+        const deleteBtn = hasChannel ? `<button class="monitor-toggle" type="button" data-discord-action="delete" data-instance="${esc(inst.name)}">Supprimer</button>` : '';
+        const permsBtn = hasChannel ? `<button class="monitor-toggle" type="button" data-discord-action="perms" data-instance="${esc(inst.name)}">Droits</button>` : '';
+        return `<tr><td>${esc(inst.name)}</td><td style="color:var(--muted)">${esc(inst.game)}</td><td>${channelLabel}</td><td style="display:flex;gap:.4rem;flex-wrap:wrap">${createBtn}${deleteBtn}${permsBtn}</td></tr>`;
+      }).join('');
+      tbody.querySelectorAll('[data-discord-action]').forEach((btn) => {
+        btn.addEventListener('click', () => handleDiscordAction(btn.dataset.discordAction, btn.dataset.instance));
+      });
+    }
+    function esc(s) { const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
+    async function handleDiscordAction(action, instance) {
+      if (action === 'create') {
+        setFeedback('discordChannelFeedback', 'Création du canal…', true);
+        const r = await fetch(`{{ prefix }}/api/discord/channels/${encodeURIComponent(instance)}`, { method: 'POST', credentials: 'same-origin' });
+        const d = await r.json().catch(() => ({}));
+        setFeedback('discordChannelFeedback', d.message || (r.ok ? 'Canal créé' : 'Erreur'), r.ok);
+        if (r.ok) await loadDiscord();
+      } else if (action === 'delete') {
+        if (!window.confirm(`Supprimer le canal Discord de ${instance} ?`)) return;
+        const r = await fetch(`{{ prefix }}/api/discord/channels/${encodeURIComponent(instance)}`, { method: 'DELETE', credentials: 'same-origin' });
+        const d = await r.json().catch(() => ({}));
+        setFeedback('discordChannelFeedback', d.message || (r.ok ? 'Canal supprimé' : 'Erreur'), r.ok);
+        if (r.ok) await loadDiscord();
+      } else if (action === 'perms') {
+        openDiscordPerms(instance);
+      }
+    }
+    async function openDiscordPerms(instance) {
+      DISCORD_CURRENT_INSTANCE = instance;
+      document.getElementById('discordPermInstanceName').textContent = instance;
+      document.getElementById('discordPermissionsPanel').hidden = false;
+      document.getElementById('discordTargetId').value = '';
+      setFeedback('discordPermsFeedback', '', true);
+      await loadDiscordPerms();
+    }
+    async function loadDiscordPerms() {
+      const el = document.getElementById('discordPermsList');
+      el.textContent = 'Chargement…';
+      const r = await fetch(`{{ prefix }}/api/discord/channels/${encodeURIComponent(DISCORD_CURRENT_INSTANCE)}/permissions`, { credentials: 'same-origin' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { el.textContent = d.message || 'Erreur'; return; }
+      const overwrites = d.overwrites || [];
+      if (!overwrites.length) { el.innerHTML = '<span style="color:var(--muted)">Aucun accès configuré</span>'; return; }
+      el.innerHTML = overwrites.map((ow) => {
+        const typeLabel = ow.type === 0 ? 'Rôle' : 'Utilisateur';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--border)"><span><code>${esc(ow.id)}</code> <span style="color:var(--muted)">(${typeLabel})</span></span><button class="monitor-toggle" type="button" data-perm-remove="${esc(ow.id)}">Retirer</button></div>`;
+      }).join('');
+      el.querySelectorAll('[data-perm-remove]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const targetId = btn.dataset.permRemove;
+          const r2 = await fetch(`{{ prefix }}/api/discord/channels/${encodeURIComponent(DISCORD_CURRENT_INSTANCE)}/permissions/${encodeURIComponent(targetId)}`, { method: 'DELETE', credentials: 'same-origin' });
+          const d2 = await r2.json().catch(() => ({}));
+          setFeedback('discordPermsFeedback', d2.message || (r2.ok ? 'Accès retiré' : 'Erreur'), r2.ok);
+          if (r2.ok) await loadDiscordPerms();
+        });
+      });
+    }
+    document.getElementById('btnRefreshDiscord').addEventListener('click', async (e) => {
+      e.currentTarget.disabled = true;
+      await loadDiscord();
+      e.currentTarget.disabled = false;
+    });
+    document.getElementById('btnSaveDiscordConfig').addEventListener('click', async () => {
+      const btn = document.getElementById('btnSaveDiscordConfig');
+      btn.disabled = true;
+      const r = await fetch('{{ prefix }}/api/discord/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({
+          guild_id: document.getElementById('discordGuildId').value.trim(),
+          category_id: document.getElementById('discordCategoryId').value.trim(),
+        }),
+      });
+      const d = await r.json().catch(() => ({}));
+      setFeedback('discordConfigFeedback', d.message || (r.ok ? 'Configuration enregistrée' : 'Erreur'), r.ok);
+      btn.disabled = false;
+    });
+    document.getElementById('btnAddDiscordPerm').addEventListener('click', async () => {
+      const targetId = document.getElementById('discordTargetId').value.trim();
+      const targetType = document.querySelector('[name="discordTargetType"]:checked')?.value || 'member';
+      if (!targetId) { setFeedback('discordPermsFeedback', 'ID requis', false); return; }
+      const btn = document.getElementById('btnAddDiscordPerm');
+      btn.disabled = true;
+      const r = await fetch(`{{ prefix }}/api/discord/channels/${encodeURIComponent(DISCORD_CURRENT_INSTANCE)}/permissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ target_id: targetId, target_type: targetType }),
+      });
+      const d = await r.json().catch(() => ({}));
+      setFeedback('discordPermsFeedback', d.message || (r.ok ? 'Accès accordé' : 'Erreur'), r.ok);
+      if (r.ok) { document.getElementById('discordTargetId').value = ''; await loadDiscordPerms(); }
+      btn.disabled = false;
+    });
+    document.getElementById('btnCloseDiscordPerms').addEventListener('click', () => {
+      document.getElementById('discordPermissionsPanel').hidden = true;
+      DISCORD_CURRENT_INSTANCE = '';
+    });
+    const _origSwitchView = switchView;
+    switchView = function(view) {
+      _origSwitchView(view);
+      if (view === 'discord') loadDiscord();
+    };
+    // ── end Discord panel ────────────────────────────────────────────────────
+
     switchView('dashboard');
     refreshDeployDefaults(true);
     load();
