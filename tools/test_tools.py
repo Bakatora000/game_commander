@@ -1491,6 +1491,27 @@ class ServerCpuMonitorTests(unittest.TestCase):
         self.assertEqual(snapshot["instance"]["planned_affinity"], "4 5")
 
 
+class ServerDiscordTests(unittest.TestCase):
+
+    def test_start_notifies_discord_for_commander_actions(self):
+        app = Flask(__name__)
+        app.config["GAME"] = {
+            "id": "valheim",
+            "server": {
+                "service": "valheim-server-ParkAPouet",
+                "install_dir": "/tmp/server",
+            },
+        }
+        with app.app_context(), \
+             mock.patch.object(core_server, "_systemctl", return_value=(True, "")), \
+             mock.patch.object(core_server, "_notify_action") as notify_mock:
+            ok, err = core_server.start(wait=False)
+        self.assertTrue(ok)
+        self.assertEqual(err, "")
+        self.assertEqual(notify_mock.call_args.args[0], "start")
+        self.assertTrue(notify_mock.call_args.args[1])
+
+
 class HubAuthTests(unittest.TestCase):
 
     def test_view_hub_expands_default_permissions(self):

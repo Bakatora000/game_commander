@@ -7,6 +7,7 @@ import os
 import re
 import subprocess, time
 import importlib
+import sys
 from pathlib import Path
 import psutil
 from flask import current_app
@@ -44,6 +45,38 @@ def _deploy_cfg_value(key: str, default: str = "") -> str:
 
 def _instance_id() -> str:
     return _deploy_cfg_value("INSTANCE_ID").strip()
+
+def _source_root() -> str:
+    return _deploy_cfg_value("SRC_DIR").strip()
+
+def _discordnotify_module():
+    try:
+        return importlib.import_module("shared.discordnotify")
+    except Exception:
+        pass
+    src_dir = _source_root()
+    if src_dir and src_dir not in sys.path:
+        sys.path.insert(0, src_dir)
+    try:
+        return importlib.import_module("shared.discordnotify")
+    except Exception:
+        return None
+
+def _notify_action(event: str, ok: bool, details: str = "") -> None:
+    discordnotify = _discordnotify_module()
+    if not discordnotify:
+        return
+    try:
+        discordnotify.notify_event(
+            event=event,
+            ok=ok,
+            instance_id=_instance_id(),
+            game_id=_game().get("id", ""),
+            service=_game().get("server", {}).get("service", ""),
+            details=(details or "").strip(),
+        )
+    except Exception:
+        pass
 
 def _cpu_monitor_state_path() -> Path:
     return Path(os.environ.get("GAME_COMMANDER_CPU_MONITOR_STATE", "/var/lib/game-commander/cpu-monitor.json"))
@@ -268,23 +301,32 @@ def _systemctl(action, timeout=30, no_block=False):
 def start(wait=False, timeout=180):
     ok, err = _systemctl('start', timeout=timeout, no_block=False)
     if not ok or not wait:
+        _notify_action("start", ok, err)
         return ok, err
     started = _wait_until_started(timeout)
-    return started, '' if started else 'start_timeout'
+    details = '' if started else 'start_timeout'
+    _notify_action("start", started, details)
+    return started, details
 
 def stop(wait=False, timeout=180):
     ok, err = _systemctl('stop', timeout=timeout, no_block=False)
     if not ok or not wait:
+        _notify_action("stop", ok, err)
         return ok, err
     stopped = _wait_until_stopped(timeout)
-    return stopped, '' if stopped else 'stop_timeout'
+    details = '' if stopped else 'stop_timeout'
+    _notify_action("stop", stopped, details)
+    return stopped, details
 
 def restart(wait=False, timeout=180):
     ok, err = _systemctl('restart', timeout=timeout, no_block=False)
     if not ok or not wait:
+        _notify_action("restart", ok, err)
         return ok, err
     started = _wait_until_started(timeout)
-    return started, '' if started else 'restart_timeout'
+    details = '' if started else 'restart_timeout'
+    _notify_action("restart", started, details)
+    return started, details
 
 def get_console_entries(n=100, after_cursor=None):
     """
