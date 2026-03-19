@@ -991,13 +991,14 @@ class DiscordNotifyTests(unittest.TestCase):
             r"^ParkAPouet: \d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2} - Arret$",
         )
 
-    def test_send_test_message_uses_notify_event(self):
-        with mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")) as notify_mock:
-            ok, message = discordnotify.send_test_message(instance_id="valheim2", game_id="valheim")
+    def test_send_test_message_prefixes_test(self):
+        cfg = {"enabled": True, "bot_token": "tok", "default_channel_id": "111"}
+        with mock.patch.object(discordnotify, "post_channel_message", return_value=(True, "sent")) as post_mock:
+            ok, message = discordnotify.send_test_message(instance_id="valheim2", game_id="valheim", config=cfg)
         self.assertTrue(ok)
         self.assertEqual(message, "sent")
-        self.assertEqual(notify_mock.call_args.kwargs["event"], "discord-test")
-        self.assertEqual(notify_mock.call_args.kwargs["source"], "Hub")
+        content = post_mock.call_args.args[2]
+        self.assertTrue(content.startswith("[TEST] "), f"expected [TEST] prefix, got: {content!r}")
 
 
 class HostCliTests(unittest.TestCase):
