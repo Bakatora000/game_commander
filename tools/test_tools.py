@@ -652,6 +652,47 @@ class DeployPlanTests(unittest.TestCase):
         self.assertFalse(accepted)
         self.assertEqual(game_id, "")
 
+    def test_update_instance_paths_keeps_custom_paths(self):
+        paths = deployplan.update_instance_paths(
+            game_id="valheim",
+            instance_id="park2",
+            home_dir="/home/vhserver",
+            server_dir="/srv/valheim-custom",
+            data_dir="/data/valheim-custom",
+            app_dir="/apps/valheim-custom",
+            game_service="valheim-custom",
+            prev_instance="park1",
+            prev_server_dir="/srv/valheim-custom",
+            prev_data_dir="/data/valheim-custom",
+            prev_app_dir="/apps/valheim-custom",
+            prev_game_service="valheim-custom",
+        )
+        self.assertEqual(paths["SERVER_DIR"], "/srv/valheim-custom")
+        self.assertEqual(paths["DATA_DIR"], "/data/valheim-custom")
+        self.assertEqual(paths["APP_DIR"], "/apps/valheim-custom")
+        self.assertEqual(paths["GAME_SERVICE"], "valheim-custom")
+        self.assertEqual(paths["GC_SERVICE"], "game-commander-park2")
+
+    def test_update_instance_paths_refreshes_default_paths(self):
+        paths = deployplan.update_instance_paths(
+            game_id="enshrouded",
+            instance_id="enshrouded2",
+            home_dir="/home/vhserver",
+            server_dir="/home/vhserver/enshrouded_server",
+            data_dir="/home/vhserver/enshrouded_data",
+            app_dir="/home/vhserver/game-commander-enshrouded",
+            game_service="enshrouded-server-enshrouded",
+            prev_instance="enshrouded",
+            prev_server_dir="/home/vhserver/enshrouded_server",
+            prev_data_dir="/home/vhserver/enshrouded_data",
+            prev_app_dir="/home/vhserver/game-commander-enshrouded",
+            prev_game_service="enshrouded-server-enshrouded",
+        )
+        self.assertEqual(paths["SERVER_DIR"], "/home/vhserver/enshrouded2_server")
+        self.assertEqual(paths["DATA_DIR"], "/home/vhserver/enshrouded2_server")
+        self.assertEqual(paths["APP_DIR"], "/home/vhserver/game-commander-enshrouded2")
+        self.assertEqual(paths["GAME_SERVICE"], "enshrouded-server-enshrouded2")
+
 
 class DeployPostTests(unittest.TestCase):
 

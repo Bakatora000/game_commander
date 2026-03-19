@@ -78,6 +78,43 @@ def apply_instance_defaults(
     return resolved
 
 
+def update_instance_paths(
+    *,
+    game_id: str,
+    instance_id: str,
+    home_dir: str | Path,
+    server_dir: str = "",
+    data_dir: str = "",
+    app_dir: str = "",
+    game_service: str = "",
+    prev_instance: str = "",
+    prev_server_dir: str = "",
+    prev_data_dir: str = "",
+    prev_app_dir: str = "",
+    prev_game_service: str = "",
+) -> dict[str, str]:
+    home = Path(home_dir)
+    iid = instance_id.strip()
+    resolved = {
+        "SERVER_DIR": server_dir,
+        "DATA_DIR": data_dir,
+        "APP_DIR": app_dir,
+        "GAME_SERVICE": game_service,
+        "GC_SERVICE": f"game-commander-{iid}",
+    }
+    if not prev_server_dir or prev_server_dir == str(home / f"{prev_instance}_server"):
+        resolved["SERVER_DIR"] = str(home / f"{iid}_server")
+    if not prev_data_dir or prev_data_dir == str(home / f"{prev_instance}_data"):
+        resolved["DATA_DIR"] = str(home / f"{iid}_data")
+    if not prev_app_dir or prev_app_dir == str(home / f"game-commander-{prev_instance}"):
+        resolved["APP_DIR"] = str(home / f"game-commander-{iid}")
+    if not prev_game_service or prev_game_service == f"{game_id}-server-{prev_instance}":
+        resolved["GAME_SERVICE"] = f"{game_id}-server-{iid}"
+    if game_id == "enshrouded":
+        resolved["DATA_DIR"] = resolved["SERVER_DIR"]
+    return resolved
+
+
 def _current_service_pid(game_service: str) -> str:
     if not game_service:
         return ""
@@ -388,6 +425,25 @@ def _cmd_instance_defaults(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_update_instance_paths(args: argparse.Namespace) -> int:
+    payload = update_instance_paths(
+        game_id=args.game_id,
+        instance_id=args.instance_id,
+        home_dir=args.home_dir,
+        server_dir=args.server_dir,
+        data_dir=args.data_dir,
+        app_dir=args.app_dir,
+        game_service=args.game_service,
+        prev_instance=args.prev_instance,
+        prev_server_dir=args.prev_server_dir,
+        prev_data_dir=args.prev_data_dir,
+        prev_app_dir=args.prev_app_dir,
+        prev_game_service=args.prev_game_service,
+    )
+    print(_exports(payload), end="")
+    return 0
+
+
 def _cmd_game_meta(args: argparse.Namespace) -> int:
     meta = game_meta(args.game_id)
     payload = {
@@ -522,6 +578,20 @@ def build_parser() -> argparse.ArgumentParser:
     inst.add_argument("--app-dir", default="")
     inst.add_argument("--game-service", default="")
     inst.set_defaults(func=_cmd_instance_defaults)
+    update_paths = sub.add_parser("update-instance-paths")
+    update_paths.add_argument("--game-id", required=True)
+    update_paths.add_argument("--instance-id", required=True)
+    update_paths.add_argument("--home-dir", required=True)
+    update_paths.add_argument("--server-dir", default="")
+    update_paths.add_argument("--data-dir", default="")
+    update_paths.add_argument("--app-dir", default="")
+    update_paths.add_argument("--game-service", default="")
+    update_paths.add_argument("--prev-instance", default="")
+    update_paths.add_argument("--prev-server-dir", default="")
+    update_paths.add_argument("--prev-data-dir", default="")
+    update_paths.add_argument("--prev-app-dir", default="")
+    update_paths.add_argument("--prev-game-service", default="")
+    update_paths.set_defaults(func=_cmd_update_instance_paths)
     ports = sub.add_parser("suggest-ports")
     ports.add_argument("--game-id", required=True)
     ports.add_argument("--server-port", required=True)

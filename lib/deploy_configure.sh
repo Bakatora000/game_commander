@@ -105,20 +105,21 @@ deploy_configure_paths() {
     prev_game_service="$GAME_SERVICE"
     prompt "Identifiant d'instance (unique par serveur)" "${INSTANCE_ID}"
     INSTANCE_ID="$REPLY"
-
-    if [[ -z "$prev_server_dir" || "$prev_server_dir" == "$HOME_DIR/${prev_instance}_server" ]]; then
-        SERVER_DIR="$HOME_DIR/${INSTANCE_ID}_server"
-    fi
-    if [[ -z "$prev_data_dir" || "$prev_data_dir" == "$HOME_DIR/${prev_instance}_data" ]]; then
-        DATA_DIR="$HOME_DIR/${INSTANCE_ID}_data"
-    fi
-    if [[ -z "$prev_app_dir" || "$prev_app_dir" == "$HOME_DIR/game-commander-${prev_instance}" ]]; then
-        APP_DIR="$HOME_DIR/game-commander-${INSTANCE_ID}"
-    fi
-    if [[ -z "$prev_game_service" || "$prev_game_service" == "${GAME_ID}-server-${prev_instance}" ]]; then
-        GAME_SERVICE="${GAME_ID}-server-${INSTANCE_ID}"
-    fi
-    GC_SERVICE="game-commander-${INSTANCE_ID}"
+    source <(
+        python3 "$SCRIPT_DIR/shared/deployplan.py" update-instance-paths \
+            --game-id "$GAME_ID" \
+            --instance-id "$INSTANCE_ID" \
+            --home-dir "$HOME_DIR" \
+            --server-dir "$SERVER_DIR" \
+            --data-dir "$DATA_DIR" \
+            --app-dir "$APP_DIR" \
+            --game-service "$GAME_SERVICE" \
+            --prev-instance "$prev_instance" \
+            --prev-server-dir "$prev_server_dir" \
+            --prev-data-dir "$prev_data_dir" \
+            --prev-app-dir "$prev_app_dir" \
+            --prev-game-service "$prev_game_service"
+    )
 
     info "Chemins"
     prompt "Répertoire serveur $GAME_LABEL" "${SERVER_DIR}"
