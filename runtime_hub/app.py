@@ -25,6 +25,11 @@ if not app.secret_key:
     raise RuntimeError("Variable GAME_COMMANDER_HUB_SECRET non définie.")
 
 app.config["PREFIX"] = PREFIX
+app.config["SESSION_COOKIE_NAME"] = "gc_hub_session"
+app.config["SESSION_COOKIE_PATH"] = PREFIX
+app.config["SESSION_COOKIE_SECURE"] = True
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["HUB_MANIFEST"] = os.environ.get("GC_HUB_MANIFEST", "/etc/nginx/game-commander-manifest.json")
 app.config["CPU_MONITOR_STATE"] = os.environ.get("GC_HUB_CPU_MONITOR_STATE", "/var/lib/game-commander/cpu-monitor.json")
 app.config["MAIN_SCRIPT"] = os.environ.get("GC_HUB_MAIN_SCRIPT", "/home/vhserver/gc/game_commander.sh")

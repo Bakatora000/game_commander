@@ -32,6 +32,11 @@ if not app.secret_key:
 
 app.config['GAME']   = GAME
 app.config['PREFIX'] = PREFIX
+app.config['SESSION_COOKIE_NAME'] = f"gc_{PREFIX.strip('/').replace('/', '_') or 'root'}_session"
+app.config['SESSION_COOKIE_PATH'] = PREFIX or "/"
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = "Lax"
 
 # ── Modules core ──────────────────────────────────────────────────────────────
 from core import auth, server, metrics, saves
