@@ -47,8 +47,8 @@ Un **Hub Admin** central (`/commander`) pilote toutes les instances, chacune dis
 
 ## Screenshots
 
-### Hub Admin — Dashboard
-![Hub Admin](docs/screenshots/valheim/valheim_dashboard.png)
+### Valheim Commander — Dashboard
+![Valheim Dashboard](docs/screenshots/valheim/valheim_dashboard.png)
 
 ### Valheim Commander — Mods
 ![Valheim Mods](docs/screenshots/valheim/valheim_mods.png)
