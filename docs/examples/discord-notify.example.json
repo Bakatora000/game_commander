@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "bot_token": "DISCORD_BOT_TOKEN",
+  "default_channel_id": "123456789012345678",
+  "instance_channels": {
+    "ParkAPouet": "123456789012345678",
+    "enshrouded2": "234567890123456789"
+  },
+  "game_channels": {
+    "satisfactory": "345678901234567890"
+  },
+  "event_channels": {
+    "rebalance": "456789012345678901"
+  }
+}

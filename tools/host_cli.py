@@ -12,7 +12,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from shared import bootstraphub, cpuplan, deploycore, hostctl, hostops, hubsync, redeploycore, uninstallcore, updatecore, updatehooks
+from shared import bootstraphub, cpuplan, deploycore, discordnotify, hostctl, hostops, hubsync, redeploycore, uninstallcore, updatecore, updatehooks
 
 
 def _existing_path(value: str) -> Path:
@@ -27,6 +27,7 @@ def cmd_service_action(args: argparse.Namespace) -> int:
         hostops.service_action_cmd(args.service, args.action),
         timeout=120,
     )
+    _notify(args.action, ok, instance_id=_service_instance(args.service), service=args.service, details=message)
     if not ok and message:
         print(message, file=sys.stderr)
         return 1
@@ -38,16 +39,21 @@ def cmd_service_action(args: argparse.Namespace) -> int:
 def cmd_update_instance(args: argparse.Namespace) -> int:
     config_file = hostctl.resolve_instance_config(args.instance)
     if not config_file:
+        _notify("update", False, instance_id=args.instance, details="Configuration d'instance introuvable")
         print("Configuration d'instance introuvable", file=sys.stderr)
         return 1
+    env = hostctl.parse_env_file(config_file)
+    game_id = env.get("GAME_ID", "")
     ok, result = updatecore.run_core_update(config_file, Path(args.main_script).resolve().parent)
     if not ok:
+        _notify("update", False, instance_id=args.instance, game_id=game_id, details=_details_text(result))
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
     ok, hooks = updatehooks.run_post_update_hooks(config_file, Path(args.main_script).resolve().parent)
     if not ok:
+        _notify("update", False, instance_id=args.instance, game_id=game_id, details=_details_text(hooks))
         print(hooks, file=sys.stderr)
         return 1
     for line in hooks:
@@ -55,20 +61,27 @@ def cmd_update_instance(args: argparse.Namespace) -> int:
     if not args.skip_hub_sync:
         ok, hub = hubsync.sync_hub_service(config_file, Path(args.main_script).resolve().parent)
         if not ok:
+            _notify("update", False, instance_id=args.instance, game_id=game_id, details=_details_text(hub))
             print(hub, file=sys.stderr)
             return 1
         for line in hub:
             print(line)
+    _notify("update", True, instance_id=args.instance, game_id=game_id, details=_details_text(result + hooks))
     return 0
 
 
 def cmd_redeploy_instance(args: argparse.Namespace) -> int:
+    env = hostctl.parse_env_file(args.config)
+    instance_id = env.get("INSTANCE_ID", "")
+    game_id = env.get("GAME_ID", "")
     ok, result = redeploycore.run_redeploy(args.config, args.main_script)
     if not ok:
+        _notify("redeploy", False, instance_id=instance_id, game_id=game_id, details=_details_text(result))
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
+    _notify("redeploy", True, instance_id=instance_id, game_id=game_id, details=_details_text(result))
     return 0
 
 
@@ -81,6 +94,34 @@ def _default_domain() -> str:
         return socket.getfqdn() or "localhost"
     except Exception:
         return "localhost"
+
+
+def _details_text(result: str | list[str]) -> str:
+    if isinstance(result, list):
+        return "\n".join(str(line) for line in result if str(line).strip())
+    return str(result or "")
+
+
+def _service_instance(service: str) -> str:
+    if service.startswith("game-commander-"):
+        return service.removeprefix("game-commander-")
+    if "-server-" in service:
+        return service.split("-server-", 1)[1]
+    return service
+
+
+def _notify(event: str, ok: bool, *, instance_id: str = "", game_id: str = "", service: str = "", details: str = "") -> None:
+    try:
+        discordnotify.notify_event(
+            event=event,
+            ok=ok,
+            instance_id=instance_id,
+            game_id=game_id,
+            service=service,
+            details=details,
+        )
+    except Exception:
+        pass
 
 
 def cmd_deploy_instance(args: argparse.Namespace) -> int:
@@ -101,10 +142,12 @@ def cmd_deploy_instance(args: argparse.Namespace) -> int:
         max_players=str(args.max_players or ""),
     )
     if not ok:
+        _notify("deploy", False, instance_id=args.instance, game_id=args.game_id, details=_details_text(result))
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
+    _notify("deploy", True, instance_id=args.instance, game_id=args.game_id, details=_details_text(result))
     return 0
 
 
@@ -112,27 +155,35 @@ def cmd_uninstall_instance(args: argparse.Namespace) -> int:
     config_file = hostctl.resolve_instance_config(args.instance)
     repo_root = Path(args.main_script).resolve().parent
     if config_file:
+        env = hostctl.parse_env_file(config_file)
+        game_id = env.get("GAME_ID", args.game_id)
         ok, result = uninstallcore.run_full_uninstall(config_file, repo_root)
     else:
         if not args.game_id:
+            _notify("uninstall", False, instance_id=args.instance, details="Configuration d'instance introuvable")
             print("Configuration d'instance introuvable", file=sys.stderr)
             return 1
+        game_id = args.game_id
         ok, result = uninstallcore.run_partial_uninstall(args.instance, args.game_id, repo_root)
     if not ok:
+        _notify("uninstall", False, instance_id=args.instance, game_id=game_id, details=_details_text(result))
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
+    _notify("uninstall", True, instance_id=args.instance, game_id=game_id, details=_details_text(result))
     return 0
 
 
 def cmd_rebalance(args: argparse.Namespace) -> int:
     core_groups = cpuplan.detect_core_groups()
     if not core_groups:
+        _notify("rebalance", False, details="Topologie CPU introuvable")
         print("Topologie CPU introuvable", file=sys.stderr)
         return 1
     instances = cpuplan.collect_managed_instances()
     if not instances:
+        _notify("rebalance", False, details="Aucune instance gérée trouvée")
         print("Aucune instance gérée trouvée", file=sys.stderr)
         return 1
     plan = cpuplan.plan_instances(instances, core_groups)
@@ -140,6 +191,7 @@ def cmd_rebalance(args: argparse.Namespace) -> int:
     for message in messages:
         print(message)
     print("Répartition CPU recalculée")
+    _notify("rebalance", True, details=_details_text(messages + ["Répartition CPU recalculée"]))
     return 0
 
 
@@ -158,6 +210,7 @@ def cmd_bootstrap_hub(args: argparse.Namespace) -> int:
     else:
         for line in result:
             print(line, file=stream)
+    _notify("bootstrap-hub", ok, details=_details_text(result))
     return 0 if ok else 1
 
 

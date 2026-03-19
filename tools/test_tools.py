@@ -30,7 +30,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import appfiles, appservice, bootstraphub, cpuplan, deploybackups, deploycore, deploydeps, deployenv, deploynginx, deployplan, deploypost, deployssl, deploysudo, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
+from shared import appfiles, appservice, bootstraphub, cpuplan, deploybackups, deploycore, deploydeps, deployenv, deploynginx, deployplan, deploypost, deployssl, deploysudo, discordnotify, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -854,6 +854,40 @@ class HostOpsTests(unittest.TestCase):
         )
 
 
+class DiscordNotifyTests(unittest.TestCase):
+
+    def test_load_config_missing_returns_empty(self):
+        self.assertEqual(discordnotify.load_config("/tmp/definitely_missing_gc_discord.json"), {})
+
+    def test_resolve_channel_prefers_instance_then_default(self):
+        cfg = {
+            "bot_token": "token",
+            "default_channel_id": "999",
+            "instance_channels": {"valheim2": "123"},
+            "game_channels": {"valheim": "456"},
+        }
+        self.assertEqual(discordnotify.resolve_channel_id(cfg, instance_id="valheim2", game_id="valheim"), "123")
+        self.assertEqual(discordnotify.resolve_channel_id(cfg, instance_id="other", game_id="valheim"), "456")
+        self.assertEqual(discordnotify.resolve_channel_id(cfg, instance_id="other", game_id="other"), "999")
+
+    def test_notify_event_posts_to_discord_when_configured(self):
+        cfg = {"bot_token": "token", "instance_channels": {"valheim2": "123"}}
+        with mock.patch.object(discordnotify, "post_channel_message", return_value=(True, "sent")) as post_mock:
+            ok, message = discordnotify.notify_event(
+                event="restart",
+                ok=True,
+                instance_id="valheim2",
+                game_id="valheim",
+                details="done",
+                config=cfg,
+            )
+        self.assertTrue(ok)
+        self.assertEqual(message, "sent")
+        self.assertEqual(post_mock.call_args.args[0], "token")
+        self.assertEqual(post_mock.call_args.args[1], "123")
+        self.assertIn("[OK] restart", post_mock.call_args.args[2])
+
+
 class HostCliTests(unittest.TestCase):
 
     def test_list_configs_uses_hostctl_discovery(self):
@@ -914,6 +948,34 @@ class HostCliTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertFalse(sync_hub.called)
             self.assertIn("core ok", stdout.getvalue())
+
+    def test_service_action_notifies_discord(self):
+        from tools import host_cli
+        with mock.patch.object(hostops, "run_command", return_value=(True, "ok")), \
+             mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")) as notify_mock, \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            rc = host_cli.main(["service-action", "--service", "valheim-server-valheim2", "--action", "restart"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(notify_mock.call_args.kwargs["event"], "restart")
+        self.assertEqual(notify_mock.call_args.kwargs["instance_id"], "valheim2")
+
+    def test_deploy_instance_notifies_discord(self):
+        from tools import host_cli
+        with mock.patch.object(deploycore, "run_deploy_instance", return_value=(True, ["done"])), \
+             mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")) as notify_mock, \
+             mock.patch("pwd.getpwuid", return_value=types.SimpleNamespace(pw_name="vhserver")), \
+             mock.patch("sys.stdout", new_callable=io.StringIO):
+            rc = host_cli.main([
+                "deploy-instance",
+                "--main-script", str(ROOT_DIR / "game_commander.sh"),
+                "--game-id", "minecraft",
+                "--instance", "minecraft2",
+                "--domain", "gaming.example.com",
+                "--admin-password", "secret123",
+            ])
+        self.assertEqual(rc, 0)
+        self.assertEqual(notify_mock.call_args.kwargs["event"], "deploy")
+        self.assertEqual(notify_mock.call_args.kwargs["instance_id"], "minecraft2")
 
     def test_inject_missing_file(self):
         """Retourne 1 si le fichier n'existe pas."""
@@ -4258,13 +4320,15 @@ if __name__ == "__main__":
         MinecraftConsoleTests,
         MinecraftFabricModsTests,
         SaveManagerTests,
+        DiscordNotifyTests,
+        HostCliTests,
         BootstrapHubTests,
     ]
     if len(sys.argv) > 1:
         names = sys.argv[1:]
         test_classes = [c for c in test_classes if c.__name__ in names]
         if not test_classes:
-            print(f"Classes disponibles : {[c.__name__ for c in [NginxInjectTests, NginxRemoveTests, NginxFindConfTests, NginxManifestTests, ConfigGenGameJsonTests, ConfigGenUsersJsonTests, ConfigGenEnshroudedCfgTests, ConfigGenPatchBepinexTests, ConfigGenMinecraftPropsTests, MinecraftConfigTests, TerrariaConfigTests, MinecraftPlayersTests, MinecraftAdminsTests, MinecraftConsoleTests, MinecraftFabricModsTests, SaveManagerTests, BootstrapHubTests]]}")
+            print(f"Classes disponibles : {[c.__name__ for c in [NginxInjectTests, NginxRemoveTests, NginxFindConfTests, NginxManifestTests, ConfigGenGameJsonTests, ConfigGenUsersJsonTests, ConfigGenEnshroudedCfgTests, ConfigGenPatchBepinexTests, ConfigGenMinecraftPropsTests, MinecraftConfigTests, TerrariaConfigTests, MinecraftPlayersTests, MinecraftAdminsTests, MinecraftConsoleTests, MinecraftFabricModsTests, SaveManagerTests, DiscordNotifyTests, HostCliTests, BootstrapHubTests]]}")
             sys.exit(1)
 
     for cls in test_classes:

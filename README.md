@@ -51,6 +51,12 @@ Alternative locale une fois le dépôt présent :
 
 ```bash
 sudo bash game_commander.sh bootstrap-hub --domain gaming.example.com
+
+Notifications Discord :
+- optionnelles, via bot Discord + salons configurés localement
+- fichier de config local recommandé : `/etc/game-commander/discord.json`
+- exemple de structure : [`docs/examples/discord-notify.example.json`](docs/examples/discord-notify.example.json)
+- les actions hôte `start/stop/restart/update/deploy/uninstall/rebalance` peuvent ensuite notifier le salon par instance ou un salon par défaut
 ```
 
 ## Jeux gérés actuellement
