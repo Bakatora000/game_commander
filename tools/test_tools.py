@@ -611,6 +611,36 @@ class DeployPlanTests(unittest.TestCase):
         self.assertTrue(deployplan.admin_password_required("secret"))
         self.assertFalse(deployplan.admin_password_required(""))
 
+    def test_render_summary_handles_valheim_flags(self):
+        lines = deployplan.render_summary(
+            {
+                "GAME_ID": "valheim",
+                "GAME_LABEL": "Valheim",
+                "DEPLOY_MODE": "managed",
+                "SYS_USER": "vhserver",
+                "HOME_DIR": "/home/vhserver",
+                "SERVER_DIR": "/home/vhserver/valheim2_server",
+                "DATA_DIR": "/home/vhserver/valheim2_data",
+                "SERVER_NAME": "ParkAPouet",
+                "SERVER_PORT": "2458",
+                "MAX_PLAYERS": "10",
+                "WORLD_NAME": "Monde1",
+                "CROSSPLAY": "true",
+                "BEPINEX": "false",
+                "BACKUP_DIR": "/home/vhserver/gamebackups",
+                "GAME_SERVICE": "valheim-server-valheim2",
+                "APP_DIR": "/home/vhserver/game-commander-valheim2",
+                "DOMAIN": "gaming.example.com",
+                "URL_PREFIX": "/valheim2",
+                "FLASK_PORT": "5006",
+                "SSL_MODE": "existing",
+                "ADMIN_LOGIN": "admin",
+            }
+        )
+        self.assertIn("Crossplay         : Oui", lines)
+        self.assertIn("BepInEx           : Non", lines)
+        self.assertIn("URL               : gaming.example.com/valheim2", lines)
+
 
 class DeployPostTests(unittest.TestCase):
 

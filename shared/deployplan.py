@@ -230,6 +230,52 @@ def admin_password_required(password: str) -> bool:
     return bool(password)
 
 
+def render_summary(env: dict[str, str]) -> list[str]:
+    lines = [
+        f"Jeu               : {env.get('GAME_LABEL', '')}",
+        f"Mode              : {env.get('DEPLOY_MODE', '')}",
+        f"Utilisateur       : {env.get('SYS_USER', '')} ({env.get('HOME_DIR', '')})",
+        f"Serveur           : {env.get('SERVER_DIR', '')}",
+    ]
+    if env.get("GAME_ID") != "enshrouded":
+        lines.append(f"Données           : {env.get('DATA_DIR', '')}")
+    lines.extend(
+        [
+            f"Nom serveur       : {env.get('SERVER_NAME', '')}",
+            f"Port              : {env.get('SERVER_PORT', '')}",
+        ]
+    )
+    if env.get("GAME_ID") == "soulmask":
+        lines.extend(
+            [
+                f"Query Port        : {env.get('QUERY_PORT', '')}",
+                f"Echo Port         : {env.get('ECHO_PORT', '')}",
+                f"Mode              : {env.get('SERVER_MODE', '')}",
+            ]
+        )
+    lines.append(f"Joueurs max       : {env.get('MAX_PLAYERS', '')}")
+    if env.get("GAME_ID") == "valheim":
+        lines.extend(
+            [
+                f"Monde             : {env.get('WORLD_NAME', '')}",
+                f"Crossplay         : {'Oui' if env.get('CROSSPLAY', '').lower() == 'true' else 'Non'}",
+                f"BepInEx           : {'Oui' if env.get('BEPINEX', '').lower() == 'true' else 'Non'}",
+            ]
+        )
+    lines.extend(
+        [
+            f"Sauvegardes       : {env.get('BACKUP_DIR', '')} (7j)",
+            f"Service jeu       : {env.get('GAME_SERVICE', '')}",
+            f"Game Commander    : {env.get('APP_DIR', '')}",
+            f"URL               : {env.get('DOMAIN', '')}{env.get('URL_PREFIX', '')}",
+            f"Port Flask        : {env.get('FLASK_PORT', '')}",
+            f"SSL               : {env.get('SSL_MODE', '')}",
+            f"Admin             : {env.get('ADMIN_LOGIN', '')}",
+        ]
+    )
+    return lines
+
+
 def suggest_free_port_group(
     *,
     game_id: str,
@@ -365,6 +411,38 @@ def _cmd_validate_admin(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_summary(args: argparse.Namespace) -> int:
+    env = {
+        "GAME_ID": args.game_id,
+        "GAME_LABEL": args.game_label,
+        "DEPLOY_MODE": args.deploy_mode,
+        "SYS_USER": args.sys_user,
+        "HOME_DIR": args.home_dir,
+        "SERVER_DIR": args.server_dir,
+        "DATA_DIR": args.data_dir,
+        "SERVER_NAME": args.server_name,
+        "SERVER_PORT": args.server_port,
+        "QUERY_PORT": args.query_port,
+        "ECHO_PORT": args.echo_port,
+        "SERVER_MODE": args.server_mode,
+        "MAX_PLAYERS": args.max_players,
+        "WORLD_NAME": args.world_name,
+        "CROSSPLAY": args.crossplay,
+        "BEPINEX": args.bepinex,
+        "BACKUP_DIR": args.backup_dir,
+        "GAME_SERVICE": args.game_service,
+        "APP_DIR": args.app_dir,
+        "DOMAIN": args.domain,
+        "URL_PREFIX": args.url_prefix,
+        "FLASK_PORT": args.flask_port,
+        "SSL_MODE": args.ssl_mode,
+        "ADMIN_LOGIN": args.admin_login,
+    }
+    for line in render_summary(env):
+        sys.stdout.write(f"{line}\n")
+    return 0
+
+
 def _cmd_suggest_ports(args: argparse.Namespace) -> int:
     payload = suggest_free_port_group(
         game_id=args.game_id,
@@ -434,6 +512,32 @@ def build_parser() -> argparse.ArgumentParser:
     admin = sub.add_parser("validate-admin")
     admin.add_argument("--password", required=True)
     admin.set_defaults(func=_cmd_validate_admin)
+    summary = sub.add_parser("summary")
+    summary.add_argument("--game-id", required=True)
+    summary.add_argument("--game-label", required=True)
+    summary.add_argument("--deploy-mode", required=True)
+    summary.add_argument("--sys-user", required=True)
+    summary.add_argument("--home-dir", required=True)
+    summary.add_argument("--server-dir", required=True)
+    summary.add_argument("--data-dir", default="")
+    summary.add_argument("--server-name", required=True)
+    summary.add_argument("--server-port", required=True)
+    summary.add_argument("--query-port", default="")
+    summary.add_argument("--echo-port", default="")
+    summary.add_argument("--server-mode", default="")
+    summary.add_argument("--max-players", required=True)
+    summary.add_argument("--world-name", default="")
+    summary.add_argument("--crossplay", default="false")
+    summary.add_argument("--bepinex", default="false")
+    summary.add_argument("--backup-dir", required=True)
+    summary.add_argument("--game-service", required=True)
+    summary.add_argument("--app-dir", required=True)
+    summary.add_argument("--domain", required=True)
+    summary.add_argument("--url-prefix", required=True)
+    summary.add_argument("--flask-port", required=True)
+    summary.add_argument("--ssl-mode", required=True)
+    summary.add_argument("--admin-login", required=True)
+    summary.set_defaults(func=_cmd_summary)
     return parser
 
 

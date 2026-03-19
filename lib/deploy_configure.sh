@@ -293,31 +293,38 @@ deploy_configure_admin() {
 deploy_print_summary() {
     hdr "RÉCAPITULATIF"
     echo ""
-    echo -e "  ${BOLD}Jeu               :${RESET} $GAME_LABEL"
-    echo -e "  ${BOLD}Mode              :${RESET} $DEPLOY_MODE"
-    echo -e "  ${BOLD}Utilisateur       :${RESET} $SYS_USER ($HOME_DIR)"
-    echo -e "  ${BOLD}Serveur           :${RESET} $SERVER_DIR"
-    [[ "$GAME_ID" != "enshrouded" ]] && echo -e "  ${BOLD}Données           :${RESET} $DATA_DIR"
-    echo -e "  ${BOLD}Nom serveur       :${RESET} $SERVER_NAME"
-    echo -e "  ${BOLD}Port              :${RESET} $SERVER_PORT"
-    [[ "$GAME_ID" == "soulmask" ]] && {
-        echo -e "  ${BOLD}Query Port        :${RESET} $QUERY_PORT"
-        echo -e "  ${BOLD}Echo Port         :${RESET} $ECHO_PORT"
-        echo -e "  ${BOLD}Mode              :${RESET} $SERVER_MODE"
-    }
-    echo -e "  ${BOLD}Joueurs max       :${RESET} $MAX_PLAYERS"
-    [[ "$GAME_ID" == "valheim" ]] && {
-        echo -e "  ${BOLD}Monde             :${RESET} $WORLD_NAME"
-        echo -e "  ${BOLD}Crossplay         :${RESET} $($CROSSPLAY && echo "Oui" || echo "Non")"
-        echo -e "  ${BOLD}BepInEx           :${RESET} $($BEPINEX && echo "Oui" || echo "Non")"
-    }
-    echo -e "  ${BOLD}Sauvegardes       :${RESET} $BACKUP_DIR (7j)"
-    echo -e "  ${BOLD}Service jeu       :${RESET} $GAME_SERVICE"
-    echo -e "  ${BOLD}Game Commander    :${RESET} $APP_DIR"
-    echo -e "  ${BOLD}URL               :${RESET} $DOMAIN${URL_PREFIX}"
-    echo -e "  ${BOLD}Port Flask        :${RESET} $FLASK_PORT"
-    echo -e "  ${BOLD}SSL               :${RESET} $SSL_MODE"
-    echo -e "  ${BOLD}Admin             :${RESET} $ADMIN_LOGIN"
+    while IFS= read -r line; do
+        [[ -n "$line" ]] || continue
+        local label="${line%%:*}"
+        local value="${line#*: }"
+        echo -e "  ${BOLD}${label}:${RESET} ${value}"
+    done < <(
+        python3 "$SCRIPT_DIR/shared/deployplan.py" summary \
+            --game-id "$GAME_ID" \
+            --game-label "$GAME_LABEL" \
+            --deploy-mode "$DEPLOY_MODE" \
+            --sys-user "$SYS_USER" \
+            --home-dir "$HOME_DIR" \
+            --server-dir "$SERVER_DIR" \
+            --data-dir "$DATA_DIR" \
+            --server-name "$SERVER_NAME" \
+            --server-port "$SERVER_PORT" \
+            --query-port "${QUERY_PORT:-}" \
+            --echo-port "${ECHO_PORT:-}" \
+            --server-mode "${SERVER_MODE:-}" \
+            --max-players "$MAX_PLAYERS" \
+            --world-name "${WORLD_NAME:-}" \
+            --crossplay "$([[ "${CROSSPLAY:-false}" == "true" ]] && echo true || echo false)" \
+            --bepinex "$([[ "${BEPINEX:-false}" == "true" ]] && echo true || echo false)" \
+            --backup-dir "$BACKUP_DIR" \
+            --game-service "$GAME_SERVICE" \
+            --app-dir "$APP_DIR" \
+            --domain "$DOMAIN" \
+            --url-prefix "$URL_PREFIX" \
+            --flask-port "$FLASK_PORT" \
+            --ssl-mode "$SSL_MODE" \
+            --admin-login "$ADMIN_LOGIN"
+    )
     echo ""
     sep
 }
