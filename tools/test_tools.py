@@ -641,6 +641,17 @@ class DeployPlanTests(unittest.TestCase):
         self.assertIn("BepInEx           : Non", lines)
         self.assertIn("URL               : gaming.example.com/valheim2", lines)
 
+    def test_game_menu_and_choice(self):
+        lines = deployplan.game_menu_lines()
+        self.assertEqual(lines[0], "0|Quit")
+        self.assertIn("4|Minecraft Fabric", lines)
+        accepted, game_id = deployplan.resolve_game_choice("4")
+        self.assertTrue(accepted)
+        self.assertEqual(game_id, "minecraft-fabric")
+        accepted, game_id = deployplan.resolve_game_choice("0")
+        self.assertFalse(accepted)
+        self.assertEqual(game_id, "")
+
 
 class DeployPostTests(unittest.TestCase):
 

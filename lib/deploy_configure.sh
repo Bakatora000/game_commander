@@ -26,26 +26,13 @@ deploy_select_game() {
         else
             echo -e "  ${BOLD}Jeu à déployer :${RESET}"
         fi
-        echo -e "  ${CYAN}[0]${RESET} Quit"
-        echo -e "  ${CYAN}[1]${RESET} Valheim"
-        echo -e "  ${CYAN}[2]${RESET} Enshrouded"
-        echo -e "  ${CYAN}[3]${RESET} Minecraft Java"
-        echo -e "  ${CYAN}[4]${RESET} Minecraft Fabric"
-        echo -e "  ${CYAN}[5]${RESET} Terraria"
-        echo -e "  ${CYAN}[6]${RESET} Soulmask"
-        echo -e "  ${CYAN}[7]${RESET} Satisfactory"
+        while IFS='|' read -r key label; do
+            echo -e "  ${CYAN}[${key}]${RESET} ${label}"
+        done < <(python3 "$SCRIPT_DIR/shared/deployplan.py" game-menu)
         echo ""
         prompt "Votre choix" "1"
-        case "$REPLY" in
-            0) return 10 ;;
-            2) GAME_ID="enshrouded" ;;
-            3) GAME_ID="minecraft" ;;
-            4) GAME_ID="minecraft-fabric" ;;
-            5) GAME_ID="terraria" ;;
-            6) GAME_ID="soulmask" ;;
-            7) GAME_ID="satisfactory" ;;
-            *) GAME_ID="valheim" ;;
-        esac
+        source <(python3 "$SCRIPT_DIR/shared/deployplan.py" game-choice --choice "$REPLY" --default-game-id "valheim")
+        [[ "$GAME_ACCEPTED" == "true" ]] || return 10
     else
         echo -e "  ${DIM}  (config) Jeu : ${BOLD}${GAME_ID}${RESET}"
     fi

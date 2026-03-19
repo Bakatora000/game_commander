@@ -17,6 +17,16 @@ GAME_CATALOG: dict[str, dict[str, str]] = {
     "satisfactory": {"label": "Satisfactory", "steam_appid": "1690800", "game_binary": "FactoryServer.sh"},
 }
 
+GAME_MENU_ORDER = [
+    ("1", "valheim"),
+    ("2", "enshrouded"),
+    ("3", "minecraft"),
+    ("4", "minecraft-fabric"),
+    ("5", "terraria"),
+    ("6", "soulmask"),
+    ("7", "satisfactory"),
+]
+
 
 def _run_stdout(cmd: list[str]) -> str:
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
@@ -171,6 +181,21 @@ def port_owner(port: int) -> str:
 
 def game_meta(game_id: str) -> dict[str, str]:
     return dict(GAME_CATALOG.get(game_id, {"label": game_id, "steam_appid": "", "game_binary": ""}))
+
+
+def game_menu_lines() -> list[str]:
+    lines = ["0|Quit"]
+    for key, game_id in GAME_MENU_ORDER:
+        lines.append(f"{key}|{game_meta(game_id)['label']}")
+    return lines
+
+
+def resolve_game_choice(choice: str, default_game_id: str = "valheim") -> tuple[bool, str]:
+    normalized = (choice or "").strip()
+    if normalized == "0":
+        return False, ""
+    mapping = {key: game_id for key, game_id in GAME_MENU_ORDER}
+    return True, mapping.get(normalized, default_game_id)
 
 
 def next_free_flask_port(port: int) -> int:
@@ -374,6 +399,22 @@ def _cmd_game_meta(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_game_menu(args: argparse.Namespace) -> int:
+    for line in game_menu_lines():
+        sys.stdout.write(f"{line}\n")
+    return 0
+
+
+def _cmd_game_choice(args: argparse.Namespace) -> int:
+    accepted, game_id = resolve_game_choice(args.choice, args.default_game_id)
+    payload = {
+        "GAME_ACCEPTED": "true" if accepted else "false",
+        "GAME_ID": game_id,
+    }
+    print(_exports(payload), end="")
+    return 0
+
+
 def _cmd_web_defaults(args: argparse.Namespace) -> int:
     conf, owner = existing_prefix_owner(args.domain, args.url_prefix)
     payload = {
@@ -498,6 +539,12 @@ def build_parser() -> argparse.ArgumentParser:
     meta = sub.add_parser("game-meta")
     meta.add_argument("--game-id", required=True)
     meta.set_defaults(func=_cmd_game_meta)
+    menu = sub.add_parser("game-menu")
+    menu.set_defaults(func=_cmd_game_menu)
+    choice = sub.add_parser("game-choice")
+    choice.add_argument("--choice", required=True)
+    choice.add_argument("--default-game-id", default="valheim")
+    choice.set_defaults(func=_cmd_game_choice)
     web = sub.add_parser("web-defaults")
     web.add_argument("--domain", required=True)
     web.add_argument("--url-prefix", required=True)
