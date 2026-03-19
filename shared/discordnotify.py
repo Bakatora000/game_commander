@@ -62,11 +62,8 @@ def format_event_message(
     service: str = "",
     details: str = "",
 ) -> str:
-    host = socket.getfqdn() or "localhost"
-    status = "OK" if ok else "ERR"
-    subject = instance_id or service or "host"
-    header = " ".join(part for part in [f"[{status}] {event}", subject, f"({game_id})" if game_id else ""] if part)
-    content = f"{header}\nHôte: {host}"
+    subject = instance_id or game_id or service or "Game Commander"
+    content = subject
     details = (details or "").strip()
     if details:
         snippet = details[:1500]

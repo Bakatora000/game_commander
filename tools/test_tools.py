@@ -885,7 +885,9 @@ class DiscordNotifyTests(unittest.TestCase):
         self.assertEqual(message, "sent")
         self.assertEqual(post_mock.call_args.args[0], "token")
         self.assertEqual(post_mock.call_args.args[1], "123")
-        self.assertIn("[OK] restart", post_mock.call_args.args[2])
+        self.assertIn("valheim2", post_mock.call_args.args[2])
+        self.assertNotIn("[OK]", post_mock.call_args.args[2])
+        self.assertNotIn("Hôte:", post_mock.call_args.args[2])
 
     def test_send_test_message_uses_notify_event(self):
         with mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")) as notify_mock:
