@@ -6,6 +6,7 @@ Interface d'administration hôte distincte des Commanders d'instance.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from flask import Flask, jsonify, redirect, render_template, request, session
 
 from core import auth, host
@@ -28,7 +29,7 @@ app.config["HUB_MANIFEST"] = os.environ.get("GC_HUB_MANIFEST", "/etc/nginx/game-
 app.config["CPU_MONITOR_STATE"] = os.environ.get("GC_HUB_CPU_MONITOR_STATE", "/var/lib/game-commander/cpu-monitor.json")
 app.config["MAIN_SCRIPT"] = os.environ.get("GC_HUB_MAIN_SCRIPT", "/home/vhserver/gc/game_commander.sh")
 app.config["HOST_CLI"] = os.environ.get("GC_HUB_HOST_CLI", "/home/vhserver/gc/tools/host_cli.py")
-app.config["ACTION_LOG_DIR"] = os.environ.get("GC_HUB_ACTION_LOG_DIR", str((app.root_path and (os.path.dirname(app.root_path))) + "/action-logs"))
+app.config["ACTION_LOG_DIR"] = os.environ.get("GC_HUB_ACTION_LOG_DIR", str(Path(app.root_path) / "action-logs"))
 
 
 @app.context_processor

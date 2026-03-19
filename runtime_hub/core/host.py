@@ -42,7 +42,19 @@ def _host_cli_path() -> Path:
 
 
 def _action_log_dir() -> Path:
-    return Path(current_app.config.get("ACTION_LOG_DIR") or (Path(current_app.root_path).parent / "action-logs"))
+    configured = current_app.config.get("ACTION_LOG_DIR")
+    local_dir = Path(current_app.root_path) / "action-logs"
+    legacy_dir = Path(current_app.root_path).parent / "action-logs"
+    if configured:
+        path = Path(configured)
+        if path.resolve() == legacy_dir.resolve():
+            legacy_log = legacy_dir / "hub-actions.log"
+            local_log = local_dir / "hub-actions.log"
+            if local_log.is_file() and local_log.stat().st_size > 0:
+                if not legacy_log.is_file() or legacy_log.stat().st_size == 0:
+                    return local_dir
+        return path
+    return local_dir
 
 
 def _global_log_path() -> Path:

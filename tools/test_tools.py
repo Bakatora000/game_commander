@@ -1868,6 +1868,21 @@ class HubHostTests(unittest.TestCase):
                 lines = hub_host.get_global_console(max_lines=2)
             self.assertEqual(lines, ["line2", "line3"])
 
+    def test_global_console_prefers_local_log_over_empty_legacy_path(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({"instances": []}), encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            app.config["ACTION_LOG_DIR"] = str(root.parent / "action-logs")
+            (root / "action-logs").mkdir()
+            (root.parent / "action-logs").mkdir(exist_ok=True)
+            (root.parent / "action-logs" / "hub-actions.log").write_text("", encoding="utf-8")
+            (root / "action-logs" / "hub-actions.log").write_text("lineA\nlineB\n", encoding="utf-8")
+            with app.app_context():
+                lines = hub_host.get_global_console(max_lines=5)
+            self.assertEqual(lines, ["lineA", "lineB"])
+
 
 class DeployHelpersTests(unittest.TestCase):
 
