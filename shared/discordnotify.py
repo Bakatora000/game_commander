@@ -123,3 +123,21 @@ def notify_event(
         details=details,
     )
     return post_channel_message(str(cfg.get("bot_token", "")), channel_id, content)
+
+
+def send_test_message(
+    *,
+    event: str = "discord-test",
+    instance_id: str = "",
+    game_id: str = "",
+    details: str = "Test de notification Discord Game Commander",
+    config: dict | None = None,
+) -> tuple[bool, str]:
+    return notify_event(
+        event=event,
+        ok=True,
+        instance_id=instance_id,
+        game_id=game_id,
+        details=details,
+        config=config,
+    )

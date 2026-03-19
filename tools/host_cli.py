@@ -236,6 +236,18 @@ def cmd_resolve_config(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_discord_test(args: argparse.Namespace) -> int:
+    ok, message = discordnotify.send_test_message(
+        event=args.event,
+        instance_id=args.instance,
+        game_id=args.game_id,
+        details=args.message,
+    )
+    stream = sys.stdout if ok else sys.stderr
+    print(message, file=stream)
+    return 0 if ok else 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Game Commander host action CLI")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -307,6 +319,13 @@ def build_parser() -> argparse.ArgumentParser:
     add_search_flags(resolve_config)
     resolve_config.add_argument("--instance", required=True)
     resolve_config.set_defaults(func=cmd_resolve_config)
+
+    discord_test = sub.add_parser("discord-test")
+    discord_test.add_argument("--instance", default="")
+    discord_test.add_argument("--game-id", default="")
+    discord_test.add_argument("--event", default="discord-test")
+    discord_test.add_argument("--message", default="Test de notification Discord Game Commander")
+    discord_test.set_defaults(func=cmd_discord_test)
 
     return parser
 

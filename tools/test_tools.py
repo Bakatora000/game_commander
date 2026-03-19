@@ -887,6 +887,13 @@ class DiscordNotifyTests(unittest.TestCase):
         self.assertEqual(post_mock.call_args.args[1], "123")
         self.assertIn("[OK] restart", post_mock.call_args.args[2])
 
+    def test_send_test_message_uses_notify_event(self):
+        with mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")) as notify_mock:
+            ok, message = discordnotify.send_test_message(instance_id="valheim2", game_id="valheim")
+        self.assertTrue(ok)
+        self.assertEqual(message, "sent")
+        self.assertEqual(notify_mock.call_args.kwargs["event"], "discord-test")
+
 
 class HostCliTests(unittest.TestCase):
 
@@ -976,6 +983,16 @@ class HostCliTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertEqual(notify_mock.call_args.kwargs["event"], "deploy")
         self.assertEqual(notify_mock.call_args.kwargs["instance_id"], "minecraft2")
+
+    def test_discord_test_command(self):
+        from tools import host_cli
+        with mock.patch.object(discordnotify, "send_test_message", return_value=(True, "sent")) as send_mock, \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            rc = host_cli.main(["discord-test", "--instance", "valheim2", "--game-id", "valheim"])
+        self.assertEqual(rc, 0)
+        self.assertEqual(send_mock.call_args.kwargs["instance_id"], "valheim2")
+        self.assertEqual(send_mock.call_args.kwargs["game_id"], "valheim")
+        self.assertIn("sent", stdout.getvalue())
 
     def test_inject_missing_file(self):
         """Retourne 1 si le fichier n'existe pas."""
