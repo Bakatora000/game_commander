@@ -271,6 +271,18 @@ Roadmap status update:
   - backups isolated per instance
   - claim/admin actions via the native HTTPS API
   - connection info with game port and reliable port
+  - validated Hub deploy on a live host (`instance_id=satisfactory`)
+  - validated runtime state after deploy:
+    - `satisfactory-server-satisfactory` active
+    - `game-commander-satisfactory` active
+    - local Commander reachable on `/satisfactory`
+    - `hub-status` reachable with `state=20`
+  - validated Satisfactory native admin API after claim:
+    - `PasswordlessLogin` reports the server as already claimed
+    - admin password login works
+    - authenticated reads of server state/options work
+  - retained product note:
+    - after first deploy, the real game session/world creation is still finalized from the game client side on first connection
 - `/commander` is no longer only a landing page:
   - it is now a dedicated Hub Admin Flask app
   - auth is separate from per-instance Commanders

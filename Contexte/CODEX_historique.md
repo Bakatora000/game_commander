@@ -777,6 +777,38 @@ Limites restantes :
 - pas encore de panneau gameplay avancé
 - le nom du serveur n'est pas forcément lisible sans authentification admin
 
+## [2026-03-20] Satisfactory — validation réelle du déploiement Hub
+
+Validation effectuée sur l'instance `satisfactory`.
+
+État retenu :
+- déploiement Hub réussi après correction du chargement des métadonnées jeu dans le flux `deploy --config`
+- instance enregistrée avec :
+  - `GAME_ID=satisfactory`
+  - `INSTANCE_ID=satisfactory`
+  - `SERVER_PORT=7777`
+  - `QUERY_PORT=8888`
+  - `URL_PREFIX=/satisfactory`
+  - `FLASK_PORT=5007`
+- service jeu actif :
+  - `satisfactory-server-satisfactory`
+- service Commander actif :
+  - `game-commander-satisfactory`
+- l'instance répond localement :
+  - `/satisfactory` redirige vers login
+  - `/satisfactory/api/hub-status` répond avec `state=20`
+
+Validation API Satisfactory native :
+- le serveur est bien revendiqué :
+  - `PasswordlessLogin` renvoie `passwordless_login_not_possible`
+- l'auth admin native est valide avec le mot de passe configuré
+- les lectures authentifiées `QueryServerState` / `GetServerOptions` répondent correctement
+
+Observation produit retenue :
+- le serveur est bien déployé, démarré et administrable
+- la création/initialisation concrète de la vraie session de jeu reste finalisée au premier passage côté client en jeu
+- ne pas traiter cet état initial (`activeSessionName` auto-généré, `isGameRunning=false` avant vraie entrée en jeu) comme un échec de déploiement
+
 ## Hub Admin — séparation des rôles
 
 Le hub `/commander` n'est plus une simple page statique nginx :
