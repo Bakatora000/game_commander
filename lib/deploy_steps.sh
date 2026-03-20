@@ -735,38 +735,6 @@ deploy_step_app_service() {
     cpu_monitor_install
 }
 
-deploy_hub_admin_hash() {
-    local hub_users_file="$1"
-    local source_users_file="$2"
-    local hash=""
-
-    if [[ -n "${ADMIN_PASSWORD:-}" ]]; then
-        hash=$(python3 -c \
-            "import bcrypt,sys; print(bcrypt.hashpw(sys.argv[1].encode(), bcrypt.gensalt()).decode())" \
-            "$ADMIN_PASSWORD") || return 1
-        printf '%s\n' "$hash"
-        return 0
-    fi
-
-    if [[ -f "$source_users_file" ]]; then
-        hash="$(python3 - "$source_users_file" "$ADMIN_LOGIN" <<'PYEOF'
-import json
-import sys
-from pathlib import Path
-
-users = json.loads(Path(sys.argv[1]).read_text())
-user = users.get(sys.argv[2], {})
-print(user.get("password_hash", ""))
-PYEOF
-)"
-        if [[ -n "$hash" ]]; then
-            printf '%s\n' "$hash"
-            return 0
-        fi
-    fi
-
-    return 1
-}
 
 deploy_step_hub_service() {
     hdr "ÉTAPE 8B : Hub Admin"

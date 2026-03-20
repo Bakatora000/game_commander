@@ -19,12 +19,8 @@ uninstall_flask_remove_nginx_block() {
     elif (( has_port > 0 )); then
         ask_yn "Retirer le bloc port ${port} du vhost ${BOLD}$nginx${RESET} (partagé) ?" && {
             cp "$nginx" "${nginx}.bak.$(date +%Y%m%d%H%M%S)"
-            python3 -c "
-import re
-with open('$nginx') as f: c = f.read()
-c = re.sub(r'\n?[ \t]*# ── Game Commander[^\n]*\n.*?location [^\{]+\{[^}]*proxy_pass[^}]*${port}[^}]*\}[^\n]*\n?[ \t]*location [^\{]+/static[^}]*\}[ \t]*\n?[ \t]*# ─+\n?', '\n', c, flags=re.DOTALL)
-with open('$nginx','w') as f: f.write(c)
-"
+            python3 "$SCRIPT_DIR/shared/deploynginx.py" remove-legacy-block \
+                --nginx-file "$nginx" --port "$port"
             ok "Bloc port ${port} retiré"
             run nginx -t 2>/dev/null && run systemctl reload nginx || true
         }
@@ -102,9 +98,8 @@ uninstall_flask_section() {
 
         port=""
         [[ -f "$work_dir/game.json" ]] && \
-            port=$(python3 -c \
-                "import json; d=json.load(open('$work_dir/game.json')); print(d.get('web',{}).get('flask_port',''))" \
-                2>/dev/null || true)
+            port=$(python3 "$SCRIPT_DIR/shared/appfiles.py" read-game-json \
+                --path "$work_dir/game.json" --field flask-port 2>/dev/null || true)
         [[ -n "$port" ]] || port=$(grep -oP '(?<=port=)\d+' "$work_dir/app.py" 2>/dev/null | tail -1 || true)
         [[ -n "$port" ]] || port="?"
 

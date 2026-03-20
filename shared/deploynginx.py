@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -65,6 +66,37 @@ def run_deploy_nginx(
         return False, "Erreur config Nginx — vérifiez avec : nginx -t"
 
 
+def remove_legacy_nginx_block(nginx_file: str | Path, port: str) -> bool:
+    """Remove a Game Commander proxy block for *port* from a legacy nginx vhost file.
+
+    Returns True if the file was modified, False if the pattern was not found.
+    """
+    path = Path(nginx_file)
+    content = path.read_text(encoding="utf-8")
+    pattern = (
+        r"\n?[ \t]*# ── Game Commander[^\n]*\n"
+        r".*?"
+        r"location [^\{]+\{"
+        r"[^}]*proxy_pass[^}]*" + re.escape(port) + r"[^}]*\}"
+        r"[^\n]*\n?"
+        r"[ \t]*location [^\{]+/static[^}]*\}[ \t]*\n?"
+        r"[ \t]*# ─+\n?"
+    )
+    new_content, count = re.subn(pattern, "\n", content, flags=re.DOTALL)
+    if count == 0:
+        return False
+    path.write_text(new_content, encoding="utf-8")
+    return True
+
+
+def _cmd_remove_legacy_block(args: argparse.Namespace) -> int:
+    modified = remove_legacy_nginx_block(args.nginx_file, args.port)
+    if not modified:
+        print(f"Bloc port {args.port} introuvable dans {args.nginx_file}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def _cmd_apply(args: argparse.Namespace) -> int:
     ok, message = run_deploy_nginx(
         script_dir=args.script_dir,
@@ -89,6 +121,10 @@ def build_parser() -> argparse.ArgumentParser:
     apply_cmd.add_argument("--flask-port", required=True)
     apply_cmd.add_argument("--game-label", required=True)
     apply_cmd.set_defaults(func=_cmd_apply)
+    rlb = sub.add_parser("remove-legacy-block")
+    rlb.add_argument("--nginx-file", required=True)
+    rlb.add_argument("--port", required=True)
+    rlb.set_defaults(func=_cmd_remove_legacy_block)
     return parser
 
 

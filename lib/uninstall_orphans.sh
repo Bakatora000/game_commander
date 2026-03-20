@@ -31,9 +31,8 @@ uninstall_orphans_collect() {
             wdir=$(readlink -f "/proc/${pid}/cwd" 2>/dev/null || echo "")
             app_name=""
             if [[ -n "$wdir" && -f "$wdir/game.json" ]]; then
-                app_name=$(python3 -c \
-                    "import json; d=json.load(open('$wdir/game.json')); print(d.get('name','?')+' — '+d.get('subtitle',''))" \
-                    2>/dev/null || true)
+                app_name=$(python3 "$SCRIPT_DIR/shared/appfiles.py" read-game-json \
+                    --path "$wdir/game.json" --field app-desc 2>/dev/null || true)
             fi
             desc="Flask/Python"
             [[ -n "$app_name" ]] && desc="$desc ($app_name)"

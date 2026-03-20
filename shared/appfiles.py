@@ -225,6 +225,25 @@ def install_app_files(
     return True, messages
 
 
+def read_game_json_field(path: str | Path, field: str) -> str:
+    try:
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+    except Exception:
+        return ""
+    if field == "flask-port":
+        return data.get("web", {}).get("flask_port", "")
+    if field == "app-desc":
+        name = data.get("name") or "?"
+        subtitle = data.get("subtitle") or ""
+        return f"{name} — {subtitle}" if subtitle else name
+    return ""
+
+
+def _cmd_read_game_json(args: argparse.Namespace) -> int:
+    print(read_game_json_field(args.path, args.field))
+    return 0
+
+
 def _cmd_install(args: argparse.Namespace) -> int:
     ok, messages = install_app_files(
         deploy_app=args.deploy_app,
@@ -285,6 +304,10 @@ def build_parser() -> argparse.ArgumentParser:
     install.add_argument("--steamcmd-path", default="")
     install.add_argument("--bepinex", action="store_true")
     install.set_defaults(func=_cmd_install)
+    read_gj = sub.add_parser("read-game-json")
+    read_gj.add_argument("--path", required=True)
+    read_gj.add_argument("--field", required=True, choices=["flask-port", "app-desc"])
+    read_gj.set_defaults(func=_cmd_read_game_json)
     return parser
 
 
