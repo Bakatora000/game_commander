@@ -214,6 +214,36 @@ def load_config(path: str | Path | None = None) -> dict:
     return {}
 
 
+def list_guild_members(
+    guild_id: str,
+    bot_token: str,
+    *,
+    limit: int = 1000,
+    timeout: int = 10,
+) -> tuple[bool, str, list]:
+    """List guild members (requires GUILD_MEMBERS privileged intent).
+    Returns (ok, message, members) where each member has user.id and user.username."""
+    ok, msg, body = _discord_api(
+        "GET", f"/guilds/{guild_id}/members?limit={limit}", bot_token, timeout=timeout,
+    )
+    if not ok:
+        return False, msg, []
+    return True, "ok", body or []
+
+
+def list_guild_roles(
+    guild_id: str,
+    bot_token: str,
+    *,
+    timeout: int = 10,
+) -> tuple[bool, str, list]:
+    """List all roles in a guild. Returns (ok, message, roles)."""
+    ok, msg, body = _discord_api("GET", f"/guilds/{guild_id}/roles", bot_token, timeout=timeout)
+    if not ok:
+        return False, msg, []
+    return True, "ok", body or []
+
+
 def test_connection(cfg: dict, *, timeout: int = 10) -> tuple[bool, str, str]:
     """Test bot token and guild access. Returns (ok, message, bot_username)."""
     token = cfg.get("bot_token", "")

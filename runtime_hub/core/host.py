@@ -514,6 +514,33 @@ def _save_discord_cfg(cfg: dict) -> tuple[bool, str]:
     return discordnotify.save_config(cfg, _discord_cfg_path())
 
 
+def get_discord_members_and_roles() -> dict:
+    from shared import discordnotify
+    cfg = _load_discord_cfg()
+    guild_id = cfg.get("guild_id", "").strip()
+    token = cfg.get("bot_token", "")
+    if not guild_id or not token:
+        return {"members": [], "roles": []}
+    members = []
+    ok_m, _, raw_members = discordnotify.list_guild_members(guild_id, token)
+    if ok_m:
+        for m in raw_members:
+            user = m.get("user") or {}
+            uid = str(user.get("id", ""))
+            name = m.get("nick") or user.get("global_name") or user.get("username", "")
+            if uid and name:
+                members.append({"id": uid, "name": name})
+    roles = []
+    ok_r, _, raw_roles = discordnotify.list_guild_roles(guild_id, token)
+    if ok_r:
+        roles = [
+            {"id": str(r["id"]), "name": r["name"]}
+            for r in raw_roles
+            if r.get("name") != "@everyone"
+        ]
+    return {"members": members, "roles": roles}
+
+
 def test_discord_connection() -> tuple[bool, str]:
     from shared import discordnotify
     cfg = _load_discord_cfg()

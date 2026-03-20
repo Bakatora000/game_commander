@@ -475,9 +475,11 @@
             <div class="accounts-grid">
               <section class="card">
                 <h3 class="section-title">Ajouter un accès</h3>
-                <label class="field-label" for="discordTargetId">ID Discord</label>
-                <input class="field-input" id="discordTargetId" placeholder="123456789012345678">
-                <p class="deploy-help">Clic droit sur un utilisateur ou un rôle dans Discord → <em>Copier l'identifiant</em>. Mode développeur requis.</p>
+                <label class="field-label" for="discordTargetId">Utilisateur ou Rôle Discord</label>
+                <input class="field-input" id="discordTargetId" list="discordMembersList" placeholder="Nom d'utilisateur ou ID Discord" autocomplete="off">
+                <datalist id="discordMembersList"></datalist>
+                <datalist id="discordRolesList"></datalist>
+                <p class="deploy-help">Saisissez un nom (autocomplete) ou un ID Discord. En l'absence d'autocomplete, activez l'intent GUILD_MEMBERS dans le portail développeur Discord.</p>
                 <div style="display:flex;gap:1.2rem;margin:.6rem 0 1rem">
                   <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
                     <input type="radio" name="discordTargetType" value="member" checked> Utilisateur
@@ -1103,6 +1105,8 @@
     // ── Discord panel ────────────────────────────────────────────────────────
     let DISCORD_CURRENT_INSTANCE = '';
     let GUILD_CHANNELS = []; // [{id, name}] — canaux texte du serveur
+    let GUILD_MEMBERS = []; // [{id, name}]
+    let GUILD_ROLES = []; // [{id, name}]
     function channelNameById(id) {
       if (!id) return '';
       const ch = GUILD_CHANNELS.find(c => c.id === id);
@@ -1114,6 +1118,21 @@
       const byName = GUILD_CHANNELS.find(c => c.name.toLowerCase() === v.toLowerCase());
       if (byName) return byName.id;
       return v; // ID brut ou valeur inconnue
+    }
+    function resolveDiscordName(id, type) {
+      // type: 0=role, 1=member
+      const list = type === 0 ? GUILD_ROLES : GUILD_MEMBERS;
+      const found = list.find(x => x.id === id);
+      return found ? found.name : id;
+    }
+    function resolvePermTargetInput(value) {
+      const v = value.trim();
+      if (!v) return '';
+      const targetType = document.querySelector('[name="discordTargetType"]:checked')?.value || 'member';
+      const list = targetType === 'role' ? GUILD_ROLES : GUILD_MEMBERS;
+      const byName = list.find(x => x.name.toLowerCase() === v.toLowerCase());
+      if (byName) return byName.id;
+      return v;
     }
     async function loadDiscord() {
       const r = await fetch('{{ prefix }}/api/discord', { credentials: 'same-origin' });
@@ -1180,6 +1199,14 @@
       document.getElementById('discordPermissionsPanel').hidden = false;
       document.getElementById('discordTargetId').value = '';
       setFeedback('discordPermsFeedback', '', true);
+      const mr = await fetch('{{ prefix }}/api/discord/members-and-roles', { credentials: 'same-origin' });
+      if (mr.ok) {
+        const mrd = await mr.json().catch(() => ({}));
+        GUILD_MEMBERS = mrd.members || [];
+        GUILD_ROLES = mrd.roles || [];
+        document.getElementById('discordMembersList').innerHTML = GUILD_MEMBERS.map(m => `<option value="${esc(m.name)}">`).join('');
+        document.getElementById('discordRolesList').innerHTML = GUILD_ROLES.map(r => `<option value="${esc(r.name)}">`).join('');
+      }
       await loadDiscordPerms();
     }
     async function loadDiscordPerms() {
@@ -1192,7 +1219,11 @@
       if (!overwrites.length) { el.innerHTML = '<span style="color:var(--muted)">Aucun accès configuré</span>'; return; }
       el.innerHTML = overwrites.map((ow) => {
         const typeLabel = ow.type === 0 ? 'Rôle' : 'Utilisateur';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--border)"><span><code>${esc(ow.id)}</code> <span style="color:var(--muted)">(${typeLabel})</span></span><button class="monitor-toggle" type="button" data-perm-remove="${esc(ow.id)}">Retirer</button></div>`;
+        const name = resolveDiscordName(ow.id, ow.type);
+        const displayName = name !== ow.id
+          ? `<span title="ID : ${esc(ow.id)}" style="cursor:default">${esc(name)}</span>`
+          : `<code>${esc(ow.id)}</code>`;
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:.3rem 0;border-bottom:1px solid var(--border)"><span>${displayName} <span style="color:var(--muted)">(${typeLabel})</span></span><button class="monitor-toggle" type="button" data-perm-remove="${esc(ow.id)}">Retirer</button></div>`;
       }).join('');
       el.querySelectorAll('[data-perm-remove]').forEach((btn) => {
         btn.addEventListener('click', async () => {
@@ -1235,10 +1266,23 @@
       if (r.ok) await loadDiscord();
       btn.disabled = false;
     });
+    document.querySelectorAll('[name="discordTargetType"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        const input = document.getElementById('discordTargetId');
+        if (radio.value === 'role') {
+          input.setAttribute('list', 'discordRolesList');
+          input.placeholder = 'Nom du rôle ou ID Discord';
+        } else {
+          input.setAttribute('list', 'discordMembersList');
+          input.placeholder = "Nom d'utilisateur ou ID Discord";
+        }
+        input.value = '';
+      });
+    });
     document.getElementById('btnAddDiscordPerm').addEventListener('click', async () => {
-      const targetId = document.getElementById('discordTargetId').value.trim();
+      const targetId = resolvePermTargetInput(document.getElementById('discordTargetId').value);
       const targetType = document.querySelector('[name="discordTargetType"]:checked')?.value || 'member';
-      if (!targetId) { setFeedback('discordPermsFeedback', 'ID requis', false); return; }
+      if (!targetId) { setFeedback('discordPermsFeedback', 'Utilisateur ou rôle requis', false); return; }
       const btn = document.getElementById('btnAddDiscordPerm');
       btn.disabled = true;
       const r = await fetch(`{{ prefix }}/api/discord/channels/${encodeURIComponent(DISCORD_CURRENT_INSTANCE)}/permissions`, {
