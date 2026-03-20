@@ -50,6 +50,8 @@ deploy_step_dependencies() {
         --game-id "$GAME_ID" \
         --home-dir "$HOME_DIR")" || die "Échec inspection dépendances"
 
+    source <(python3 "$SCRIPT_DIR/shared/deploydeps.py" flags --from-json "$deps_json")
+
     APT_UPDATED=false
     apt_once() { $APT_UPDATED || { info "apt update..."; apt-get update -qq; APT_UPDATED=true; }; }
 
@@ -65,72 +67,37 @@ deploy_step_dependencies() {
 
     while IFS= read -r pkg; do
         [[ -n "$pkg" ]] && install_pkg "$pkg"
-    done < <(python3 - <<'PY' "$deps_json"
-import json, sys
-for pkg in json.loads(sys.argv[1]).get("apt_missing", []):
-    print(pkg)
-PY
-    )
+    done < <(python3 "$SCRIPT_DIR/shared/deploydeps.py" list-pkgs --from-json "$deps_json" --type apt)
 
-    if python3 - <<'PY' "$deps_json"
-import json, sys
-data = json.loads(sys.argv[1])
-raise SystemExit(0 if data.get("need_i386") and not data.get("i386_enabled") else 1)
-PY
-    then
-        {
-            info "Activation i386..."
-            dpkg --add-architecture i386
-            apt_once
-        }
+    if [[ "$NEEDS_I386" == "true" && "$I386_ENABLED" != "true" ]]; then
+        info "Activation i386..."
+        dpkg --add-architecture i386
+        apt_once
     fi
+
     while IFS= read -r pkg; do
         [[ -n "$pkg" ]] && install_pkg "$pkg"
-    done < <(python3 - <<'PY' "$deps_json"
-import json, sys
-for pkg in json.loads(sys.argv[1]).get("extra_apt_missing", []):
-    print(pkg)
-PY
-    )
+    done < <(python3 "$SCRIPT_DIR/shared/deploydeps.py" list-pkgs --from-json "$deps_json" --type extra-apt)
 
     while IFS= read -r pkg; do
         [[ -z "$pkg" ]] && continue
         warn "Python: ${pkg/python3-/} manquant"
-            do_it=false
-            $AUTO_INSTALL_DEPS && do_it=true || { confirm "Installer $pkg (apt) ?" "o" && do_it=true; }
-            $do_it && { apt_once; apt-get install -y -qq "$pkg" && ok "Python: ${pkg/python3-/} installé (apt)"; }
-    done < <(python3 - <<'PY' "$deps_json"
-import json, sys
-for pkg in json.loads(sys.argv[1]).get("python_apt_missing", []):
-    print(pkg)
-PY
-    )
+        local do_it=false
+        $AUTO_INSTALL_DEPS && do_it=true || { confirm "Installer $pkg (apt) ?" "o" && do_it=true; }
+        $do_it && { apt_once; apt-get install -y -qq "$pkg" && ok "Python: ${pkg/python3-/} installé (apt)"; }
+    done < <(python3 "$SCRIPT_DIR/shared/deploydeps.py" list-pkgs --from-json "$deps_json" --type python-apt)
 
     while IFS= read -r pkg; do
         [[ -z "$pkg" ]] && continue
-            warn "Python: $pkg manquant"
-            do_it=false
-            $AUTO_INSTALL_DEPS && do_it=true || { confirm "pip install $pkg ?" "o" && do_it=true; }
-            $do_it && pip3 install "$pkg" --break-system-packages -q && ok "Python: $pkg installé"
-    done < <(python3 - <<'PY' "$deps_json"
-import json, sys
-for pkg in json.loads(sys.argv[1]).get("python_pip_missing", []):
-    print(pkg)
-PY
-    )
+        warn "Python: $pkg manquant"
+        local do_it=false
+        $AUTO_INSTALL_DEPS && do_it=true || { confirm "pip install $pkg ?" "o" && do_it=true; }
+        $do_it && pip3 install "$pkg" --break-system-packages -q && ok "Python: $pkg installé"
+    done < <(python3 "$SCRIPT_DIR/shared/deploydeps.py" list-pkgs --from-json "$deps_json" --type python-pip)
 
-    if python3 - <<'PY' "$deps_json"
-import json, sys
-raise SystemExit(0 if json.loads(sys.argv[1]).get("enshrouded", {}).get("required") else 1)
-PY
-    then
+    if [[ "$NEEDS_ENSHROUDED" == "true" ]]; then
         info "Enshrouded requiert Wine (binaire Windows) + Xvfb..."
-        if python3 - <<'PY' "$deps_json"
-import json, sys
-ens = json.loads(sys.argv[1]).get("enshrouded", {})
-raise SystemExit(0 if (not ens.get("wine64_installed") or not ens.get("wine64_in_path")) else 1)
-PY
-        then
+        if [[ "$WINE64_OK" != "true" ]]; then
             warn "wine64 absent — installation depuis les dépôts système..."
             apt_once
             apt-get install -y -qq wine64 xvfb && ok "Wine64 + Xvfb installés" || die "Échec installation Wine"
@@ -138,43 +105,23 @@ PY
             ok "Wine64 déjà présent"
         fi
         if ! cmd_exists wine64; then
-            if python3 - <<'PY' "$deps_json"
-import json, sys
-ens = json.loads(sys.argv[1]).get("enshrouded", {})
-raise SystemExit(0 if ens.get("wine_in_path") else 1)
-PY
-            then
+            if [[ "$WINE_IN_PATH" == "true" ]]; then
                 ln -sf "$(command -v wine)" /usr/local/bin/wine64
                 ok "Symlink wine64 → wine créé dans /usr/local/bin"
-            elif python3 - <<'PY' "$deps_json"
-import json, sys
-ens = json.loads(sys.argv[1]).get("enshrouded", {})
-raise SystemExit(0 if ens.get("wine64_alt_path") else 1)
-PY
-            then
+            elif [[ -n "$WINE64_ALT_PATH" ]]; then
                 ln -sf /usr/lib/wine/wine64 /usr/local/bin/wine64
                 ok "Symlink wine64 → /usr/lib/wine/wine64 créé"
             else
                 die "wine64 introuvable dans le PATH après installation — vérifiez le paquet wine"
             fi
         fi
-        if python3 - <<'PY' "$deps_json"
-import json, sys
-ens = json.loads(sys.argv[1]).get("enshrouded", {})
-raise SystemExit(0 if not ens.get("xvfb_run_in_path") else 1)
-PY
-        then
+        if [[ "$XVFB_IN_PATH" != "true" ]]; then
             apt_once
             apt-get install -y -qq xvfb && ok "Xvfb installé" || warn "Xvfb absent"
         else
             ok "Xvfb déjà présent"
         fi
-        if python3 - <<'PY' "$deps_json"
-import json, sys
-ens = json.loads(sys.argv[1]).get("enshrouded", {})
-raise SystemExit(0 if not ens.get("wine_prefix_exists") else 1)
-PY
-        then
+        if [[ "$WINE_PREFIX_EXISTS" != "true" ]]; then
             info "Initialisation du prefix Wine pour $SYS_USER..."
             sudo -u "$SYS_USER" WINEDEBUG=-all wineboot --init 2>/dev/null && ok "Prefix Wine initialisé" || warn "wineboot : vérifiez manuellement"
         else
@@ -182,30 +129,19 @@ PY
         fi
     fi
 
-    STEAMCMD_PATH=""
-    if python3 - <<'PY' "$deps_json"
-import json, sys
-data = json.loads(sys.argv[1])
-raise SystemExit(0 if data.get("need_i386") else 1)
-PY
-    then
-        STEAMCMD_PATH="$(python3 - <<'PY' "$deps_json"
-import json, sys
-print(json.loads(sys.argv[1]).get("steamcmd_path", ""))
-PY
-        )"
+    if [[ "$NEEDS_I386" == "true" ]]; then
         if [[ -n "$STEAMCMD_PATH" ]]; then
             ok "SteamCMD : $STEAMCMD_PATH"
         else
             warn "SteamCMD introuvable"
-            do_steam=false
+            local do_steam=false
             $AUTO_INSTALL_STEAMCMD && do_steam=true || { confirm "Installer SteamCMD ?" "o" && do_steam=true; }
             $do_steam && {
                 mkdir -p "$HOME_DIR/steamcmd"
                 curl -sqL "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_linux.tar.gz" \
                     | tar -xzC "$HOME_DIR/steamcmd"
                 chown -R "$SYS_USER:$SYS_USER" "$HOME_DIR/steamcmd"
-                STEAMCMD_PATH="$HOME_DIR/steamcmd/steamcmd.sh"
+                STEAMCMD_PATH="$STEAMCMD_HOME"
                 ok "SteamCMD installé : $STEAMCMD_PATH"
             } || die "SteamCMD requis."
         fi

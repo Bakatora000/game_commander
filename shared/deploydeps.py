@@ -8,6 +8,7 @@ import importlib.util
 import json
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 
@@ -85,6 +86,14 @@ def inspect_dependencies(
     }
 
 
+_LIST_PKG_KEYS = {
+    "apt": "apt_missing",
+    "extra-apt": "extra_apt_missing",
+    "python-apt": "python_apt_missing",
+    "python-pip": "python_pip_missing",
+}
+
+
 def _cmd_inspect(args: argparse.Namespace) -> int:
     payload = inspect_dependencies(
         deploy_mode=args.deploy_mode,
@@ -94,6 +103,34 @@ def _cmd_inspect(args: argparse.Namespace) -> int:
         home_dir=args.home_dir,
     )
     print(json.dumps(payload))
+    return 0
+
+
+def _cmd_list_pkgs(args: argparse.Namespace) -> int:
+    data = json.loads(args.from_json)
+    key = _LIST_PKG_KEYS.get(args.type, "")
+    for pkg in data.get(key, []):
+        sys.stdout.write(f"{pkg}\n")
+    return 0
+
+
+def _cmd_flags(args: argparse.Namespace) -> int:
+    data = json.loads(args.from_json)
+    ens = data.get("enshrouded") or {}
+    pairs = {
+        "NEEDS_I386": "true" if data.get("need_i386") else "false",
+        "I386_ENABLED": "true" if data.get("i386_enabled") else "false",
+        "NEEDS_ENSHROUDED": "true" if ens.get("required") else "false",
+        "WINE64_OK": "true" if (ens.get("wine64_installed") and ens.get("wine64_in_path")) else "false",
+        "WINE_IN_PATH": "true" if ens.get("wine_in_path") else "false",
+        "WINE64_ALT_PATH": ens.get("wine64_alt_path") or "",
+        "XVFB_IN_PATH": "true" if ens.get("xvfb_run_in_path") else "false",
+        "WINE_PREFIX_EXISTS": "true" if ens.get("wine_prefix_exists") else "false",
+        "STEAMCMD_PATH": data.get("steamcmd_path") or "",
+        "STEAMCMD_HOME": data.get("steamcmd_home") or "",
+    }
+    for k, v in pairs.items():
+        sys.stdout.write(f'{k}="{v}"\n')
     return 0
 
 
@@ -107,6 +144,13 @@ def build_parser() -> argparse.ArgumentParser:
     inspect.add_argument("--game-id", required=True)
     inspect.add_argument("--home-dir", required=True)
     inspect.set_defaults(func=_cmd_inspect)
+    list_pkgs = sub.add_parser("list-pkgs")
+    list_pkgs.add_argument("--from-json", required=True)
+    list_pkgs.add_argument("--type", required=True, choices=list(_LIST_PKG_KEYS))
+    list_pkgs.set_defaults(func=_cmd_list_pkgs)
+    flags = sub.add_parser("flags")
+    flags.add_argument("--from-json", required=True)
+    flags.set_defaults(func=_cmd_flags)
     return parser
 
 

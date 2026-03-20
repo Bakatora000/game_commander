@@ -2093,7 +2093,8 @@ class DeployHelpersTests(unittest.TestCase):
         self.assertEqual(messages, ["SSL existant — non modifié"])
 
     def test_inspect_dependencies_reports_missing_from_empty_system(self):
-        with mock.patch.object(deploydeps, "_is_dpkg_installed", return_value=False), \
+        with tempfile.TemporaryDirectory() as tmp_home, \
+             mock.patch.object(deploydeps, "_is_dpkg_installed", return_value=False), \
              mock.patch.object(deploydeps, "_python_module_available", return_value=False), \
              mock.patch.object(deploydeps, "_cmd_exists", return_value=False), \
              mock.patch("subprocess.run") as run_mock:
@@ -2103,7 +2104,7 @@ class DeployHelpersTests(unittest.TestCase):
                 steam_appid="896660",
                 ssl_mode="certbot",
                 game_id="enshrouded",
-                home_dir="/home/gameserver",
+                home_dir=tmp_home,
             )
         self.assertIn("python3", payload["apt_missing"])
         self.assertIn("python3-flask", payload["python_apt_missing"])
@@ -2112,6 +2113,43 @@ class DeployHelpersTests(unittest.TestCase):
         self.assertFalse(payload["i386_enabled"])
         self.assertIn("lib32gcc-s1", payload["extra_apt_missing"])
         self.assertTrue(payload["enshrouded"]["required"])
+
+    def test_deploydeps_list_pkgs_apt(self):
+        import json as _json
+        data = {"apt_missing": ["nginx", "curl"], "extra_apt_missing": [], "python_apt_missing": [], "python_pip_missing": []}
+        import io
+        out = io.StringIO()
+        with mock.patch("sys.stdout", out):
+            deploydeps._cmd_list_pkgs(mock.Mock(from_json=_json.dumps(data), type="apt"))
+        self.assertEqual(out.getvalue(), "nginx\ncurl\n")
+
+    def test_deploydeps_list_pkgs_empty(self):
+        import json as _json
+        data = {"apt_missing": [], "extra_apt_missing": [], "python_apt_missing": [], "python_pip_missing": []}
+        import io
+        out = io.StringIO()
+        with mock.patch("sys.stdout", out):
+            deploydeps._cmd_list_pkgs(mock.Mock(from_json=_json.dumps(data), type="python-pip"))
+        self.assertEqual(out.getvalue(), "")
+
+    def test_deploydeps_flags_outputs_shell_exports(self):
+        import json as _json
+        data = {
+            "need_i386": True, "i386_enabled": False,
+            "enshrouded": {"required": False, "wine64_installed": False, "wine64_in_path": False,
+                           "wine_in_path": False, "wine64_alt_path": "", "xvfb_run_in_path": False,
+                           "wine_prefix_exists": False},
+            "steamcmd_path": "/usr/games/steamcmd",
+            "steamcmd_home": "/home/vhserver/steamcmd/steamcmd.sh",
+        }
+        import io
+        out = io.StringIO()
+        with mock.patch("sys.stdout", out):
+            deploydeps._cmd_flags(mock.Mock(from_json=_json.dumps(data)))
+        lines = out.getvalue().splitlines()
+        self.assertIn('NEEDS_I386="true"', lines)
+        self.assertIn('I386_ENABLED="false"', lines)
+        self.assertIn('STEAMCMD_PATH="/usr/games/steamcmd"', lines)
 
     def test_latest_minecraft_server_url_uses_latest_release(self):
         def fake_fetch(url):
@@ -2228,7 +2266,7 @@ class DeployHelpersTests(unittest.TestCase):
             captured_cfg_cmds = []
 
             def fake_run(cmd, **kwargs):
-                if isinstance(cmd, list) and len(cmd) >= 4 and cmd[2].endswith("config_gen.py") and cmd[3] == "terraria-cfg":
+                if isinstance(cmd, list) and len(cmd) >= 4 and cmd[1].endswith("config_gen.py") and cmd[2] == "terraria-cfg":
                     captured_cfg_cmds.append(cmd)
                     out = Path(cmd[cmd.index("--out") + 1])
                     out.write_text("world=/tmp/world.wld\nworldpath=/tmp\nworldname=terraria2\n", encoding="utf-8")
@@ -4586,6 +4624,7 @@ if __name__ == "__main__":
         HostCliTests,
         BootstrapHubTests,
         DeployPlanTests,
+        DeployHelpersTests,
     ]
     if len(sys.argv) > 1:
         names = sys.argv[1:]
