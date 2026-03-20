@@ -1775,6 +1775,56 @@ class HubAuthTests(unittest.TestCase):
                 self.assertTrue(ok, err)
                 self.assertTrue(hub_auth.verify_password("admin", "resetpass1"))
 
+    def test_view_hub_includes_manage_accounts(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "users.json").write_text(json.dumps({
+                "admin": {"password_hash": hub_auth.hash_password("p"), "permissions": ["view_hub"], "email": ""},
+            }), encoding="utf-8")
+            app = Flask(__name__, root_path=str(root))
+            with app.app_context():
+                self.assertIn("manage_accounts", hub_auth.get_user_perms("admin"))
+
+    def test_create_account(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "users.json").write_text(json.dumps({
+                "admin": {"password_hash": hub_auth.hash_password("adminpass1"), "permissions": ["view_hub"], "email": ""},
+            }), encoding="utf-8")
+            app = Flask(__name__, root_path=str(root))
+            with app.app_context():
+                ok, err = hub_auth.create_account("alice", "alicepass1")
+                self.assertTrue(ok, err)
+                self.assertTrue(hub_auth.verify_password("alice", "alicepass1"))
+                # duplicate
+                ok2, err2 = hub_auth.create_account("alice", "otherpass1")
+                self.assertFalse(ok2)
+                self.assertIn("existe", err2)
+                # too short password
+                ok3, err3 = hub_auth.create_account("bob", "short")
+                self.assertFalse(ok3)
+
+    def test_delete_account(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "users.json").write_text(json.dumps({
+                "admin": {"password_hash": hub_auth.hash_password("adminpass1"), "permissions": ["view_hub"], "email": ""},
+                "alice": {"password_hash": hub_auth.hash_password("alicepass1"), "permissions": ["view_hub"], "email": ""},
+            }), encoding="utf-8")
+            app = Flask(__name__, root_path=str(root))
+            with app.app_context():
+                # can't delete self
+                ok, err = hub_auth.delete_account("admin", "admin")
+                self.assertFalse(ok)
+                # can delete other
+                ok2, err2 = hub_auth.delete_account("alice", "admin")
+                self.assertTrue(ok2, err2)
+                self.assertIsNone(hub_auth.get_user_record("alice"))
+                # can't delete last account
+                ok3, err3 = hub_auth.delete_account("admin", "other")
+                self.assertFalse(ok3)
+                self.assertIn("dernier", err3)
+
 
 class HubHostTests(unittest.TestCase):
 
@@ -4753,6 +4803,7 @@ if __name__ == "__main__":
         DeployHelpersTests,
         ConsoleTests,
         SysutilTests,
+        HubAuthTests,
     ]
     if len(sys.argv) > 1:
         names = sys.argv[1:]

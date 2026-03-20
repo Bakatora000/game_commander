@@ -123,7 +123,32 @@ def api_console_archive():
 @auth.require_auth
 @auth.require_perm("view_hub")
 def api_accounts():
-    return jsonify({"accounts": auth.list_accounts()})
+    return jsonify({
+        "accounts": auth.list_accounts(),
+        "current_username": session.get("username", ""),
+        "can_manage_accounts": auth.has_perm("manage_accounts"),
+    })
+
+
+@app.route(f"{PREFIX}/api/accounts", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("manage_accounts")
+def api_create_account():
+    data = request.get_json() or {}
+    ok, err = auth.create_account(data.get("username", ""), data.get("password", ""))
+    if not ok:
+        return jsonify({"error": "invalid_request", "message": err}), 400
+    return jsonify({"ok": True})
+
+
+@app.route(f"{PREFIX}/api/accounts/<username>", methods=["DELETE"])
+@auth.require_auth
+@auth.require_perm("manage_accounts")
+def api_delete_account(username):
+    ok, err = auth.delete_account(username, session.get("username", ""))
+    if not ok:
+        return jsonify({"error": "invalid_request", "message": err}), 400
+    return jsonify({"ok": True})
 
 
 @app.route(f"{PREFIX}/api/accounts/change-password", methods=["POST"])
@@ -154,7 +179,7 @@ def api_update_account_email(username):
 
 @app.route(f"{PREFIX}/api/accounts/<username>/reset-password", methods=["POST"])
 @auth.require_auth
-@auth.require_perm("view_hub")
+@auth.require_perm("manage_accounts")
 def api_reset_account_password(username):
     data = request.get_json() or {}
     ok, err = auth.reset_account_password(username, data.get("new_password", ""))

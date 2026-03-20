@@ -18,6 +18,7 @@ DEFAULT_VIEW_HUB_PERMISSIONS = {
     "manage_lifecycle",
     "run_updates",
     "rebalance_cpu",
+    "manage_accounts",
 }
 
 
@@ -119,6 +120,37 @@ def reset_account_password(target_username, new_password):
     if target_username not in users:
         return False, "Compte introuvable"
     users[target_username]["password_hash"] = hash_password(new_password)
+    save_users(users)
+    return True, ""
+
+
+def create_account(username: str, password: str) -> tuple[bool, str]:
+    username = username.strip()
+    if len(username) < 2:
+        return False, "Nom d'utilisateur trop court (2 caractères minimum)"
+    if len(password) < 8:
+        return False, "Mot de passe trop court (8 caractères minimum)"
+    users = load_users()
+    if username in users:
+        return False, f"Le compte '{username}' existe déjà"
+    users[username] = {
+        "password_hash": hash_password(password),
+        "permissions": ["view_hub"],
+        "email": "",
+    }
+    save_users(users)
+    return True, ""
+
+
+def delete_account(target_username: str, requesting_username: str) -> tuple[bool, str]:
+    if target_username == requesting_username:
+        return False, "Impossible de supprimer son propre compte"
+    users = load_users()
+    if target_username not in users:
+        return False, "Compte introuvable"
+    if len(users) <= 1:
+        return False, "Impossible de supprimer le dernier compte"
+    del users[target_username]
     save_users(users)
     return True, ""
 
