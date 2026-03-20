@@ -25,5 +25,9 @@ env/*.env
 *.bak
 *.bak.*
 
+# Config Discord locale (contient bot_token et infos sensibles)
+discord.local.json
+discord_*.txt
+
 # Fichiers Claude Code
 .claude/
