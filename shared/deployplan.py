@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import pwd
 import subprocess
 import sys
 from pathlib import Path
@@ -292,6 +293,41 @@ def admin_password_required(password: str) -> bool:
     return bool(password)
 
 
+def get_user_info(username: str) -> tuple[bool, str]:
+    """Check if a system user exists. Returns (exists, home_dir)."""
+    try:
+        pw = pwd.getpwnam(username)
+        return True, pw.pw_dir
+    except KeyError:
+        return False, ""
+
+
+def create_system_user(username: str) -> tuple[bool, str]:
+    """Create a system user with a home dir and bash shell. Returns (ok, error_message)."""
+    result = subprocess.run(
+        ["useradd", "-m", "-s", "/bin/bash", username],
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return False, (result.stderr.strip() or "useradd a échoué")
+    return True, ""
+
+
+def set_user_password_stdin() -> tuple[bool, str]:
+    """Read 'username:password' from stdin and pipe it to chpasswd. Returns (ok, error_message)."""
+    line = sys.stdin.readline()
+    result = subprocess.run(
+        ["chpasswd"],
+        input=line,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return False, (result.stderr.strip() or "chpasswd a échoué")
+    return True, ""
+
+
 def render_summary(env: dict[str, str]) -> list[str]:
     lines = [
         f"Jeu               : {env.get('GAME_LABEL', '')}",
@@ -407,6 +443,28 @@ def describe_port_conflicts(
 
 def _exports(payload: dict[str, str]) -> str:
     return "".join(f'{k}="{v}"\n' for k, v in payload.items())
+
+
+def _cmd_user_info(args: argparse.Namespace) -> int:
+    exists, home_dir = get_user_info(args.username)
+    print(_exports({"USER_EXISTS": "true" if exists else "false", "HOME_DIR": home_dir}), end="")
+    return 0
+
+
+def _cmd_create_user(args: argparse.Namespace) -> int:
+    ok, msg = create_system_user(args.username)
+    if not ok:
+        print(f"Erreur : {msg}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def _cmd_set_user_password(_args: argparse.Namespace) -> int:
+    ok, msg = set_user_password_stdin()
+    if not ok:
+        print(f"Erreur : {msg}", file=sys.stderr)
+        return 1
+    return 0
 
 
 def _cmd_instance_defaults(args: argparse.Namespace) -> int:
@@ -567,6 +625,14 @@ def _cmd_describe_conflicts(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Game Commander deploy planning helpers")
     sub = parser.add_subparsers(dest="command", required=True)
+    user_info = sub.add_parser("user-info")
+    user_info.add_argument("--username", required=True)
+    user_info.set_defaults(func=_cmd_user_info)
+    create_user = sub.add_parser("create-user")
+    create_user.add_argument("--username", required=True)
+    create_user.set_defaults(func=_cmd_create_user)
+    set_pwd = sub.add_parser("set-user-password")
+    set_pwd.set_defaults(func=_cmd_set_user_password)
     inst = sub.add_parser("instance-defaults")
     inst.add_argument("--game-id", required=True)
     inst.add_argument("--instance-id", default="")

@@ -60,21 +60,25 @@ deploy_configure_user() {
     prompt "Nom d'utilisateur" "${SYS_USER}"
     SYS_USER="$REPLY"
 
-    if ! id "$SYS_USER" &>/dev/null; then
+    source <(python3 "$SCRIPT_DIR/shared/deployplan.py" user-info --username "$SYS_USER")
+    if [[ "$USER_EXISTS" != "true" ]]; then
         warn "L'utilisateur '$SYS_USER' n'existe pas."
         if confirm "Créer $SYS_USER ?" "o"; then
-            useradd -m -s /bin/bash "$SYS_USER"
+            python3 "$SCRIPT_DIR/shared/deployplan.py" create-user --username "$SYS_USER" \
+                || die "Création de l'utilisateur échouée"
             ok "Utilisateur $SYS_USER créé"
             if ! $CONFIG_MODE; then
                 prompt_secret "Mot de passe système pour $SYS_USER"
-                echo "$SYS_USER:$REPLY" | chpasswd && ok "Mot de passe défini"
+                printf '%s:%s\n' "$SYS_USER" "$REPLY" | \
+                    python3 "$SCRIPT_DIR/shared/deployplan.py" set-user-password \
+                    && ok "Mot de passe défini" || warn "Mot de passe non défini"
             fi
+            source <(python3 "$SCRIPT_DIR/shared/deployplan.py" user-info --username "$SYS_USER")
         else
             die "Utilisateur requis."
         fi
     fi
 
-    HOME_DIR=$(eval echo "~$SYS_USER")
     ok "Utilisateur : $SYS_USER ($HOME_DIR)"
 }
 

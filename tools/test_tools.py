@@ -611,6 +611,58 @@ class DeployPlanTests(unittest.TestCase):
         self.assertTrue(deployplan.admin_password_required("secret"))
         self.assertFalse(deployplan.admin_password_required(""))
 
+    def test_get_user_info_existing(self):
+        import pwd as _pwd
+        fake_pw = _pwd.struct_passwd(("vhserver", "x", 1000, 1000, "", "/home/vhserver", "/bin/bash"))
+        with mock.patch("deployplan.pwd.getpwnam", return_value=fake_pw):
+            exists, home = deployplan.get_user_info("vhserver")
+        self.assertTrue(exists)
+        self.assertEqual(home, "/home/vhserver")
+
+    def test_get_user_info_missing(self):
+        with mock.patch("deployplan.pwd.getpwnam", side_effect=KeyError("no user")):
+            exists, home = deployplan.get_user_info("nobody")
+        self.assertFalse(exists)
+        self.assertEqual(home, "")
+
+    def test_create_system_user_success(self):
+        with mock.patch("deployplan.subprocess.run") as m:
+            m.return_value = mock.Mock(returncode=0, stderr="")
+            ok, msg = deployplan.create_system_user("newuser")
+        self.assertTrue(ok)
+        self.assertEqual(msg, "")
+        m.assert_called_once_with(
+            ["useradd", "-m", "-s", "/bin/bash", "newuser"],
+            capture_output=True, text=True,
+        )
+
+    def test_create_system_user_failure(self):
+        with mock.patch("deployplan.subprocess.run") as m:
+            m.return_value = mock.Mock(returncode=1, stderr="user exists")
+            ok, msg = deployplan.create_system_user("newuser")
+        self.assertFalse(ok)
+        self.assertEqual(msg, "user exists")
+
+    def test_set_user_password_stdin_success(self):
+        with mock.patch("deployplan.subprocess.run") as m, \
+             mock.patch("deployplan.sys.stdin") as stdin:
+            stdin.readline.return_value = "newuser:secret\n"
+            m.return_value = mock.Mock(returncode=0, stderr="")
+            ok, msg = deployplan.set_user_password_stdin()
+        self.assertTrue(ok)
+        m.assert_called_once_with(
+            ["chpasswd"], input="newuser:secret\n", capture_output=True, text=True,
+        )
+
+    def test_set_user_password_stdin_failure(self):
+        with mock.patch("deployplan.subprocess.run") as m, \
+             mock.patch("deployplan.sys.stdin") as stdin:
+            stdin.readline.return_value = "newuser:bad\n"
+            m.return_value = mock.Mock(returncode=1, stderr="auth error")
+            ok, msg = deployplan.set_user_password_stdin()
+        self.assertFalse(ok)
+        self.assertEqual(msg, "auth error")
+
     def test_render_summary_handles_valheim_flags(self):
         lines = deployplan.render_summary(
             {
