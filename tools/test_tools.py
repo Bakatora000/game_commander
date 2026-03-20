@@ -330,6 +330,32 @@ class DeployConfigureTests(unittest.TestCase):
             self.assertEqual(record["game_binary"], "enshrouded_server.exe")
             self.assertEqual(record["game_service"], "enshrouded-server-enshrouded2")
 
+    def test_config_mode_allows_missing_admin_password_when_users_json_exists(self):
+        with tempfile.TemporaryDirectory() as d:
+            app_dir = Path(d) / "game-commander-satisfactory"
+            app_dir.mkdir()
+            (app_dir / "users.json").write_text("{}", encoding="utf-8")
+            cfg = deployconfigure.DeployConfig(
+                config_mode=True,
+                app_dir=str(app_dir),
+                admin_login="admin",
+                admin_password="",
+            )
+            deployconfigure._configure_admin(cfg)
+
+    def test_config_mode_requires_admin_password_when_users_json_missing(self):
+        with tempfile.TemporaryDirectory() as d:
+            app_dir = Path(d) / "game-commander-satisfactory"
+            app_dir.mkdir()
+            cfg = deployconfigure.DeployConfig(
+                config_mode=True,
+                app_dir=str(app_dir),
+                admin_login="admin",
+                admin_password="",
+            )
+            with self.assertRaises(SystemExit):
+                deployconfigure._configure_admin(cfg)
+
 
 class UpdateCoreTests(unittest.TestCase):
 

@@ -370,6 +370,12 @@ def _configure_admin(cfg: DeployConfig) -> None:
         if not cfg.admin_password:
             cfg.admin_password = console.prompt_secret(f"Mot de passe pour {cfg.admin_login}")
 
+    if cfg.config_mode and not cfg.admin_password:
+        users_file = Path(cfg.app_dir or "") / "users.json"
+        if users_file.is_file():
+            console.info("ADMIN_PASSWORD absent du fichier de config — users.json existant conservé")
+            return
+
     if not cfg.admin_password:
         console.die("Mot de passe admin obligatoire.")
 
