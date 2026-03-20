@@ -333,7 +333,7 @@ def run_instance_redeploy(instance_name: str) -> tuple[bool, str, dict | None]:
     return False, message or "Échec redéploiement", card
 
 
-def run_instance_uninstall(instance_name: str, *, delete_discord_channel: bool = False) -> tuple[bool, str, dict]:
+def run_instance_uninstall(instance_name: str, *, delete_discord_channel_requested: bool = False) -> tuple[bool, str, dict]:
     instance = _instance_entry(instance_name)
     if not instance:
         return False, "Instance introuvable", get_hub_payload()
@@ -386,7 +386,7 @@ def run_instance_uninstall(instance_name: str, *, delete_discord_channel: bool =
         timeout=1200,
     )
     final_message = message or f"Instance {instance_name} désinstallée"
-    if ok and delete_discord_channel:
+    if ok and delete_discord_channel_requested:
         channel_id = str(((_load_discord_cfg().get("instance_channels") or {}).get(instance_name)) or "").strip()
         if channel_id:
             discord_ok, discord_message = delete_discord_channel(instance_name)
@@ -401,7 +401,7 @@ def run_instance_uninstall(instance_name: str, *, delete_discord_channel: bool =
                 )
         else:
             details.append("Aucun canal Discord associé à supprimer")
-    log_message = "\n".join(details + ([message] if message else [f"Instance {instance_name} désinstallée"]))
+    log_message = "\n".join(details + ([final_message] if final_message else [f"Instance {instance_name} désinstallée"]))
     _append_action_log(instance_name, "uninstall", ok, log_message)
     payload = get_hub_payload()
     if ok:

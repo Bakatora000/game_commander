@@ -2109,7 +2109,7 @@ class HubHostTests(unittest.TestCase):
                      {"instances": [{"name": "valheim2", "state": 0, "players": {"value": 0, "max": 10}}], "monitor": {}},
                      {"instances": [], "monitor": {}},
                  ]):
-                ok, message, payload = hub_host.run_instance_uninstall("valheim2", delete_discord_channel=True)
+                ok, message, payload = hub_host.run_instance_uninstall("valheim2", delete_discord_channel_requested=True)
             self.assertTrue(ok)
             self.assertIn("canal Discord supprimé", message)
             self.assertEqual(payload["instances"], [])
@@ -2138,7 +2138,7 @@ class HubHostTests(unittest.TestCase):
                      {"instances": [{"name": "valheim2", "state": 0, "players": {"value": 0, "max": 10}}], "monitor": {}},
                      {"instances": [], "monitor": {}},
                  ]):
-                ok, message, payload = hub_host.run_instance_uninstall("valheim2", delete_discord_channel=True)
+                ok, message, payload = hub_host.run_instance_uninstall("valheim2", delete_discord_channel_requested=True)
             self.assertTrue(ok)
             self.assertIn("n'a pas pu être supprimé", message)
             self.assertIn("http 403", message)

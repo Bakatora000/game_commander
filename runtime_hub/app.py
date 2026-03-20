@@ -258,7 +258,7 @@ def api_instance_uninstall(instance_name):
     try:
         ok, message, payload = host.run_instance_uninstall(
             instance_name,
-            delete_discord_channel=bool(data.get("delete_discord_channel")),
+            delete_discord_channel_requested=bool(data.get("delete_discord_channel")),
         )
     except Exception as exc:
         return jsonify({"ok": False, "message": f"Erreur Hub pendant la désinstallation : {exc}"}), 500
