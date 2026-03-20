@@ -1161,6 +1161,24 @@ class DiscordNotifyTests(unittest.TestCase):
             timeout=10,
         )
 
+    def test_find_or_create_game_category_maps_minecraft_variants_to_minecraft(self):
+        channels = [
+            {"id": "cat42", "type": 4, "name": "minecraft"},
+        ]
+        with mock.patch.object(discordnotify, "list_guild_channels", return_value=(True, "ok", channels)):
+            ok_fabric, message_fabric, category_fabric = discordnotify.find_or_create_game_category(
+                "guild", "minecraft-fabric", "token"
+            )
+            ok_java, message_java, category_java = discordnotify.find_or_create_game_category(
+                "guild", "minecraft-java", "token"
+            )
+        self.assertTrue(ok_fabric)
+        self.assertEqual(message_fabric, "existing")
+        self.assertEqual(category_fabric, "cat42")
+        self.assertTrue(ok_java)
+        self.assertEqual(message_java, "existing")
+        self.assertEqual(category_java, "cat42")
+
     def test_cli_create_channel_reuses_existing_channel_by_name(self):
         cfg = {"bot_token": "token", "guild_id": "guild", "instance_channels": {}}
         with mock.patch.object(discordnotify, "load_config", return_value=cfg), \

@@ -97,6 +97,13 @@ def list_guild_channels(
     return True, "ok", body or []
 
 
+def _game_category_name(game_id: str) -> str:
+    normalized = game_id.strip().lower().replace("_", "-")
+    if normalized in {"minecraft", "minecraft-java", "minecraft-fabric"}:
+        return "minecraft"
+    return normalized
+
+
 def find_or_create_game_category(
     guild_id: str,
     game_id: str,
@@ -105,7 +112,7 @@ def find_or_create_game_category(
     timeout: int = 10,
 ) -> tuple[bool, str, str]:
     """Find existing category for game_id or create it. Returns (ok, message, category_id)."""
-    category_name = game_id.lower().replace("_", "-")
+    category_name = _game_category_name(game_id)
     ok, msg, channels = list_guild_channels(guild_id, bot_token, timeout=timeout)
     if not ok:
         return False, msg, ""
