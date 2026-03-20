@@ -415,26 +415,32 @@
             <div class="monitor-head">
               <div>
                 <h2 class="section-title">Intégration Discord</h2>
-                <p class="section-subtitle">Canaux Discord associés aux instances. Le bot token se configure dans <code>/etc/game-commander/discord.json</code>.</p>
+                <p class="section-subtitle">Le bot token se configure dans <code>/etc/game-commander/discord.json</code>. Les paramètres ci-dessous sont sauvegardés dans ce même fichier.</p>
               </div>
-              <button class="monitor-toggle" type="button" id="btnRefreshDiscord">Actualiser</button>
             </div>
             <div class="feedback" id="discordConfigFeedback"></div>
             <div class="accounts-grid">
               <section class="card">
-                <h3 class="section-title">Configuration</h3>
-                <label class="field-label" for="discordGuildId">Guild ID</label>
+                <h3 class="section-title">Serveur Discord</h3>
+                <label class="field-label" for="discordGuildId">ID du serveur Discord</label>
                 <input class="field-input" id="discordGuildId" placeholder="123456789012345678">
-                <label class="field-label" for="discordCategoryId">Category ID (optionnel)</label>
+                <p class="deploy-help">Dans Discord : clic droit sur l'icône de ton serveur → <em>Copier l'identifiant du serveur</em>. Nécessite le mode développeur (Paramètres utilisateur → Avancé).</p>
+                <label class="field-label" for="discordCategoryId">ID de catégorie de secours <span style="font-weight:400;color:var(--muted)">(optionnel)</span></label>
                 <input class="field-input" id="discordCategoryId" placeholder="123456789012345678">
-                <button class="primary-btn" type="button" id="btnSaveDiscordConfig">Enregistrer</button>
+                <p class="deploy-help">Normalement inutile : une catégorie par jeu est créée automatiquement (<em>valheim</em>, <em>enshrouded</em>…). Ce champ sert de repli uniquement si le jeu n'est pas identifiable.</p>
+                <button class="primary-btn" type="button" id="btnSaveDiscordConfig">Enregistrer dans discord.json</button>
               </section>
             </div>
           </section>
 
           <section class="accounts-panel" style="margin-top:16px">
-            <h2 class="section-title">Canaux d'instances</h2>
-            <p class="section-subtitle">Un canal Discord peut être associé à chaque instance.</p>
+            <div class="monitor-head">
+              <div>
+                <h2 class="section-title">Canaux d'instances</h2>
+                <p class="section-subtitle">Un canal Discord par instance, créé automatiquement au déploiement si l'ID du serveur est configuré ci-dessus.</p>
+              </div>
+              <button class="monitor-toggle" type="button" id="btnRefreshDiscord">Actualiser la liste</button>
+            </div>
             <div class="feedback" id="discordChannelFeedback"></div>
             <table class="monitor-table" style="width:100%">
               <thead>
@@ -460,20 +466,23 @@
             <div class="feedback" id="discordPermsFeedback"></div>
             <div class="accounts-grid">
               <section class="card">
-                <label class="field-label" for="discordTargetId">ID Discord (utilisateur ou rôle)</label>
+                <h3 class="section-title">Ajouter un accès</h3>
+                <label class="field-label" for="discordTargetId">ID Discord</label>
                 <input class="field-input" id="discordTargetId" placeholder="123456789012345678">
+                <p class="deploy-help">Clic droit sur un utilisateur ou un rôle dans Discord → <em>Copier l'identifiant</em>. Mode développeur requis.</p>
                 <div style="display:flex;gap:1.2rem;margin:.6rem 0 1rem">
                   <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
                     <input type="radio" name="discordTargetType" value="member" checked> Utilisateur
                   </label>
                   <label style="display:flex;align-items:center;gap:.4rem;cursor:pointer">
-                    <input type="radio" name="discordTargetType" value="role"> Rôle
+                    <input type="radio" name="discordTargetType" value="role"> Rôle Discord
                   </label>
                 </div>
-                <button class="primary-btn" type="button" id="btnAddDiscordPerm">Accorder l'accès</button>
+                <button class="primary-btn" type="button" id="btnAddDiscordPerm">Accorder l'accès en lecture</button>
               </section>
               <section class="card">
                 <h3 class="section-title">Accès actuels</h3>
+                <p class="deploy-help" style="margin-bottom:.6rem">Utilisateurs et rôles pouvant voir et lire ce canal. Aucun droit d'envoi de message.</p>
                 <div id="discordPermsList">—</div>
               </section>
             </div>
