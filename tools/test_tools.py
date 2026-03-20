@@ -1179,6 +1179,24 @@ class DiscordNotifyTests(unittest.TestCase):
         self.assertEqual(message_java, "existing")
         self.assertEqual(category_java, "cat42")
 
+    def test_find_or_create_game_category_maps_terraria_variants_to_terraria(self):
+        channels = [
+            {"id": "cat84", "type": 4, "name": "terraria"},
+        ]
+        with mock.patch.object(discordnotify, "list_guild_channels", return_value=(True, "ok", channels)):
+            ok_tshock, message_tshock, category_tshock = discordnotify.find_or_create_game_category(
+                "guild", "terraria-tshock", "token"
+            )
+            ok_base, message_base, category_base = discordnotify.find_or_create_game_category(
+                "guild", "terraria", "token"
+            )
+        self.assertTrue(ok_tshock)
+        self.assertEqual(message_tshock, "existing")
+        self.assertEqual(category_tshock, "cat84")
+        self.assertTrue(ok_base)
+        self.assertEqual(message_base, "existing")
+        self.assertEqual(category_base, "cat84")
+
     def test_cli_create_channel_reuses_existing_channel_by_name(self):
         cfg = {"bot_token": "token", "guild_id": "guild", "instance_channels": {}}
         with mock.patch.object(discordnotify, "load_config", return_value=cfg), \

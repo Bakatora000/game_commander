@@ -101,6 +101,8 @@ def _game_category_name(game_id: str) -> str:
     normalized = game_id.strip().lower().replace("_", "-")
     if normalized in {"minecraft", "minecraft-java", "minecraft-fabric"}:
         return "minecraft"
+    if normalized in {"terraria", "terraria-tshock"}:
+        return "terraria"
     return normalized
 
 
