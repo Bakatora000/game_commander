@@ -203,7 +203,7 @@ def api_reset_account_password(username):
 
 @app.route(f"{PREFIX}/api/instances/<instance_name>/<action>", methods=["POST"])
 @auth.require_auth
-@auth.require_perm("manage_instances")
+@auth.require_perm("manage_lifecycle")
 def api_instance_service_action(instance_name, action):
     try:
         ok, message, card = host.run_instance_service_action(instance_name, action)
@@ -278,7 +278,7 @@ def api_rebalance():
 
 @app.route(f"{PREFIX}/api/deploy", methods=["POST"])
 @auth.require_auth
-@auth.require_perm("manage_lifecycle")
+@auth.require_perm("manage_instances")
 def api_deploy():
     data = request.get_json() or {}
     try:
