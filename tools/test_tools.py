@@ -32,6 +32,7 @@ sys.path.insert(0, str(ROOT_DIR))
 import nginx_manager
 import config_gen
 from shared import appfiles, appservice, bootstraphub, console, cpuplan, deploybackups, deploycore, deploydeps, deployenv, deploynginx, deployplan, deploypost, deployssl, deploysudo, discordnotify, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, sysutil, uninstallcore, updatecore, updatehooks
+from shared import deployconfigure
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -302,6 +303,18 @@ class InstanceEnvTests(unittest.TestCase):
     def test_default_game_service_uses_game_prefix(self):
         self.assertEqual(instanceenv.default_game_service("valheim", "valheim2"), "valheim-server-valheim2")
         self.assertEqual(instanceenv.default_game_service("minecraft-fabric", "fabric"), "minecraft-fabric-server-fabric")
+
+
+class DeployConfigureTests(unittest.TestCase):
+
+    def test_select_game_loads_satisfactory_metadata_keys(self):
+        cfg = deployconfigure.DeployConfig(game_id="satisfactory", instance_id="sat1", config_mode=True)
+        ok = deployconfigure._select_game(cfg, ROOT_DIR)
+        self.assertTrue(ok)
+        self.assertEqual(cfg.game_label, "Satisfactory")
+        self.assertEqual(cfg.game_binary, "FactoryServer.sh")
+        self.assertEqual(cfg.steam_appid, "1690800")
+        self.assertEqual(cfg.game_service, "satisfactory-server-sat1")
 
     def test_load_instance_record_applies_defaults(self):
         with tempfile.TemporaryDirectory() as d:

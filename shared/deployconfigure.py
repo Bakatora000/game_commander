@@ -8,7 +8,7 @@ import sys
 if str(_here) not in sys.path:
     sys.path.insert(0, str(_here))
 
-from shared import console, deployenv, deployplan
+from shared import console, deployenv, deployplan, instanceenv
 from shared.deployconfig import DeployConfig
 
 
@@ -66,13 +66,13 @@ def _select_game(cfg: DeployConfig, script_dir: Path) -> bool:
     env = deployenv.apply_game_defaults(cfg.to_env())
     _apply_env_dict(cfg, env)
 
-    # Load game metadata (GAME_LABEL, GAME_BINARY, STEAM_APPID, GAME_SERVICE)
+    # Load game metadata from deployplan.game_meta()
     meta = deployplan.game_meta(cfg.game_id)
-    cfg.game_label   = meta.get("GAME_LABEL", cfg.game_id)
-    cfg.game_binary  = meta.get("GAME_BINARY", "")
-    cfg.steam_appid  = meta.get("STEAM_APPID", "")
+    cfg.game_label   = meta.get("label", cfg.game_id)
+    cfg.game_binary  = meta.get("game_binary", "")
+    cfg.steam_appid  = meta.get("steam_appid", "")
     if not cfg.game_service:
-        cfg.game_service = meta.get("GAME_SERVICE", "")
+        cfg.game_service = instanceenv.default_game_service(cfg.game_id, cfg.instance_id)
     if not cfg.gc_service:
         cfg.gc_service = f"game-commander-{cfg.instance_id}" if cfg.instance_id else ""
 
