@@ -887,32 +887,32 @@
       el.style.color = ok ? '#9be7c5' : '#ffd69b';
     }
     const HUB_PERMS = [
-      { key: ‘manage_instances’,  label: ‘Déployer des instances’ },
-      { key: ‘manage_lifecycle’,  label: ‘Démarrer / Arrêter / Redéployer / Désinstaller’ },
-      { key: ‘run_updates’,       label: ‘Mettre à jour les instances’ },
-      { key: ‘rebalance_cpu’,     label: ‘Rééquilibrer le CPU’ },
-      { key: ‘manage_accounts’,   label: ‘Gérer les comptes’ },
+      { key: 'manage_instances',  label: 'Déployer des instances' },
+      { key: 'manage_lifecycle',  label: 'Démarrer / Arrêter / Redéployer / Désinstaller' },
+      { key: 'run_updates',       label: 'Mettre à jour les instances' },
+      { key: 'rebalance_cpu',     label: 'Rééquilibrer le CPU' },
+      { key: 'manage_accounts',   label: 'Gérer les comptes' },
     ];
     async function loadAccounts() {
-      const response = await fetch(‘{{ prefix }}/api/accounts’, { credentials: ‘same-origin’ });
-      const listEl = document.getElementById(‘accountsList’);
+      const response = await fetch('{{ prefix }}/api/accounts', { credentials: 'same-origin' });
+      const listEl = document.getElementById('accountsList');
       if (!response.ok) {
-        listEl.innerHTML = ‘<p class="section-subtitle">Comptes indisponibles.</p>’;
+        listEl.innerHTML = '<p class="section-subtitle">Comptes indisponibles.</p>';
         return;
       }
       const data = await response.json();
       const accounts = data.accounts || [];
-      const currentUser = data.current_username || ‘’;
+      const currentUser = data.current_username || '';
       const canManage = !!data.can_manage_accounts;
-      document.getElementById(‘createAccountCard’).hidden = !canManage;
+      document.getElementById('createAccountCard').hidden = !canManage;
       listEl.innerHTML = accounts.map((account) => {
         const isSelf = account.username === currentUser;
         const perms = account.permissions || [];
         const resetBlock = canManage ? `
             <label class="field-label" for="reset-${esc(account.username)}">Réinitialiser le mot de passe</label>
-            <input class="field-input" id="reset-${esc(account.username)}" type="password" placeholder="Nouveau mot de passe">` : ‘’;
-        const resetBtn = canManage ? `<button class="secondary-btn" type="button" data-action="reset-password" data-username="${esc(account.username)}">Réinitialiser</button>` : ‘’;
-        const deleteBtn = (canManage && !isSelf) ? `<button class="secondary-btn" type="button" data-action="delete-account" data-username="${esc(account.username)}" style="color:#e05050">Supprimer</button>` : ‘’;
+            <input class="field-input" id="reset-${esc(account.username)}" type="password" placeholder="Nouveau mot de passe">` : '';
+        const resetBtn = canManage ? `<button class="secondary-btn" type="button" data-action="reset-password" data-username="${esc(account.username)}">Réinitialiser</button>` : '';
+        const deleteBtn = (canManage && !isSelf) ? `<button class="secondary-btn" type="button" data-action="delete-account" data-username="${esc(account.username)}" style="color:#e05050">Supprimer</button>` : '';
         const permsBlock = canManage ? `
             <p class="field-label" style="margin-top:.8rem;margin-bottom:.3rem">Permissions</p>
             <div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.4rem">
@@ -922,22 +922,22 @@
               ${HUB_PERMS.map(p => `
               <label style="display:flex;align-items:center;gap:.4rem;font-size:.9rem;cursor:pointer">
                 <input type="checkbox" class="perm-checkbox" data-perm="${p.key}"
-                  ${perms.includes(p.key) ? ‘checked’ : ‘’} style="accent-color:var(--accent)">
+                  ${perms.includes(p.key) ? 'checked' : ''} style="accent-color:var(--accent)">
                 ${p.label}
-              </label>`).join(‘’)}
+              </label>`).join('')}
             </div>
-            <button class="secondary-btn" type="button" data-action="save-perms" data-username="${esc(account.username)}">Sauvegarder les permissions</button>` : ‘’;
+            <button class="secondary-btn" type="button" data-action="save-perms" data-username="${esc(account.username)}">Sauvegarder les permissions</button>` : '';
         return `
         <div class="account-row">
-          <div class="account-name">${esc(account.username)}${isSelf ? ‘ <span style="color:var(--muted);font-size:.8rem">(moi)</span>’ : ‘’}</div>
-          <div class="account-email">Email : ${esc(account.email || ‘non renseigné’)}</div>
+          <div class="account-name">${esc(account.username)}${isSelf ? ' <span style="color:var(--muted);font-size:.8rem">(moi)</span>' : ''}</div>
+          <div class="account-email">Email : ${esc(account.email || 'non renseigné')}</div>
           <div class="mini-actions">
             <button class="secondary-btn" type="button" data-action="toggle-details" data-username="${esc(account.username)}">Détails</button>
             ${deleteBtn}
           </div>
           <div class="account-details" id="details-${esc(account.username)}" hidden>
             <label class="field-label" for="email-${esc(account.username)}">Email</label>
-            <input class="field-input" id="email-${esc(account.username)}" value="${esc(account.email || ‘’)}">
+            <input class="field-input" id="email-${esc(account.username)}" value="${esc(account.email || '')}">
             ${resetBlock}
             <div class="mini-actions">
               <button class="secondary-btn" type="button" data-action="save-email" data-username="${esc(account.username)}">Enregistrer l’email</button>
@@ -947,94 +947,94 @@
             <div class="feedback" id="feedback-${esc(account.username)}"></div>
           </div>
         </div>`;
-      }).join(‘’);
-      listEl.querySelectorAll(‘[data-action="toggle-details"]’).forEach((button) => {
-        button.addEventListener(‘click’, () => {
+      }).join('');
+      listEl.querySelectorAll('[data-action="toggle-details"]').forEach((button) => {
+        button.addEventListener('click', () => {
           const username = button.dataset.username;
           const detailsEl = document.getElementById(`details-${username}`);
           const hidden = detailsEl.hidden;
           detailsEl.hidden = !hidden;
-          button.textContent = hidden ? ‘Masquer’ : ‘Détails’;
+          button.textContent = hidden ? 'Masquer' : 'Détails';
         });
       });
-      listEl.querySelectorAll(‘[data-action="save-email"]’).forEach((button) => {
-        button.addEventListener(‘click’, async () => {
+      listEl.querySelectorAll('[data-action="save-email"]').forEach((button) => {
+        button.addEventListener('click', async () => {
           const username = button.dataset.username;
           const email = document.getElementById(`email-${username}`).value.trim();
           const response = await fetch(`{{ prefix }}/api/accounts/${encodeURIComponent(username)}/email`, {
-            method: ‘POST’,
-            headers: { ‘Content-Type’: ‘application/json’ },
-            credentials: ‘same-origin’,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
             body: JSON.stringify({ email }),
           });
           const data = await response.json().catch(() => ({}));
-          setFeedback(`feedback-${username}`, response.ok ? ‘Email enregistré’ : (data.message || ‘Erreur’), response.ok);
+          setFeedback(`feedback-${username}`, response.ok ? 'Email enregistré' : (data.message || 'Erreur'), response.ok);
         });
       });
-      listEl.querySelectorAll(‘[data-action="reset-password"]’).forEach((button) => {
-        button.addEventListener(‘click’, async () => {
+      listEl.querySelectorAll('[data-action="reset-password"]').forEach((button) => {
+        button.addEventListener('click', async () => {
           const username = button.dataset.username;
           const newPassword = document.getElementById(`reset-${username}`).value;
           const response = await fetch(`{{ prefix }}/api/accounts/${encodeURIComponent(username)}/reset-password`, {
-            method: ‘POST’,
-            headers: { ‘Content-Type’: ‘application/json’ },
-            credentials: ‘same-origin’,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
             body: JSON.stringify({ new_password: newPassword }),
           });
           const data = await response.json().catch(() => ({}));
-          setFeedback(`feedback-${username}`, response.ok ? ‘Mot de passe réinitialisé’ : (data.message || ‘Erreur’), response.ok);
-          if (response.ok) document.getElementById(`reset-${username}`).value = ‘’;
+          setFeedback(`feedback-${username}`, response.ok ? 'Mot de passe réinitialisé' : (data.message || 'Erreur'), response.ok);
+          if (response.ok) document.getElementById(`reset-${username}`).value = '';
         });
       });
-      listEl.querySelectorAll(‘[data-action="delete-account"]’).forEach((button) => {
-        button.addEventListener(‘click’, async () => {
+      listEl.querySelectorAll('[data-action="delete-account"]').forEach((button) => {
+        button.addEventListener('click', async () => {
           const username = button.dataset.username;
           if (!confirm(`Supprimer le compte "${username}" ? Cette action est irréversible.`)) return;
           const response = await fetch(`{{ prefix }}/api/accounts/${encodeURIComponent(username)}`, {
-            method: ‘DELETE’,
-            credentials: ‘same-origin’,
+            method: 'DELETE',
+            credentials: 'same-origin',
           });
           const data = await response.json().catch(() => ({}));
           if (response.ok) {
             await loadAccounts();
           } else {
-            alert(data.message || ‘Erreur lors de la suppression’);
+            alert(data.message || 'Erreur lors de la suppression');
           }
         });
       });
-      listEl.querySelectorAll(‘[data-action="save-perms"]’).forEach((button) => {
-        button.addEventListener(‘click’, async () => {
+      listEl.querySelectorAll('[data-action="save-perms"]').forEach((button) => {
+        button.addEventListener('click', async () => {
           const username = button.dataset.username;
           const detailEl = document.getElementById(`details-${username}`);
-          const checked = [...detailEl.querySelectorAll(‘.perm-checkbox:checked’)].map(cb => cb.dataset.perm);
+          const checked = [...detailEl.querySelectorAll('.perm-checkbox:checked')].map(cb => cb.dataset.perm);
           const response = await fetch(`{{ prefix }}/api/accounts/${encodeURIComponent(username)}/permissions`, {
-            method: ‘POST’,
-            headers: { ‘Content-Type’: ‘application/json’ },
-            credentials: ‘same-origin’,
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
             body: JSON.stringify({ permissions: checked }),
           });
           const data = await response.json().catch(() => ({}));
-          setFeedback(`feedback-${username}`, response.ok ? ‘Permissions mises à jour’ : (data.message || ‘Erreur’), response.ok);
+          setFeedback(`feedback-${username}`, response.ok ? 'Permissions mises à jour' : (data.message || 'Erreur'), response.ok);
           if (response.ok) await loadAccounts();
         });
       });
     }
-    document.getElementById(‘btnCreateAccount’).addEventListener(‘click’, async () => {
-      const btn = document.getElementById(‘btnCreateAccount’);
-      const username = document.getElementById(‘newAccountUsername’).value.trim();
-      const password = document.getElementById(‘newAccountPassword’).value;
+    document.getElementById('btnCreateAccount').addEventListener('click', async () => {
+      const btn = document.getElementById('btnCreateAccount');
+      const username = document.getElementById('newAccountUsername').value.trim();
+      const password = document.getElementById('newAccountPassword').value;
       btn.disabled = true;
-      const response = await fetch(‘{{ prefix }}/api/accounts’, {
-        method: ‘POST’,
-        headers: { ‘Content-Type’: ‘application/json’ },
-        credentials: ‘same-origin’,
+      const response = await fetch('{{ prefix }}/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ username, password }),
       });
       const data = await response.json().catch(() => ({}));
-      setFeedback(‘createAccountFeedback’, response.ok ? `Compte "${username}" créé` : (data.message || ‘Erreur’), response.ok);
+      setFeedback('createAccountFeedback', response.ok ? `Compte "${username}" créé` : (data.message || 'Erreur'), response.ok);
       if (response.ok) {
-        document.getElementById(‘newAccountUsername’).value = ‘’;
-        document.getElementById(‘newAccountPassword’).value = ‘’;
+        document.getElementById('newAccountUsername').value = '';
+        document.getElementById('newAccountPassword').value = '';
         await loadAccounts();
       }
       btn.disabled = false;
