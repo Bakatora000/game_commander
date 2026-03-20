@@ -99,9 +99,9 @@ def list_guild_channels(
 
 def _game_category_name(game_id: str) -> str:
     normalized = game_id.strip().lower().replace("_", "-")
-    if normalized in {"minecraft", "minecraft-java", "minecraft-fabric"}:
+    if normalized in {"minecraft", "minecraftjava", "minecraft-java", "minecraftfabric", "minecraft-fabric"}:
         return "minecraft"
-    if normalized in {"terraria", "terraria-tshock"}:
+    if normalized in {"terraria", "terrariatshock", "terraria-tshock"}:
         return "terraria"
     return normalized
 

@@ -1172,12 +1172,24 @@ class DiscordNotifyTests(unittest.TestCase):
             ok_java, message_java, category_java = discordnotify.find_or_create_game_category(
                 "guild", "minecraft-java", "token"
             )
+            ok_java_legacy, message_java_legacy, category_java_legacy = discordnotify.find_or_create_game_category(
+                "guild", "minecraftjava", "token"
+            )
+            ok_fabric_legacy, message_fabric_legacy, category_fabric_legacy = discordnotify.find_or_create_game_category(
+                "guild", "minecraftfabric", "token"
+            )
         self.assertTrue(ok_fabric)
         self.assertEqual(message_fabric, "existing")
         self.assertEqual(category_fabric, "cat42")
         self.assertTrue(ok_java)
         self.assertEqual(message_java, "existing")
         self.assertEqual(category_java, "cat42")
+        self.assertTrue(ok_java_legacy)
+        self.assertEqual(message_java_legacy, "existing")
+        self.assertEqual(category_java_legacy, "cat42")
+        self.assertTrue(ok_fabric_legacy)
+        self.assertEqual(message_fabric_legacy, "existing")
+        self.assertEqual(category_fabric_legacy, "cat42")
 
     def test_find_or_create_game_category_maps_terraria_variants_to_terraria(self):
         channels = [
@@ -1190,12 +1202,18 @@ class DiscordNotifyTests(unittest.TestCase):
             ok_base, message_base, category_base = discordnotify.find_or_create_game_category(
                 "guild", "terraria", "token"
             )
+            ok_tshock_legacy, message_tshock_legacy, category_tshock_legacy = discordnotify.find_or_create_game_category(
+                "guild", "terrariatshock", "token"
+            )
         self.assertTrue(ok_tshock)
         self.assertEqual(message_tshock, "existing")
         self.assertEqual(category_tshock, "cat84")
         self.assertTrue(ok_base)
         self.assertEqual(message_base, "existing")
         self.assertEqual(category_base, "cat84")
+        self.assertTrue(ok_tshock_legacy)
+        self.assertEqual(message_tshock_legacy, "existing")
+        self.assertEqual(category_tshock_legacy, "cat84")
 
     def test_cli_create_channel_reuses_existing_channel_by_name(self):
         cfg = {"bot_token": "token", "guild_id": "guild", "instance_channels": {}}
