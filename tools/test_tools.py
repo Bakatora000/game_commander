@@ -1175,6 +1175,25 @@ class DiscordNotifyTests(unittest.TestCase):
 
 class HostCliTests(unittest.TestCase):
 
+    def test_compact_discord_details_filters_verbose_redeploy_output(self):
+        from tools import host_cli
+        details = host_cli._compact_discord_details("redeploy", True, [
+            "Config chargée depuis : /tmp/deploy_config.env",
+            "Journal : /tmp/gamecommander.log",
+            "╔════════════════════════════════════════════════════════╗",
+            "║ GAME COMMANDER — DÉPLOIEMENT v2.0 ║",
+            "→ Mode : FICHIER DE CONFIG (/tmp/deploy_config.env)",
+            "Service satisfactory-server-satisfactory : actif",
+            "Config sauvegardée : /home/vhserver/game-commander-satisfactory/deploy_config.env",
+            "Channel existant #satisfactory réutilisé (id: 123)",
+        ])
+        self.assertIn("Config chargée depuis", details)
+        self.assertIn("Journal :", details)
+        self.assertIn("Config sauvegardée", details)
+        self.assertIn("Channel existant", details)
+        self.assertNotIn("DÉPLOIEMENT v2.0", details)
+        self.assertNotIn("Mode : FICHIER DE CONFIG", details)
+
     def test_list_configs_uses_hostctl_discovery(self):
         with tempfile.TemporaryDirectory() as d, mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             root = Path(d)
@@ -1223,7 +1242,7 @@ class HostCliTests(unittest.TestCase):
                  mock.patch.object(updatecore, "run_core_update", return_value=(True, ["core ok"])), \
                  mock.patch.object(updatehooks, "run_post_update_hooks", return_value=(True, ["hooks ok"])), \
                  mock.patch.object(hubsync, "sync_hub_service") as sync_hub, \
-                 mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")), \
+                 mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")) as notify_mock, \
                  mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
                 rc = host_cli.main([
                     "update-instance",
@@ -1247,7 +1266,7 @@ class HostCliTests(unittest.TestCase):
                  mock.patch.object(discordnotify, "load_config", return_value={"enabled": True, "bot_token": "tok"}), \
                  mock.patch.object(discordnotify, "notifications_enabled", return_value=True), \
                  mock.patch.object(discordnotify, "_cli_create_channel", return_value=0) as channel_mock, \
-                 mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")), \
+                 mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")) as notify_mock, \
                  mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
                 rc = host_cli.main([
                     "redeploy-instance",
@@ -1258,6 +1277,7 @@ class HostCliTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertIn("redeploy ok", stdout.getvalue())
             channel_mock.assert_called_once_with("satisfactory", "satisfactory")
+            self.assertEqual(notify_mock.call_args.kwargs["details"], "redeploy ok")
         finally:
             if cfg.exists():
                 cfg.unlink()

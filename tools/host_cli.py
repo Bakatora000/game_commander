@@ -48,14 +48,14 @@ def cmd_update_instance(args: argparse.Namespace) -> int:
     game_id = env.get("GAME_ID", "")
     ok, result = updatecore.run_core_update(config_file, Path(args.main_script).resolve().parent)
     if not ok:
-        _print_discord_status(_notify('update', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_details_text(result)))
+        _print_discord_status(_notify('update', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_compact_discord_details('update', False, result)))
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
     ok, hooks = updatehooks.run_post_update_hooks(config_file, Path(args.main_script).resolve().parent)
     if not ok:
-        _print_discord_status(_notify('update', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_details_text(hooks)))
+        _print_discord_status(_notify('update', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_compact_discord_details('update', False, hooks)))
         print(hooks, file=sys.stderr)
         return 1
     for line in hooks:
@@ -63,12 +63,12 @@ def cmd_update_instance(args: argparse.Namespace) -> int:
     if not args.skip_hub_sync:
         ok, hub = hubsync.sync_hub_service(config_file, Path(args.main_script).resolve().parent)
         if not ok:
-            _print_discord_status(_notify('update', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_details_text(hub)))
+            _print_discord_status(_notify('update', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_compact_discord_details('update', False, hub)))
             print(hub, file=sys.stderr)
             return 1
         for line in hub:
             print(line)
-    _print_discord_status(_notify('update', True, instance_id=args.instance, game_id=game_id, source=args.source, details=_details_text(result + hooks)))
+    _print_discord_status(_notify('update', True, instance_id=args.instance, game_id=game_id, source=args.source, details=_compact_discord_details('update', True, result + hooks)))
     return 0
 
 
@@ -78,7 +78,7 @@ def cmd_redeploy_instance(args: argparse.Namespace) -> int:
     game_id = env.get("GAME_ID", "")
     ok, result = redeploycore.run_redeploy(args.config, args.main_script)
     if not ok:
-        _print_discord_status(_notify('redeploy', False, instance_id=instance_id, game_id=game_id, source=args.source, details=_details_text(result)))
+        _print_discord_status(_notify('redeploy', False, instance_id=instance_id, game_id=game_id, source=args.source, details=_compact_discord_details('redeploy', False, result)))
         print(result, file=sys.stderr)
         return 1
     for line in result:
@@ -91,7 +91,7 @@ def cmd_redeploy_instance(args: argparse.Namespace) -> int:
                 print("Discord : création/réutilisation du canal échouée", file=sys.stderr)
     except Exception as exc:
         print(f"Discord : {exc}", file=sys.stderr)
-    _print_discord_status(_notify('redeploy', True, instance_id=instance_id, game_id=game_id, source=args.source, details=_details_text(result)))
+    _print_discord_status(_notify('redeploy', True, instance_id=instance_id, game_id=game_id, source=args.source, details=_compact_discord_details('redeploy', True, result)))
     return 0
 
 
@@ -110,6 +110,42 @@ def _details_text(result: str | list[str]) -> str:
     if isinstance(result, list):
         return "\n".join(str(line) for line in result if str(line).strip())
     return str(result or "")
+
+
+def _compact_discord_details(event: str, ok: bool, result: str | list[str]) -> str:
+    text = _details_text(result)
+    if not text:
+        return ""
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    if event not in {"deploy", "redeploy", "update", "uninstall"}:
+        return text[:900]
+    interesting_prefixes = (
+        "Config chargée depuis",
+        "Journal :",
+        "Config sauvegardée :",
+        "Service ",
+        "Accès :",
+        "Instance ",
+        "Game Commander répond",
+        "Nginx :",
+        "Hub Admin synchronisé",
+        "Service game-commander-hub redémarré",
+        "Répartition CPU recalculée",
+        "users.json ",
+        "Channel ",
+        "Discord :",
+    )
+    filtered = [
+        line for line in lines
+        if line.startswith(interesting_prefixes)
+        and "DÉPLOIEMENT v2.0" not in line
+        and "Serveur de jeu + Interface web" not in line
+    ]
+    if not filtered:
+        filtered = [lines[-1]]
+    if ok and len(filtered) > 6:
+        filtered = filtered[:2] + filtered[-4:]
+    return "\n".join(filtered)[:900]
 
 
 def _print_discord_status(status: str, *, stream=None) -> None:
@@ -163,12 +199,12 @@ def cmd_deploy_instance(args: argparse.Namespace) -> int:
         max_players=str(args.max_players or ""),
     )
     if not ok:
-        _print_discord_status(_notify('deploy', False, instance_id=args.instance, game_id=args.game_id, source=args.source, details=_details_text(result)))
+        _print_discord_status(_notify('deploy', False, instance_id=args.instance, game_id=args.game_id, source=args.source, details=_compact_discord_details('deploy', False, result)))
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
-    _print_discord_status(_notify('deploy', True, instance_id=args.instance, game_id=args.game_id, source=args.source, details=_details_text(result)))
+    _print_discord_status(_notify('deploy', True, instance_id=args.instance, game_id=args.game_id, source=args.source, details=_compact_discord_details('deploy', True, result)))
     return 0
 
 
@@ -187,12 +223,12 @@ def cmd_uninstall_instance(args: argparse.Namespace) -> int:
         game_id = args.game_id
         ok, result = uninstallcore.run_partial_uninstall(args.instance, args.game_id, repo_root)
     if not ok:
-        _print_discord_status(_notify('uninstall', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_details_text(result)))
+        _print_discord_status(_notify('uninstall', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_compact_discord_details('uninstall', False, result)))
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
-    _print_discord_status(_notify('uninstall', True, instance_id=args.instance, game_id=game_id, source=args.source, details=_details_text(result)))
+    _print_discord_status(_notify('uninstall', True, instance_id=args.instance, game_id=game_id, source=args.source, details=_compact_discord_details('uninstall', True, result)))
     return 0
 
 
