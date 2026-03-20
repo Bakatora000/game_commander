@@ -1101,6 +1101,36 @@ class DiscordNotifyTests(unittest.TestCase):
         embed = post_mock.call_args.kwargs.get("embed") or {}
         self.assertIn("Test", embed.get("title", ""), "expected test title in embed")
 
+    def test_find_text_channel_by_name_prefers_requested_category(self):
+        channels = [
+            {"id": "11", "type": 0, "name": "satisfactory", "parent_id": "other"},
+            {"id": "22", "type": 0, "name": "satisfactory", "parent_id": "cat42"},
+        ]
+        with mock.patch.object(discordnotify, "list_guild_channels", return_value=(True, "ok", channels)):
+            ok, message, channel_id = discordnotify.find_text_channel_by_name(
+                "guild",
+                "satisfactory",
+                "token",
+                category_id="cat42",
+            )
+        self.assertTrue(ok)
+        self.assertEqual(message, "existing")
+        self.assertEqual(channel_id, "22")
+
+    def test_cli_create_channel_reuses_existing_channel_by_name(self):
+        cfg = {"bot_token": "token", "guild_id": "guild", "instance_channels": {}}
+        with mock.patch.object(discordnotify, "load_config", return_value=cfg), \
+             mock.patch.object(discordnotify, "find_text_channel_by_name", return_value=(True, "existing", "123")), \
+             mock.patch.object(discordnotify, "save_config", return_value=(True, "/etc/game-commander/discord.json")) as save_mock, \
+             mock.patch.object(discordnotify, "create_channel") as create_mock, \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            rc = discordnotify._cli_create_channel("satisfactory", "satisfactory")
+        self.assertEqual(rc, 0)
+        self.assertIn("réutilisé", stdout.getvalue())
+        self.assertEqual(cfg["instance_channels"]["satisfactory"], "123")
+        self.assertFalse(create_mock.called)
+        self.assertTrue(save_mock.called)
+
 
 class HostCliTests(unittest.TestCase):
 

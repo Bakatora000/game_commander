@@ -639,6 +639,20 @@ def create_discord_channel(instance_name: str) -> tuple[bool, str]:
         if ok_cat:
             category_id = cat_id
     channel_name = instance_name.lower().replace("_", "-")
+    found, _, channel_id = discordnotify.find_text_channel_by_name(
+        guild_id,
+        channel_name,
+        cfg["bot_token"],
+        category_id=category_id,
+    )
+    if found and channel_id:
+        instance_channels = cfg.setdefault("instance_channels", {})
+        instance_channels[instance_name] = channel_id
+        saved, save_msg = _save_discord_cfg(cfg)
+        if not saved:
+            return False, f"Channel existant détecté ({channel_id}) mais discord.json non mis à jour : {save_msg}"
+        game_label = f" [{game_id}]" if game_id else ""
+        return True, f"Channel existant #{channel_name} réutilisé (id: {channel_id}){game_label}"
     ok, msg, channel_id = discordnotify.create_channel(
         guild_id, channel_name, cfg["bot_token"],
         category_id=category_id,

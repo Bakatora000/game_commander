@@ -145,6 +145,34 @@ def create_channel(
     return True, "ok", channel_id
 
 
+def find_text_channel_by_name(
+    guild_id: str,
+    name: str,
+    bot_token: str,
+    *,
+    category_id: str | None = None,
+    timeout: int = 10,
+) -> tuple[bool, str, str]:
+    """Find an existing text channel by name, preferring the requested category."""
+    ok, msg, channels = list_guild_channels(guild_id, bot_token, timeout=timeout)
+    if not ok:
+        return False, msg, ""
+    normalized = name.strip().lower()
+    if not normalized:
+        return False, "empty channel name", ""
+    matches = [
+        ch for ch in (channels or [])
+        if ch.get("type") == 0 and str(ch.get("name", "")).strip().lower() == normalized
+    ]
+    if not matches:
+        return False, "not found", ""
+    if category_id:
+        for ch in matches:
+            if str(ch.get("parent_id") or "") == str(category_id):
+                return True, "existing", str(ch.get("id", ""))
+    return True, "existing", str(matches[0].get("id", ""))
+
+
 def delete_channel(channel_id: str, bot_token: str, *, timeout: int = 10) -> tuple[bool, str]:
     """Delete a Discord channel."""
     ok, msg, _ = _discord_api("DELETE", f"/channels/{channel_id}", bot_token, timeout=timeout)
@@ -459,6 +487,22 @@ def _cli_create_channel(instance_id: str, game_id: str = "") -> int:
         else:
             print(f"Avertissement: catégorie '{game_id}' non trouvée/créée: {msg_cat}", file=sys.stderr)
     channel_name = instance_id.lower().replace("_", "-")
+    found, _, channel_id = find_text_channel_by_name(
+        guild_id,
+        channel_name,
+        cfg["bot_token"],
+        category_id=category_id,
+    )
+    if found and channel_id:
+        cfg.setdefault("instance_channels", {})[instance_id] = channel_id
+        saved, save_msg = save_config(cfg)
+        if not saved:
+            print(f"Channel existant détecté ({channel_id}) mais discord.json non mis à jour : {save_msg}",
+                  file=sys.stderr)
+            return 1
+        game_label = f" [{game_id}]" if game_id else ""
+        print(f"Channel existant #{channel_name} réutilisé (id: {channel_id}){game_label}")
+        return 0
     ok, msg, channel_id = create_channel(
         guild_id, channel_name, cfg["bot_token"],
         category_id=category_id,
