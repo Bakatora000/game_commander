@@ -31,7 +31,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import appfiles, appservice, bootstraphub, cpuplan, deploybackups, deploycore, deploydeps, deployenv, deploynginx, deployplan, deploypost, deployssl, deploysudo, discordnotify, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, uninstallcore, updatecore, updatehooks
+from shared import appfiles, appservice, bootstraphub, console, cpuplan, deploybackups, deploycore, deploydeps, deployenv, deploynginx, deployplan, deploypost, deployssl, deploysudo, discordnotify, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, sysutil, uninstallcore, updatecore, updatehooks
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
 from runtime.games.minecraft import console as minecraft_console
@@ -4589,6 +4589,131 @@ server {
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# ConsoleTests
+# ══════════════════════════════════════════════════════════════════════════════
+
+class ConsoleTests(unittest.TestCase):
+    def test_ask_yn_assume_yes_returns_true_without_prompt(self):
+        with mock.patch("builtins.input", side_effect=AssertionError("should not prompt")):
+            self.assertTrue(console.ask_yn("question?", assume_yes=True))
+
+    def test_ask_yn_reads_oui(self):
+        with mock.patch("builtins.input", return_value="o"):
+            self.assertTrue(console.ask_yn("question?"))
+
+    def test_ask_yn_reads_non(self):
+        with mock.patch("builtins.input", return_value="n"):
+            self.assertFalse(console.ask_yn("question?"))
+
+    def test_confirm_bool_config_mode_true(self):
+        with mock.patch("builtins.print") as p:
+            result = console.confirm_bool(True, "Deploy app?", config_mode=True)
+        self.assertTrue(result)
+        printed = " ".join(str(a) for call in p.call_args_list for a in call[0])
+        self.assertIn("oui", printed)
+
+    def test_confirm_bool_config_mode_false(self):
+        with mock.patch("builtins.print") as p:
+            result = console.confirm_bool(False, "Deploy app?", config_mode=True)
+        self.assertFalse(result)
+        printed = " ".join(str(a) for call in p.call_args_list for a in call[0])
+        self.assertIn("non", printed)
+
+    def test_confirm_bool_interactive_delegates_to_confirm(self):
+        with mock.patch("builtins.input", return_value="o"):
+            self.assertTrue(console.confirm_bool(False, "question?", config_mode=False))
+
+    def test_banner_prints_game_commander(self):
+        with mock.patch("builtins.print") as p:
+            console.banner()
+        printed = " ".join(str(a) for call in p.call_args_list for a in call[0])
+        self.assertIn("GAME COMMANDER", printed)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# SysutilTests
+# ══════════════════════════════════════════════════════════════════════════════
+
+class SysutilTests(unittest.TestCase):
+    def test_service_state_returns_active(self):
+        with mock.patch("shared.sysutil.subprocess.run") as run_mock:
+            run_mock.return_value = mock.Mock(returncode=0, stdout="active\n")
+            self.assertEqual(sysutil.service_state("valheim"), "active")
+
+    def test_service_state_returns_inactive_on_empty(self):
+        with mock.patch("shared.sysutil.subprocess.run") as run_mock:
+            run_mock.return_value = mock.Mock(returncode=3, stdout="")
+            self.assertEqual(sysutil.service_state("valheim"), "inactive")
+
+    def test_service_active_true(self):
+        with mock.patch("shared.sysutil.subprocess.run") as run_mock:
+            run_mock.return_value = mock.Mock(returncode=0, stdout="active\n")
+            self.assertTrue(sysutil.service_active("valheim"))
+
+    def test_service_active_false(self):
+        with mock.patch("shared.sysutil.subprocess.run") as run_mock:
+            run_mock.return_value = mock.Mock(returncode=3, stdout="inactive\n")
+            self.assertFalse(sysutil.service_active("valheim"))
+
+    def test_cmd_exists_true(self):
+        with mock.patch("shared.sysutil.shutil.which", return_value="/usr/bin/nginx"):
+            self.assertTrue(sysutil.cmd_exists("nginx"))
+
+    def test_cmd_exists_false(self):
+        with mock.patch("shared.sysutil.shutil.which", return_value=None):
+            self.assertFalse(sysutil.cmd_exists("nonexistent"))
+
+    def test_wait_for_process_found_immediately(self):
+        with mock.patch("shared.sysutil.subprocess.run") as run_mock, \
+             mock.patch("shared.sysutil.time.sleep"):
+            run_mock.return_value = mock.Mock(returncode=0)
+            self.assertTrue(sysutil.wait_for_process("valheim_server", timeout=10))
+
+    def test_wait_for_process_timeout(self):
+        with mock.patch("shared.sysutil.subprocess.run") as run_mock, \
+             mock.patch("shared.sysutil.time.sleep"):
+            run_mock.return_value = mock.Mock(returncode=1)
+            self.assertFalse(sysutil.wait_for_process("valheim_server", timeout=4))
+
+    def test_stop_and_disable_removes_unit_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            unit = Path(tmp) / "valheim.service"
+            unit.write_text("[Service]\n", encoding="utf-8")
+            with mock.patch("shared.sysutil.subprocess.run") as run_mock, \
+                 mock.patch("shared.sysutil.Path", wraps=Path) as path_mock:
+                run_mock.return_value = mock.Mock(returncode=3, stdout="inactive\n")
+                # Redirect unit_file lookup to tmp
+                orig_truediv = Path.__truediv__
+                def patched_truediv(self_path, key):
+                    if str(self_path) == "/etc/systemd/system" and key == "valheim.service":
+                        return unit
+                    if str(self_path) == "/etc/systemd/system" and key == "valheim.service.d":
+                        return Path(tmp) / "valheim.service.d"
+                    return orig_truediv(self_path, key)
+                with mock.patch.object(Path, "__truediv__", patched_truediv):
+                    messages = sysutil.stop_and_disable("valheim")
+            self.assertTrue(any("supprimé" in m for m in messages))
+            self.assertFalse(unit.exists())
+
+    def test_stop_and_disable_dry_run_does_not_delete(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            unit = Path(tmp) / "valheim.service"
+            unit.write_text("[Service]\n", encoding="utf-8")
+            orig_truediv = Path.__truediv__
+            def patched_truediv(self_path, key):
+                if str(self_path) == "/etc/systemd/system" and key == "valheim.service":
+                    return unit
+                if str(self_path) == "/etc/systemd/system" and key == "valheim.service.d":
+                    return Path(tmp) / "valheim.service.d"
+                return orig_truediv(self_path, key)
+            with mock.patch("shared.sysutil.subprocess.run") as run_mock, \
+                 mock.patch.object(Path, "__truediv__", patched_truediv):
+                run_mock.return_value = mock.Mock(returncode=3, stdout="inactive\n")
+                sysutil.stop_and_disable("valheim", dry_run=True)
+            self.assertTrue(unit.exists())
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Runner
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -4625,6 +4750,8 @@ if __name__ == "__main__":
         BootstrapHubTests,
         DeployPlanTests,
         DeployHelpersTests,
+        ConsoleTests,
+        SysutilTests,
     ]
     if len(sys.argv) > 1:
         names = sys.argv[1:]

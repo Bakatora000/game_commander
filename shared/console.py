@@ -55,3 +55,29 @@ def confirm(question: str, default: str = "o") -> bool:
     except EOFError:
         ans = default
     return ans.lower() in ("o", "oui", "y", "yes")
+
+
+def ask_yn(question: str, assume_yes: bool = False) -> bool:
+    """Yes/no prompt. Returns True immediately if assume_yes is set."""
+    if assume_yes:
+        return True
+    return confirm(question)
+
+
+def confirm_bool(val: bool, question: str, config_mode: bool = False) -> bool:
+    """Confirm a boolean value. In config mode, displays and returns val without prompting."""
+    if config_mode:
+        label = "oui" if val else "non"
+        print(f"  {_DIM}  (config) {question} → {label}{_RESET}")
+        return val
+    return confirm(question)
+
+
+def banner() -> None:
+    """Print the Game Commander deploy banner."""
+    print("""
+  ╔════════════════════════════════════════════════════════╗
+  ║      GAME COMMANDER — DÉPLOIEMENT v2.0                 ║
+  ║   Serveur de jeu + Interface web (sans AMP)            ║
+  ╚════════════════════════════════════════════════════════╝
+""")
