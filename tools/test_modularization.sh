@@ -50,8 +50,12 @@ test_entrypoint_is_thin() {
     grep -qv 'source "\$SCRIPT_DIR/lib/cmd_rebalance.sh"' "$file" || return 1
     grep -qv 'source "\$SCRIPT_DIR/lib/cmd_status.sh"' "$file" || return 1
     grep -qv 'source "\$SCRIPT_DIR/lib/cmd_uninstall.sh"' "$file" || return 1
-    grep -q 'source "\$SCRIPT_DIR/lib/cmd_deploy.sh"' "$file" || return 1
     grep -qv 'source "\$SCRIPT_DIR/lib/cmd_update.sh"' "$file" || return 1
+    # deploy pipeline is now fully Python — no bash deploy modules sourced
+    grep -qv 'source "\$SCRIPT_DIR/lib/deploy_helpers.sh"' "$file" || return 1
+    grep -qv 'source "\$SCRIPT_DIR/lib/deploy_configure.sh"' "$file" || return 1
+    grep -qv 'source "\$SCRIPT_DIR/lib/deploy_steps.sh"' "$file" || return 1
+    grep -qv 'source "\$SCRIPT_DIR/lib/cmd_deploy.sh"' "$file" || return 1
 
     if grep -qE 'apt-get|steamcmd|systemctl reload nginx|certbot|journalctl -u' "$file"; then
         return 1
@@ -59,55 +63,53 @@ test_entrypoint_is_thin() {
 }
 
 test_deploy_uses_nginx_module() {
-    local file="$ROOT_DIR/lib/cmd_deploy.sh"
+    local file="$ROOT_DIR/shared/cmd_deploy.py"
 
-    grep -q 'deploy_step_dependencies' "$file" || return 1
-    grep -q 'deploy_step_game_install' "$file" || return 1
-    grep -q 'deploy_step_nginx' "$file" || return 1
-    grep -q 'deploy_step_validation' "$file" || return 1
+    grep -q 'run_configure' "$file" || return 1
+    grep -q 'run_all_steps' "$file" || return 1
+    grep -q 'deploy_step_nginx\|deploynginx' "$ROOT_DIR/shared/deploysteps.py" || return 1
+    grep -q 'deploy_step_validation' "$ROOT_DIR/shared/deploysteps.py" || return 1
 }
 
 test_deploy_modules_present() {
-    local helpers_file="$ROOT_DIR/lib/deploy_helpers.sh"
-    local configure_file="$ROOT_DIR/lib/deploy_configure.sh"
-    local steps_file="$ROOT_DIR/lib/deploy_steps.sh"
+    local config_file="$ROOT_DIR/shared/deployconfig.py"
+    local configure_file="$ROOT_DIR/shared/deployconfigure.py"
+    local steps_file="$ROOT_DIR/shared/deploysteps.py"
 
-    grep -q 'deploy_set_defaults()' "$helpers_file" || return 1
-    grep -q 'deploy_handle_special_args()' "$helpers_file" || return 1
-    grep -q 'deploy_init_logging()' "$helpers_file" || return 1
-    grep -q 'deploy_step_configuration()' "$configure_file" || return 1
-    grep -q 'deploy_configure_server()' "$configure_file" || return 1
-    grep -q 'shared/deployplan.py" game-meta' "$configure_file" || return 1
-    grep -q 'shared/deployplan.py" web-defaults' "$configure_file" || return 1
-    grep -q 'shared/deployplan.py" describe-conflicts' "$configure_file" || return 1
-    grep -q 'deploy_step_dependencies()' "$steps_file" || return 1
-    grep -q 'shared/deploybackups.py' "$steps_file" || return 1
-    grep -q 'shared/appfiles.py' "$steps_file" || return 1
-    grep -q 'shared/startscripts.py" soulmask' "$steps_file" || return 1
-    grep -q 'deploy_step_nginx()' "$steps_file" || return 1
-    grep -q 'nginx_manifest_add "\$INSTANCE_ID" "\$URL_PREFIX" "\$FLASK_PORT" "\$GAME_LABEL"' "$steps_file" || return 1
-    grep -q 'deploy_step_validation()' "$steps_file" || return 1
+    grep -q 'class DeployConfig' "$config_file" || return 1
+    grep -q 'def to_env' "$config_file" || return 1
+    grep -q 'deploy_mode.*managed\|managed.*deploy_mode' "$config_file" || return 1
+    grep -q 'def run_configure' "$configure_file" || return 1
+    grep -q 'def _configure_server' "$configure_file" || return 1
+    grep -q 'deployplan.game_meta' "$configure_file" || return 1
+    grep -q 'deployplan.next_free_flask_port\|deployplan.existing_prefix_owner' "$configure_file" || return 1
+    grep -q 'deployplan.describe_port_conflicts' "$configure_file" || return 1
+    grep -q 'def deploy_step_dependencies' "$steps_file" || return 1
+    grep -q 'deploybackups' "$steps_file" || return 1
+    grep -q 'appfiles' "$steps_file" || return 1
+    grep -q 'render_soulmask_start_script\|soulmask' "$steps_file" || return 1
+    grep -q 'def deploy_step_nginx' "$steps_file" || return 1
+    grep -q 'deploynginx.run_deploy_nginx' "$steps_file" || return 1
+    grep -q 'def deploy_step_validation' "$steps_file" || return 1
 }
 
 test_attach_mode_present() {
-    local helpers_file="$ROOT_DIR/lib/deploy_helpers.sh"
-    local configure_file="$ROOT_DIR/lib/deploy_configure.sh"
-    local deploy_file="$ROOT_DIR/lib/cmd_deploy.sh"
-    local steps_file="$ROOT_DIR/lib/deploy_steps.sh"
-    grep -q 'DEPLOY_MODE="managed"' "$helpers_file" || return 1
-    grep -q 'GAME_SERVICE=""' "$helpers_file" || return 1
-    grep -q 'DEPLOY_MODE="managed"' "$helpers_file" || return 1
-    grep -q 'deploy_configure_mode()' "$configure_file" || return 1
+    local config_file="$ROOT_DIR/shared/deployconfig.py"
+    local configure_file="$ROOT_DIR/shared/deployconfigure.py"
+    local deploy_file="$ROOT_DIR/shared/cmd_deploy.py"
+    local steps_file="$ROOT_DIR/shared/deploysteps.py"
+    grep -q 'deploy_mode.*managed\|managed.*deploy_mode' "$config_file" || return 1
+    grep -q 'game_service.*=.*""' "$config_file" || return 1
+    grep -q 'def _configure_mode' "$configure_file" || return 1
     grep -q 'Mode sélectionné :' "$configure_file" || return 1
-    grep -q 'shared/deployplan.py" instance-defaults' "$configure_file" || return 1
-    grep -q 'shared/deployplan.py" suggest-ports' "$configure_file" || return 1
-    grep -q '\[\[ "\$DEPLOY_MODE" != "attach" \]\] && deploy_warn_port_group_conflicts' "$configure_file" || return 1
+    grep -q 'apply_instance_defaults' "$configure_file" || return 1
+    grep -q 'suggest_free_port_group' "$configure_file" || return 1
+    grep -q 'deploy_mode.*!=.*attach\|attach.*deploy_mode' "$configure_file" || return 1
     grep -q -- '--attach\|--existing-server' "$deploy_file" || return 1
-    grep -q '\[\[ "\$DEPLOY_MODE" == "attach" \]\]' "$steps_file" || return 1
+    grep -q 'deploy_mode.*==.*attach\|attach.*deploy_mode' "$steps_file" || return 1
     grep -q 'Mode attach — installation/mise à jour du serveur ignorée' "$steps_file" || return 1
     grep -q 'Mode attach — service de jeu existant conservé' "$steps_file" || return 1
-    grep -q 'echo "DEPLOY_MODE=\\"${DEPLOY_MODE}\\""' "$steps_file" || return 1
-    grep -q 'echo "GAME_SERVICE=\\"${GAME_SERVICE}\\""' "$steps_file" || return 1
+    grep -q 'deploypost.save_deploy_config' "$steps_file" || return 1
     grep -q 'update-instance' "$ROOT_DIR/shared/cmd_update.py" || return 1
 }
 

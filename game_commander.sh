@@ -23,10 +23,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # ── Chargement des modules ─────────────────────────────────────────────────────
 source "$SCRIPT_DIR/lib/helpers.sh"
 source "$SCRIPT_DIR/lib/nginx.sh"
-source "$SCRIPT_DIR/lib/deploy_helpers.sh"
-source "$SCRIPT_DIR/lib/deploy_configure.sh"
-source "$SCRIPT_DIR/lib/deploy_steps.sh"
-source "$SCRIPT_DIR/lib/cmd_deploy.sh"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # AIDE
@@ -79,8 +75,13 @@ run_command() {
     local cmd="$1"
     shift || true
     case "$cmd" in
-        deploy)    cmd_deploy    "$@" ;;
-        attach)    cmd_deploy    --attach "$@" ;;
+        deploy)    python3 "$SCRIPT_DIR/shared/cmd_deploy.py" \
+                       --script-dir "$SCRIPT_DIR" \
+                       ${REMAINING_ARGS[@]+"${REMAINING_ARGS[@]}"} ;;
+        attach)    python3 "$SCRIPT_DIR/shared/cmd_deploy.py" \
+                       --script-dir "$SCRIPT_DIR" \
+                       --attach \
+                       ${REMAINING_ARGS[@]+"${REMAINING_ARGS[@]}"} ;;
         uninstall) python3 "$SCRIPT_DIR/shared/uninstall_interactive.py" \
                        --script-dir "$SCRIPT_DIR" \
                        ${DRY_RUN:+--dry-run} \
