@@ -528,6 +528,17 @@ def get_discord_status() -> dict:
     instance_channels = cfg.get("instance_channels") or {}
     game_channels = cfg.get("game_channels") or {}
     default_channel_id = cfg.get("default_channel_id", "")
+    # Fetch guild text channels for name resolution
+    guild_channels = []
+    guild_id = cfg.get("guild_id", "").strip()
+    if guild_id and cfg.get("bot_token"):
+        ok_ch, _, channels = discordnotify.list_guild_channels(guild_id, cfg["bot_token"])
+        if ok_ch:
+            guild_channels = [
+                {"id": str(ch["id"]), "name": ch["name"]}
+                for ch in (channels or [])
+                if ch.get("type") == 0  # text channels only
+            ]
     result = []
     for inst in instances:
         name = inst.get("name", "")
@@ -552,6 +563,7 @@ def get_discord_status() -> dict:
         "guild_id": cfg.get("guild_id", ""),
         "category_id": cfg.get("category_id", ""),
         "default_channel_id": default_channel_id,
+        "guild_channels": guild_channels,
         "instances": result,
     }
 

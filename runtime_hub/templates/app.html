@@ -426,8 +426,9 @@
                 <input class="field-input" id="discordGuildId" placeholder="123456789012345678">
                 <p class="deploy-help">Dans Discord : clic droit sur l'icône de ton serveur → <em>Copier l'identifiant du serveur</em>. Nécessite le mode développeur (Paramètres utilisateur → Avancé).</p>
                 <label class="field-label" for="discordDefaultChannelId">Canal de notification par défaut <span style="font-weight:400;color:var(--muted)">(optionnel)</span></label>
-                <input class="field-input" id="discordDefaultChannelId" placeholder="123456789012345678">
-                <p class="deploy-help">Canal Discord utilisé pour les notifications des instances qui n'ont pas de canal dédié. Clic droit sur un canal → <em>Copier l'identifiant</em>.</p>
+                <input class="field-input" id="discordDefaultChannelId" list="discordChannelsList" placeholder="#général ou ID numérique">
+                <datalist id="discordChannelsList"></datalist>
+                <p class="deploy-help">Canal Discord utilisé pour les notifications des instances sans canal dédié. Tape <code>#</code> pour voir les canaux disponibles, ou colle un ID directement.</p>
                 <label class="field-label" for="discordCategoryId">ID de catégorie de secours <span style="font-weight:400;color:var(--muted)">(optionnel)</span></label>
                 <input class="field-input" id="discordCategoryId" placeholder="123456789012345678">
                 <p class="deploy-help">Normalement inutile : une catégorie par jeu est créée automatiquement (<em>valheim</em>, <em>enshrouded</em>…). Ce champ sert de repli uniquement si le jeu n'est pas identifiable.</p>
@@ -1101,13 +1102,31 @@
     document.getElementById('deployUrlPrefix').addEventListener('input', refreshDeployPrefixHelp);
     // ── Discord panel ────────────────────────────────────────────────────────
     let DISCORD_CURRENT_INSTANCE = '';
+    let GUILD_CHANNELS = []; // [{id, name}] — canaux texte du serveur
+    function channelNameById(id) {
+      if (!id) return '';
+      const ch = GUILD_CHANNELS.find(c => c.id === id);
+      return ch ? `#${ch.name}` : id;
+    }
+    function resolveChannelInput(value) {
+      const v = value.trim().replace(/^#/, '');
+      if (!v) return '';
+      const byName = GUILD_CHANNELS.find(c => c.name.toLowerCase() === v.toLowerCase());
+      if (byName) return byName.id;
+      return v; // ID brut ou valeur inconnue
+    }
     async function loadDiscord() {
       const r = await fetch('{{ prefix }}/api/discord', { credentials: 'same-origin' });
       if (!r.ok) { setFeedback('discordConfigFeedback', 'Erreur chargement Discord', false); return; }
       const d = await r.json();
+      GUILD_CHANNELS = d.guild_channels || [];
+      // Populate datalist
+      const datalist = document.getElementById('discordChannelsList');
+      datalist.innerHTML = GUILD_CHANNELS.map(ch => `<option value="#${esc(ch.name)}">`).join('');
       document.getElementById('discordGuildId').value = d.guild_id || '';
       document.getElementById('discordCategoryId').value = d.category_id || '';
-      document.getElementById('discordDefaultChannelId').value = d.default_channel_id || '';
+      // Show channel name instead of raw ID
+      document.getElementById('discordDefaultChannelId').value = channelNameById(d.default_channel_id) || d.default_channel_id || '';
       renderDiscordInstances(d.instances || [], d.configured);
     }
     const NOTIF_SOURCE_LABEL = {
@@ -1124,7 +1143,8 @@
       }
       tbody.innerHTML = instances.map((inst) => {
         const hasChannel = !!inst.channel_id;
-        const channelLabel = hasChannel ? `<code>#${inst.name.toLowerCase().replace(/_/g,'-')}</code> (${inst.channel_id})` : '<span style="color:var(--muted)">—</span>';
+        const chName = hasChannel ? (channelNameById(inst.channel_id) || `#${inst.name.toLowerCase().replace(/_/g,'-')}`) : '';
+        const channelLabel = hasChannel ? `<code title="ID : ${esc(inst.channel_id)}">${esc(chName)}</code>` : '<span style="color:var(--muted)">—</span>';
         const notif = NOTIF_SOURCE_LABEL[inst.notif_source] || NOTIF_SOURCE_LABEL[''];
         const notifLabel = `<span style="color:${notif.color};font-size:.85em">${notif.text}</span>`;
         const createBtn = !hasChannel && configured ? `<button class="monitor-toggle" type="button" data-discord-action="create" data-instance="${esc(inst.name)}">Créer</button>` : '';
@@ -1207,7 +1227,7 @@
         body: JSON.stringify({
           guild_id: document.getElementById('discordGuildId').value.trim(),
           category_id: document.getElementById('discordCategoryId').value.trim(),
-          default_channel_id: document.getElementById('discordDefaultChannelId').value.trim(),
+          default_channel_id: resolveChannelInput(document.getElementById('discordDefaultChannelId').value),
         }),
       });
       const d = await r.json().catch(() => ({}));
