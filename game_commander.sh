@@ -23,14 +23,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # ── Chargement des modules ─────────────────────────────────────────────────────
 source "$SCRIPT_DIR/lib/helpers.sh"
 source "$SCRIPT_DIR/lib/nginx.sh"
-source "$SCRIPT_DIR/lib/cmd_status.sh"
 source "$SCRIPT_DIR/lib/deploy_helpers.sh"
 source "$SCRIPT_DIR/lib/deploy_configure.sh"
 source "$SCRIPT_DIR/lib/deploy_steps.sh"
 source "$SCRIPT_DIR/lib/cmd_deploy.sh"
-source "$SCRIPT_DIR/lib/cmd_uninstall.sh"
 source "$SCRIPT_DIR/lib/cmd_update.sh"
-source "$SCRIPT_DIR/lib/cmd_rebalance.sh"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # AIDE
@@ -85,10 +82,16 @@ run_command() {
     case "$cmd" in
         deploy)    cmd_deploy    "$@" ;;
         attach)    cmd_deploy    --attach "$@" ;;
-        uninstall) cmd_uninstall ;;
-        status)    cmd_status    ;;
+        uninstall) python3 "$SCRIPT_DIR/shared/uninstall_interactive.py" \
+                       --script-dir "$SCRIPT_DIR" \
+                       ${DRY_RUN:+--dry-run} \
+                       "${REMAINING_ARGS[@]:-}" ;;
+        status)    python3 "$SCRIPT_DIR/shared/cmd_status.py" \
+                       --script-dir "$SCRIPT_DIR" ;;
         update)    cmd_update    "$@" ;;
-        rebalance) cmd_rebalance "$@" ;;
+        rebalance) python3 "$SCRIPT_DIR/shared/cmd_rebalance.py" \
+                       --script-dir "$SCRIPT_DIR" \
+                       "${REMAINING_ARGS[@]:-}" ;;
         bootstrap-hub)
             python3 "$SCRIPT_DIR/tools/host_cli.py" bootstrap-hub \
                 --main-script "$SCRIPT_DIR/game_commander.sh" \

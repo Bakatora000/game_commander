@@ -43,15 +43,15 @@ test_entrypoint_is_thin() {
     # cpu_affinity.sh and cpu_monitor.sh are replaced by shared/cpuplan.py
     grep -qv 'source "\$SCRIPT_DIR/lib/cpu_affinity.sh"' "$file" || return 1
     grep -qv 'source "\$SCRIPT_DIR/lib/cpu_monitor.sh"' "$file" || return 1
-    # uninstall_*.sh are replaced by shared/uninstall_interactive.py
+    # uninstall_*.sh, cmd_rebalance.sh, cmd_status.sh, cmd_uninstall.sh replaced by Python
     grep -qv 'source "\$SCRIPT_DIR/lib/uninstall_gc.sh"' "$file" || return 1
     grep -qv 'source "\$SCRIPT_DIR/lib/uninstall_flask.sh"' "$file" || return 1
     grep -qv 'source "\$SCRIPT_DIR/lib/uninstall_orphans.sh"' "$file" || return 1
-    grep -q 'source "\$SCRIPT_DIR/lib/cmd_status.sh"' "$file" || return 1
+    grep -qv 'source "\$SCRIPT_DIR/lib/cmd_rebalance.sh"' "$file" || return 1
+    grep -qv 'source "\$SCRIPT_DIR/lib/cmd_status.sh"' "$file" || return 1
+    grep -qv 'source "\$SCRIPT_DIR/lib/cmd_uninstall.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_deploy.sh"' "$file" || return 1
-    grep -q 'source "\$SCRIPT_DIR/lib/cmd_uninstall.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_update.sh"' "$file" || return 1
-    grep -q 'source "\$SCRIPT_DIR/lib/cmd_rebalance.sh"' "$file" || return 1
 
     if grep -qE 'apt-get|steamcmd|systemctl reload nginx|certbot|journalctl -u' "$file"; then
         return 1
@@ -115,7 +115,7 @@ test_attach_mode_present() {
 }
 
 test_uninstall_prefers_manifest() {
-    local file="$ROOT_DIR/lib/cmd_uninstall.sh"
+    local file="$ROOT_DIR/game_commander.sh"
 
     grep -q 'uninstall_interactive.py' "$file" || return 1
     grep -q '\-\-script-dir' "$file" || return 1
@@ -186,10 +186,11 @@ test_cpu_monitor_module_present() {
 }
 
 test_rebalance_command_present() {
-    local file="$ROOT_DIR/lib/cmd_rebalance.sh"
+    local file="$ROOT_DIR/shared/cmd_rebalance.py"
 
-    grep -q 'cmd_rebalance()' "$file" || return 1
-    grep -q 'cpuplan.py" apply' "$file" || return 1
+    grep -q 'def main' "$file" || return 1
+    grep -q 'cpuplan.apply_plan' "$file" || return 1
+    grep -q 'cpuplan.collect_managed_instances' "$file" || return 1
 }
 
 test_nginx_wrappers_call_python_manager() {
