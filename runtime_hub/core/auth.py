@@ -52,8 +52,10 @@ def verify_password(username, password):
 
 def get_user_perms(username):
     users = load_users()
-    stored = set(users.get(username, {}).get("permissions", []))
-    if stored == {"view_hub"}:
+    user = users.get(username, {})
+    stored = set(user.get("permissions", []))
+    explicit = bool(user.get("permissions_explicit"))
+    if stored == {"view_hub"} and not explicit:
         return sorted(DEFAULT_VIEW_HUB_PERMISSIONS)
     return sorted(stored)
 
@@ -137,6 +139,7 @@ def create_account(username: str, password: str) -> tuple[bool, str]:
     users[username] = {
         "password_hash": hash_password(password),
         "permissions": sorted(DEFAULT_VIEW_HUB_PERMISSIONS),
+        "permissions_explicit": True,
         "email": "",
     }
     save_users(users)
@@ -159,6 +162,7 @@ def update_account_permissions(target_username: str, permissions: list[str], req
         if not others_with_manage:
             return False, "Impossible : aucun autre compte n'a la permission 'Gérer les comptes'"
     users[target_username]["permissions"] = perms
+    users[target_username]["permissions_explicit"] = True
     save_users(users)
     return True, ""
 

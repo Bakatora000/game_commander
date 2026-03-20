@@ -1823,7 +1823,7 @@ class HubAuthTests(unittest.TestCase):
                 # view_hub always present even if not in list
                 ok2, _ = hub_auth.update_account_permissions("alice", [], "admin")
                 self.assertTrue(ok2)
-                self.assertIn("view_hub", hub_auth.get_user_perms("alice"))
+                self.assertEqual(hub_auth.get_user_perms("alice"), ["view_hub"])
                 # Give alice explicit perms without manage_accounts (bypasses legacy expansion)
                 hub_auth.update_account_permissions("alice", ["manage_instances"], "admin")
                 self.assertNotIn("manage_accounts", hub_auth.get_user_perms("alice"))
@@ -1831,6 +1831,20 @@ class HubAuthTests(unittest.TestCase):
                 ok3, err3 = hub_auth.update_account_permissions("admin", ["manage_instances"], "other")
                 self.assertFalse(ok3)
                 self.assertIn("aucun", err3.lower() if err3 else "")
+
+    def test_explicit_view_hub_only_does_not_reexpand_defaults(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            (root / "users.json").write_text(json.dumps({
+                "admin": {"password_hash": hub_auth.hash_password("adminpass1"), "permissions": ["view_hub"], "email": ""},
+                "alice": {"password_hash": hub_auth.hash_password("alicepass1"), "permissions": ["view_hub"], "email": ""},
+            }), encoding="utf-8")
+            app = Flask(__name__, root_path=str(root))
+            with app.app_context():
+                self.assertIn("manage_accounts", hub_auth.get_user_perms("alice"))
+                ok, err = hub_auth.update_account_permissions("alice", [], "admin")
+                self.assertTrue(ok, err)
+                self.assertEqual(hub_auth.get_user_perms("alice"), ["view_hub"])
 
     def test_delete_account(self):
         with tempfile.TemporaryDirectory() as d:
