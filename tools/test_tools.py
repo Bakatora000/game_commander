@@ -1172,6 +1172,35 @@ class DiscordNotifyTests(unittest.TestCase):
         self.assertFalse(create_mock.called)
         self.assertTrue(save_mock.called)
 
+    def test_delete_channel_and_empty_category_removes_category_when_last_child(self):
+        channels = [
+            {"id": "cat42", "type": 4, "name": "satisfactory"},
+            {"id": "123", "type": 0, "name": "satisfactory", "parent_id": "cat42"},
+        ]
+        with mock.patch.object(discordnotify, "list_guild_channels", return_value=(True, "ok", channels)), \
+             mock.patch.object(discordnotify, "delete_channel", return_value=(True, "ok")) as delete_mock, \
+             mock.patch.object(discordnotify, "_discord_api", return_value=(True, "ok", None)) as api_mock:
+            ok, message = discordnotify.delete_channel_and_empty_category("guild", "123", "token")
+        self.assertTrue(ok)
+        self.assertIn("catégorie", message)
+        delete_mock.assert_called_once_with("123", "token", timeout=10)
+        api_mock.assert_called_once_with("DELETE", "/channels/cat42", "token", timeout=10)
+
+    def test_delete_channel_and_empty_category_keeps_non_empty_category(self):
+        channels = [
+            {"id": "cat42", "type": 4, "name": "satisfactory"},
+            {"id": "123", "type": 0, "name": "satisfactory", "parent_id": "cat42"},
+            {"id": "124", "type": 0, "name": "satisfactory-admin", "parent_id": "cat42"},
+        ]
+        with mock.patch.object(discordnotify, "list_guild_channels", return_value=(True, "ok", channels)), \
+             mock.patch.object(discordnotify, "delete_channel", return_value=(True, "ok")) as delete_mock, \
+             mock.patch.object(discordnotify, "_discord_api") as api_mock:
+            ok, message = discordnotify.delete_channel_and_empty_category("guild", "123", "token")
+        self.assertTrue(ok)
+        self.assertEqual(message, "Channel supprimé")
+        delete_mock.assert_called_once_with("123", "token", timeout=10)
+        api_mock.assert_not_called()
+
 
 class HostCliTests(unittest.TestCase):
 

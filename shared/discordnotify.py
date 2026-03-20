@@ -179,6 +179,38 @@ def delete_channel(channel_id: str, bot_token: str, *, timeout: int = 10) -> tup
     return ok, msg
 
 
+def delete_channel_and_empty_category(
+    guild_id: str,
+    channel_id: str,
+    bot_token: str,
+    *,
+    timeout: int = 10,
+) -> tuple[bool, str]:
+    """Delete a channel and remove its parent category if it becomes empty."""
+    ok, msg, channels = list_guild_channels(guild_id, bot_token, timeout=timeout)
+    if not ok:
+        return False, msg
+    channel = next((ch for ch in (channels or []) if str(ch.get("id", "")) == str(channel_id)), None)
+    if not channel:
+        return False, "http 404"
+    parent_id = str(channel.get("parent_id") or "")
+    ok_del, msg_del = delete_channel(channel_id, bot_token, timeout=timeout)
+    if not ok_del:
+        return False, msg_del
+    if not parent_id:
+        return True, "Channel supprimé"
+    remaining = [
+        ch for ch in (channels or [])
+        if str(ch.get("id", "")) != str(channel_id) and str(ch.get("parent_id") or "") == parent_id
+    ]
+    if remaining:
+        return True, "Channel supprimé"
+    ok_cat, msg_cat, _ = _discord_api("DELETE", f"/channels/{parent_id}", bot_token, timeout=timeout)
+    if not ok_cat:
+        return True, f"Channel supprimé, mais catégorie non supprimée : {msg_cat}"
+    return True, "Channel et catégorie vide supprimés"
+
+
 def set_permission_overwrite(
     channel_id: str,
     target_id: str,

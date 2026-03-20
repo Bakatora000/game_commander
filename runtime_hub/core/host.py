@@ -677,15 +677,18 @@ def delete_discord_channel(instance_name: str) -> tuple[bool, str]:
     cfg = _load_discord_cfg()
     if not cfg.get("bot_token"):
         return False, "Bot token non configuré"
+    guild_id = cfg.get("guild_id", "").strip()
+    if not guild_id:
+        return False, "guild_id non configuré dans discord.json"
     channel_id = (cfg.get("instance_channels") or {}).get(instance_name, "")
     if not channel_id:
         return False, "Aucun channel Discord associé à cette instance"
-    ok, msg = discordnotify.delete_channel(channel_id, cfg["bot_token"])
+    ok, msg = discordnotify.delete_channel_and_empty_category(guild_id, channel_id, cfg["bot_token"])
     if not ok:
         return False, f"Erreur Discord API : {msg}"
     cfg.get("instance_channels", {}).pop(instance_name, None)
     _save_discord_cfg(cfg)
-    return True, f"Channel supprimé"
+    return True, msg or "Channel supprimé"
 
 
 def get_discord_permissions(instance_name: str) -> tuple[bool, str, list]:
