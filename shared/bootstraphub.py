@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import pwd
 import secrets
 import shutil
@@ -137,7 +138,7 @@ def _ensure_state_dir(sys_user: str) -> None:
     state_dir = Path(GC_STATE_DIR)
     state_dir.mkdir(parents=True, exist_ok=True)
     state_dir.chmod(0o755)
-    state_dir.chown(pw.pw_uid, pw.pw_gid)
+    os.chown(state_dir, pw.pw_uid, pw.pw_gid)
 
 
 def run_bootstrap_hub(
