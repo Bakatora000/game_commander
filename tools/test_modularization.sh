@@ -51,7 +51,7 @@ test_entrypoint_is_thin() {
     grep -qv 'source "\$SCRIPT_DIR/lib/cmd_status.sh"' "$file" || return 1
     grep -qv 'source "\$SCRIPT_DIR/lib/cmd_uninstall.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_deploy.sh"' "$file" || return 1
-    grep -q 'source "\$SCRIPT_DIR/lib/cmd_update.sh"' "$file" || return 1
+    grep -qv 'source "\$SCRIPT_DIR/lib/cmd_update.sh"' "$file" || return 1
 
     if grep -qE 'apt-get|steamcmd|systemctl reload nginx|certbot|journalctl -u' "$file"; then
         return 1
@@ -94,8 +94,6 @@ test_attach_mode_present() {
     local configure_file="$ROOT_DIR/lib/deploy_configure.sh"
     local deploy_file="$ROOT_DIR/lib/cmd_deploy.sh"
     local steps_file="$ROOT_DIR/lib/deploy_steps.sh"
-    local update_file="$ROOT_DIR/lib/cmd_update.sh"
-
     grep -q 'DEPLOY_MODE="managed"' "$helpers_file" || return 1
     grep -q 'GAME_SERVICE=""' "$helpers_file" || return 1
     grep -q 'DEPLOY_MODE="managed"' "$helpers_file" || return 1
@@ -110,8 +108,7 @@ test_attach_mode_present() {
     grep -q 'Mode attach — service de jeu existant conservé' "$steps_file" || return 1
     grep -q 'echo "DEPLOY_MODE=\\"${DEPLOY_MODE}\\""' "$steps_file" || return 1
     grep -q 'echo "GAME_SERVICE=\\"${GAME_SERVICE}\\""' "$steps_file" || return 1
-    grep -q 'DEPLOY_MODE GAME_SERVICE' "$update_file" || return 1
-    grep -q 'GAME_SERVICE="${GAME_SERVICE:-valheim-server-${INSTANCE_ID}}"' "$update_file" || return 1
+    grep -q 'update-instance' "$ROOT_DIR/shared/cmd_update.py" || return 1
 }
 
 test_uninstall_prefers_manifest() {
@@ -160,13 +157,13 @@ EOF
 }
 
 test_update_module_present() {
-    local file="$ROOT_DIR/lib/cmd_update.sh"
+    local file="$ROOT_DIR/shared/cmd_update.py"
 
-    grep -q 'cmd_update()' "$file" || return 1
-    grep -q 'update_collect_configs()' "$file" || return 1
-    grep -q 'rsync -a --delete' "$file" || return 1
-    grep -q 'tools/config_gen.py" game-json' "$file" || return 1
-    grep -q 'systemctl restart "\$GC_SERVICE"' "$file" || return 1
+    grep -q 'def main' "$file" || return 1
+    grep -q 'update-instance' "$file" || return 1
+    grep -q 'deploybackups.install_backup_assets' "$file" || return 1
+    grep -q 'cpuplan.apply_plan' "$file" || return 1
+    grep -q 'hubsync.sync_hub_service_from_values' "$file" || return 1
 }
 
 test_cpu_affinity_module_present() {
