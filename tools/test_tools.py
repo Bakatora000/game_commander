@@ -1157,6 +1157,21 @@ class DiscordNotifyTests(unittest.TestCase):
         self.assertFalse(create_mock.called)
         self.assertTrue(save_mock.called)
 
+    def test_cli_create_channel_replaces_stale_mapped_channel(self):
+        cfg = {"bot_token": "token", "guild_id": "guild", "instance_channels": {"satisfactory": "999"}}
+        with mock.patch.object(discordnotify, "load_config", return_value=cfg), \
+             mock.patch.object(discordnotify, "channel_exists", return_value=(False, "http 404")), \
+             mock.patch.object(discordnotify, "find_text_channel_by_name", return_value=(True, "existing", "123")), \
+             mock.patch.object(discordnotify, "save_config", return_value=(True, "/etc/game-commander/discord.json")) as save_mock, \
+             mock.patch.object(discordnotify, "create_channel") as create_mock, \
+             mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+            rc = discordnotify._cli_create_channel("satisfactory", "satisfactory")
+        self.assertEqual(rc, 0)
+        self.assertIn("orphelin", stdout.getvalue())
+        self.assertEqual(cfg["instance_channels"]["satisfactory"], "123")
+        self.assertFalse(create_mock.called)
+        self.assertTrue(save_mock.called)
+
 
 class HostCliTests(unittest.TestCase):
 

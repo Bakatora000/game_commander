@@ -228,6 +228,17 @@ def get_channel_overwrites(
     return True, "ok", overwrites
 
 
+def channel_exists(
+    channel_id: str,
+    bot_token: str,
+    *,
+    timeout: int = 10,
+) -> tuple[bool, str]:
+    """Return whether a Discord channel still exists and is reachable."""
+    ok, msg, _ = _discord_api("GET", f"/channels/{channel_id}", bot_token, timeout=timeout)
+    return ok, msg
+
+
 def load_config(path: str | Path | None = None) -> dict:
     candidates: list[Path] = []
     if path:
@@ -476,8 +487,17 @@ def _cli_create_channel(instance_id: str, game_id: str = "") -> int:
         return 1
     existing = (cfg.get("instance_channels") or {}).get(instance_id, "")
     if existing:
-        print(f"Channel déjà configuré pour {instance_id} ({existing})")
-        return 0
+        ok_existing, msg_existing = channel_exists(str(existing), cfg["bot_token"])
+        if ok_existing:
+            print(f"Channel déjà configuré pour {instance_id} ({existing})")
+            return 0
+        cfg.setdefault("instance_channels", {}).pop(instance_id, None)
+        saved, save_msg = save_config(cfg)
+        if not saved:
+            print(f"Channel Discord orphelin détecté ({existing}) mais discord.json non mis à jour : {save_msg}",
+                  file=sys.stderr)
+            return 1
+        print(f"Channel Discord orphelin supprimé de discord.json pour {instance_id} ({existing} : {msg_existing})")
     # Determine category: per-game if game_id provided, fallback to config
     category_id: str | None = cfg.get("category_id") or None
     if game_id:
