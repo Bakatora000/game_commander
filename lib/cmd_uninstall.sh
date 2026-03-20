@@ -56,18 +56,8 @@ cmd_uninstall() {
         return
     fi
 
-    DEPLOY_CONFIGS=()
-    uninstall_gc_section
-    if [[ $? -eq 10 ]]; then
-        info "Désinstallation annulée."
-        echo ""
-        return
-    fi
-    uninstall_flask_section
-    uninstall_orphans_section
-
-    echo ""
-    hdr "Terminé"
-    $DRY_RUN && warn "DRY-RUN — aucune modification n'a été effectuée"
-    echo ""
+    python3 "$SCRIPT_DIR/shared/uninstall_interactive.py" \
+        --script-dir "$SCRIPT_DIR" \
+        ${DRY_RUN:+--dry-run} \
+        ${ASSUME_YES:+--yes}
 } # fin cmd_uninstall

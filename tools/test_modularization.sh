@@ -43,6 +43,10 @@ test_entrypoint_is_thin() {
     # cpu_affinity.sh and cpu_monitor.sh are replaced by shared/cpuplan.py
     grep -qv 'source "\$SCRIPT_DIR/lib/cpu_affinity.sh"' "$file" || return 1
     grep -qv 'source "\$SCRIPT_DIR/lib/cpu_monitor.sh"' "$file" || return 1
+    # uninstall_*.sh are replaced by shared/uninstall_interactive.py
+    grep -qv 'source "\$SCRIPT_DIR/lib/uninstall_gc.sh"' "$file" || return 1
+    grep -qv 'source "\$SCRIPT_DIR/lib/uninstall_flask.sh"' "$file" || return 1
+    grep -qv 'source "\$SCRIPT_DIR/lib/uninstall_orphans.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_status.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_deploy.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_uninstall.sh"' "$file" || return 1
@@ -113,31 +117,28 @@ test_attach_mode_present() {
 test_uninstall_prefers_manifest() {
     local file="$ROOT_DIR/lib/cmd_uninstall.sh"
 
-    grep -q 'uninstall_gc_section' "$file" || return 1
-    grep -q 'uninstall_flask_section' "$file" || return 1
-    grep -q 'uninstall_orphans_section' "$file" || return 1
+    grep -q 'uninstall_interactive.py' "$file" || return 1
+    grep -q '\-\-script-dir' "$file" || return 1
 }
 
 test_uninstall_modules_present() {
-    local gc_file="$ROOT_DIR/lib/uninstall_gc.sh"
-    local flask_file="$ROOT_DIR/lib/uninstall_flask.sh"
-    local orphans_file="$ROOT_DIR/lib/uninstall_orphans.sh"
-    local helpers_file="$ROOT_DIR/lib/helpers.sh"
+    local gc_file="$ROOT_DIR/shared/uninstall_gc.py"
+    local flask_file="$ROOT_DIR/shared/uninstall_flask.py"
+    local orphans_file="$ROOT_DIR/shared/uninstall_orphans.py"
+    local orchestrator="$ROOT_DIR/shared/uninstall_interactive.py"
 
-    grep -q 'gc_read()' "$helpers_file" || return 1
-    grep -q 'gc_read _ans' "$helpers_file" || return 1
-    grep -q 'gc_read gc_sel' "$gc_file" || return 1
-    grep -q 'gc_read gc_action' "$gc_file" || return 1
-    grep -q 'gc_read fl_sel' "$flask_file" || return 1
-    grep -q 'gc_read fl_action' "$flask_file" || return 1
-    grep -q 'gc_read kill_sel' "$orphans_file" || return 1
-    grep -q 'gc_read sig_choice' "$orphans_file" || return 1
-    grep -q '\[\[ -f "\$GC_NGINX_MANIFEST" \]\] && nginx_manifest_check "\$instance_id"' "$gc_file" || return 1
-    grep -q 'nginx_manifest_remove "\$instance_id"' "$gc_file" || return 1
-    grep -q 'nginx_regenerate_locations' "$gc_file" || return 1
-    grep -q 'nginx_apply' "$gc_file" || return 1
-    grep -q 'uninstall_flask_process_entry' "$flask_file" || return 1
-    grep -q 'uninstall_orphans_section' "$orphans_file" || return 1
+    grep -q '_nginx_manifest_in_manifest' "$gc_file" || return 1
+    grep -q '_nginx_remove_manifest' "$gc_file" || return 1
+    grep -q 'stop_and_disable' "$gc_file" || return 1
+    grep -q '_process_entry' "$gc_file" || return 1
+    grep -q '_collect_flask_services' "$flask_file" || return 1
+    grep -q '_process_entry' "$flask_file" || return 1
+    grep -q '_collect_orphans' "$orphans_file" || return 1
+    grep -q '_is_systemd_managed' "$orphans_file" || return 1
+    grep -q '_is_amp_process' "$orphans_file" || return 1
+    grep -q 'uninstall_gc.section' "$orchestrator" || return 1
+    grep -q 'uninstall_flask.section' "$orchestrator" || return 1
+    grep -q 'uninstall_orphans.section' "$orchestrator" || return 1
 }
 
 test_gc_read_falls_back_to_stdin() {
@@ -294,12 +295,12 @@ test_orphans_skip_systemd_managed_processes() {
 EOF
 
     PROC_ROOT="$sandbox/proc" \
-    ROOT_DIR="$ROOT_DIR" \
-    bash <<'EOF'
-set -euo pipefail
-source "$ROOT_DIR/lib/uninstall_orphans.sh"
-uninstall_orphans_is_systemd_managed 4242
-EOF
+    python3 - <<PYEOF
+import sys
+sys.path.insert(0, "$ROOT_DIR")
+from shared import uninstall_orphans
+assert uninstall_orphans._is_systemd_managed(4242), "Expected PID 4242 to be systemd-managed"
+PYEOF
 }
 
 main() {
