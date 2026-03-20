@@ -258,6 +258,14 @@ def api_discord_get():
     return jsonify(host.get_discord_status()), 200
 
 
+@app.route(f"{PREFIX}/api/discord/test", methods=["GET"])
+@auth.require_auth
+@auth.require_perm("manage_lifecycle")
+def api_discord_test():
+    ok, message = host.test_discord_connection()
+    return jsonify({"ok": ok, "message": message}), (200 if ok else 400)
+
+
 @app.route(f"{PREFIX}/api/discord/config", methods=["POST"])
 @auth.require_auth
 @auth.require_perm("manage_lifecycle")

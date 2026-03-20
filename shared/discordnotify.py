@@ -214,6 +214,24 @@ def load_config(path: str | Path | None = None) -> dict:
     return {}
 
 
+def test_connection(cfg: dict, *, timeout: int = 10) -> tuple[bool, str, str]:
+    """Test bot token and guild access. Returns (ok, message, bot_username)."""
+    token = cfg.get("bot_token", "")
+    if not token:
+        return False, "Bot token non configuré", ""
+    ok, msg, body = _discord_api("GET", "/users/@me", token, timeout=timeout)
+    if not ok:
+        return False, f"Token invalide ou bot inaccessible : {msg}", ""
+    bot_name = (body or {}).get("username", "")
+    guild_id = cfg.get("guild_id", "").strip()
+    if not guild_id:
+        return True, f"Bot connecté ({bot_name}) — ID serveur non configuré", bot_name
+    ok2, msg2, _ = _discord_api("GET", f"/guilds/{guild_id}/channels", token, timeout=timeout)
+    if not ok2:
+        return False, f"Bot connecté ({bot_name}) mais serveur inaccessible : {msg2}", bot_name
+    return True, f"Bot connecté ({bot_name}) — serveur accessible ✓", bot_name
+
+
 def notifications_enabled(cfg: dict) -> bool:
     return bool(cfg.get("enabled", True) and cfg.get("bot_token"))
 

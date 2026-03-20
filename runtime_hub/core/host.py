@@ -514,32 +514,53 @@ def _save_discord_cfg(cfg: dict) -> tuple[bool, str]:
     return discordnotify.save_config(cfg, _discord_cfg_path())
 
 
+def test_discord_connection() -> tuple[bool, str]:
+    from shared import discordnotify
+    cfg = _load_discord_cfg()
+    ok, msg, _ = discordnotify.test_connection(cfg)
+    return ok, msg
+
+
 def get_discord_status() -> dict:
+    from shared import discordnotify
     cfg = _load_discord_cfg()
     instances = _load_manifest().get("instances", [])
     instance_channels = cfg.get("instance_channels") or {}
+    game_channels = cfg.get("game_channels") or {}
+    default_channel_id = cfg.get("default_channel_id", "")
     result = []
     for inst in instances:
         name = inst.get("name", "")
+        game = inst.get("game", "")
+        channel_id = instance_channels.get(name, "")
+        if channel_id:
+            notif_source = "instance"
+        elif game and game in game_channels:
+            notif_source = "game"
+        elif default_channel_id:
+            notif_source = "default"
+        else:
+            notif_source = ""
         result.append({
             "name": name,
-            "game": inst.get("game", ""),
-            "channel_id": instance_channels.get(name, ""),
+            "game": game,
+            "channel_id": channel_id,
+            "notif_source": notif_source,
         })
     return {
         "configured": bool(cfg.get("bot_token")),
         "guild_id": cfg.get("guild_id", ""),
         "category_id": cfg.get("category_id", ""),
+        "default_channel_id": default_channel_id,
         "instances": result,
     }
 
 
 def set_discord_config(data: dict) -> tuple[bool, str]:
     cfg = _load_discord_cfg()
-    if "guild_id" in data:
-        cfg["guild_id"] = str(data["guild_id"]).strip()
-    if "category_id" in data:
-        cfg["category_id"] = str(data["category_id"]).strip()
+    for key in ("guild_id", "category_id", "default_channel_id"):
+        if key in data:
+            cfg[key] = str(data[key]).strip()
     return _save_discord_cfg(cfg)
 
 

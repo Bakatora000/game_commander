@@ -425,10 +425,16 @@
                 <label class="field-label" for="discordGuildId">ID du serveur Discord</label>
                 <input class="field-input" id="discordGuildId" placeholder="123456789012345678">
                 <p class="deploy-help">Dans Discord : clic droit sur l'icône de ton serveur → <em>Copier l'identifiant du serveur</em>. Nécessite le mode développeur (Paramètres utilisateur → Avancé).</p>
+                <label class="field-label" for="discordDefaultChannelId">Canal de notification par défaut <span style="font-weight:400;color:var(--muted)">(optionnel)</span></label>
+                <input class="field-input" id="discordDefaultChannelId" placeholder="123456789012345678">
+                <p class="deploy-help">Canal Discord utilisé pour les notifications des instances qui n'ont pas de canal dédié. Clic droit sur un canal → <em>Copier l'identifiant</em>.</p>
                 <label class="field-label" for="discordCategoryId">ID de catégorie de secours <span style="font-weight:400;color:var(--muted)">(optionnel)</span></label>
                 <input class="field-input" id="discordCategoryId" placeholder="123456789012345678">
                 <p class="deploy-help">Normalement inutile : une catégorie par jeu est créée automatiquement (<em>valheim</em>, <em>enshrouded</em>…). Ce champ sert de repli uniquement si le jeu n'est pas identifiable.</p>
-                <button class="primary-btn" type="button" id="btnSaveDiscordConfig">Enregistrer dans discord.json</button>
+                <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem">
+                  <button class="primary-btn" type="button" id="btnSaveDiscordConfig">Enregistrer dans discord.json</button>
+                  <button class="monitor-toggle" type="button" id="btnTestDiscord">Tester la connexion</button>
+                </div>
               </section>
             </div>
           </section>
@@ -448,6 +454,7 @@
                   <th>Instance</th>
                   <th>Jeu</th>
                   <th>Canal</th>
+                  <th>Notif</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -1100,21 +1107,30 @@
       const d = await r.json();
       document.getElementById('discordGuildId').value = d.guild_id || '';
       document.getElementById('discordCategoryId').value = d.category_id || '';
+      document.getElementById('discordDefaultChannelId').value = d.default_channel_id || '';
       renderDiscordInstances(d.instances || [], d.configured);
     }
+    const NOTIF_SOURCE_LABEL = {
+      instance: { text: 'Canal dédié', color: 'var(--accent)' },
+      game:     { text: 'Par jeu',     color: 'var(--muted)' },
+      default:  { text: 'Par défaut',  color: 'var(--muted)' },
+      '':       { text: 'Aucune',      color: '#e05050' },
+    };
     function renderDiscordInstances(instances, configured) {
       const tbody = document.getElementById('discordInstancesBody');
       if (!instances.length) {
-        tbody.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">Aucune instance déployée</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted)">Aucune instance déployée</td></tr>';
         return;
       }
       tbody.innerHTML = instances.map((inst) => {
         const hasChannel = !!inst.channel_id;
         const channelLabel = hasChannel ? `<code>#${inst.name.toLowerCase().replace(/_/g,'-')}</code> (${inst.channel_id})` : '<span style="color:var(--muted)">—</span>';
+        const notif = NOTIF_SOURCE_LABEL[inst.notif_source] || NOTIF_SOURCE_LABEL[''];
+        const notifLabel = `<span style="color:${notif.color};font-size:.85em">${notif.text}</span>`;
         const createBtn = !hasChannel && configured ? `<button class="monitor-toggle" type="button" data-discord-action="create" data-instance="${esc(inst.name)}">Créer</button>` : '';
         const deleteBtn = hasChannel ? `<button class="monitor-toggle" type="button" data-discord-action="delete" data-instance="${esc(inst.name)}">Supprimer</button>` : '';
         const permsBtn = hasChannel ? `<button class="monitor-toggle" type="button" data-discord-action="perms" data-instance="${esc(inst.name)}">Droits</button>` : '';
-        return `<tr><td>${esc(inst.name)}</td><td style="color:var(--muted)">${esc(inst.game)}</td><td>${channelLabel}</td><td style="display:flex;gap:.4rem;flex-wrap:wrap">${createBtn}${deleteBtn}${permsBtn}</td></tr>`;
+        return `<tr><td>${esc(inst.name)}</td><td style="color:var(--muted)">${esc(inst.game)}</td><td>${channelLabel}</td><td>${notifLabel}</td><td style="display:flex;gap:.4rem;flex-wrap:wrap">${createBtn}${deleteBtn}${permsBtn}</td></tr>`;
       }).join('');
       tbody.querySelectorAll('[data-discord-action]').forEach((btn) => {
         btn.addEventListener('click', () => handleDiscordAction(btn.dataset.discordAction, btn.dataset.instance));
@@ -1173,6 +1189,14 @@
       await loadDiscord();
       e.currentTarget.disabled = false;
     });
+    document.getElementById('btnTestDiscord').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      const r = await fetch('{{ prefix }}/api/discord/test', { credentials: 'same-origin' });
+      const d = await r.json().catch(() => ({}));
+      setFeedback('discordConfigFeedback', d.message || (r.ok ? 'Connexion OK' : 'Erreur'), r.ok);
+      btn.disabled = false;
+    });
     document.getElementById('btnSaveDiscordConfig').addEventListener('click', async () => {
       const btn = document.getElementById('btnSaveDiscordConfig');
       btn.disabled = true;
@@ -1183,10 +1207,12 @@
         body: JSON.stringify({
           guild_id: document.getElementById('discordGuildId').value.trim(),
           category_id: document.getElementById('discordCategoryId').value.trim(),
+          default_channel_id: document.getElementById('discordDefaultChannelId').value.trim(),
         }),
       });
       const d = await r.json().catch(() => ({}));
       setFeedback('discordConfigFeedback', d.message || (r.ok ? 'Configuration enregistrée' : 'Erreur'), r.ok);
+      if (r.ok) await loadDiscord();
       btn.disabled = false;
     });
     document.getElementById('btnAddDiscordPerm').addEventListener('click', async () => {
