@@ -52,10 +52,11 @@ def verify_password(username, password):
 
 def get_user_perms(username):
     users = load_users()
-    perms = set(users.get(username, {}).get("permissions", []))
-    if "view_hub" in perms:
-        perms |= DEFAULT_VIEW_HUB_PERMISSIONS
-    return sorted(perms)
+    stored = set(users.get(username, {}).get("permissions", []))
+    # Legacy: if only ["view_hub"] is stored (old format), expand to all defaults
+    if stored == {"view_hub"}:
+        return sorted(stored | DEFAULT_VIEW_HUB_PERMISSIONS)
+    return sorted(stored)
 
 
 def get_user_record(username):
@@ -79,7 +80,7 @@ def list_accounts():
             {
                 "username": username,
                 "email": entry.get("email", ""),
-                "permissions": entry.get("permissions", []),
+                "permissions": get_user_perms(username),
             }
         )
     return accounts
@@ -133,11 +134,32 @@ def create_account(username: str, password: str) -> tuple[bool, str]:
     users = load_users()
     if username in users:
         return False, f"Le compte '{username}' existe déjà"
+    # Store all default perms explicitly so granular editing works immediately
     users[username] = {
         "password_hash": hash_password(password),
-        "permissions": ["view_hub"],
+        "permissions": sorted(DEFAULT_VIEW_HUB_PERMISSIONS),
         "email": "",
     }
+    save_users(users)
+    return True, ""
+
+
+def update_account_permissions(target_username: str, permissions: list[str], requesting_username: str) -> tuple[bool, str]:
+    """Update permissions for a hub account. view_hub is always kept."""
+    users = load_users()
+    if target_username not in users:
+        return False, "Compte introuvable"
+    # view_hub is always required for hub access
+    perms = sorted({"view_hub"} | (set(permissions) & set(DEFAULT_VIEW_HUB_PERMISSIONS)))
+    # Prevent removing manage_accounts from the last account that has it
+    if "manage_accounts" not in perms:
+        others_with_manage = [
+            u for u, data in users.items()
+            if u != target_username and "manage_accounts" in get_user_perms(u)
+        ]
+        if not others_with_manage:
+            return False, "Impossible : aucun autre compte n'a la permission 'Gérer les comptes'"
+    users[target_username]["permissions"] = perms
     save_users(users)
     return True, ""
 

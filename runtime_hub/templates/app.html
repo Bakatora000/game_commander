@@ -886,6 +886,13 @@
       el.textContent = message || '';
       el.style.color = ok ? '#9be7c5' : '#ffd69b';
     }
+    const HUB_PERMS = [
+      { key: ‘manage_instances’,  label: ‘Déployer des instances’ },
+      { key: ‘manage_lifecycle’,  label: ‘Démarrer / Arrêter / Redéployer / Désinstaller’ },
+      { key: ‘run_updates’,       label: ‘Mettre à jour les instances’ },
+      { key: ‘rebalance_cpu’,     label: ‘Rééquilibrer le CPU’ },
+      { key: ‘manage_accounts’,   label: ‘Gérer les comptes’ },
+    ];
     async function loadAccounts() {
       const response = await fetch(‘{{ prefix }}/api/accounts’, { credentials: ‘same-origin’ });
       const listEl = document.getElementById(‘accountsList’);
@@ -900,11 +907,26 @@
       document.getElementById(‘createAccountCard’).hidden = !canManage;
       listEl.innerHTML = accounts.map((account) => {
         const isSelf = account.username === currentUser;
+        const perms = account.permissions || [];
         const resetBlock = canManage ? `
             <label class="field-label" for="reset-${esc(account.username)}">Réinitialiser le mot de passe</label>
             <input class="field-input" id="reset-${esc(account.username)}" type="password" placeholder="Nouveau mot de passe">` : ‘’;
         const resetBtn = canManage ? `<button class="secondary-btn" type="button" data-action="reset-password" data-username="${esc(account.username)}">Réinitialiser</button>` : ‘’;
         const deleteBtn = (canManage && !isSelf) ? `<button class="secondary-btn" type="button" data-action="delete-account" data-username="${esc(account.username)}" style="color:#e05050">Supprimer</button>` : ‘’;
+        const permsBlock = canManage ? `
+            <p class="field-label" style="margin-top:.8rem;margin-bottom:.3rem">Permissions</p>
+            <div style="display:flex;flex-direction:column;gap:.3rem;margin-bottom:.4rem">
+              <label style="display:flex;align-items:center;gap:.4rem;color:var(--muted);font-size:.9rem">
+                <input type="checkbox" checked disabled style="accent-color:var(--accent)"> Accès Hub (toujours requis)
+              </label>
+              ${HUB_PERMS.map(p => `
+              <label style="display:flex;align-items:center;gap:.4rem;font-size:.9rem;cursor:pointer">
+                <input type="checkbox" class="perm-checkbox" data-perm="${p.key}"
+                  ${perms.includes(p.key) ? ‘checked’ : ‘’} style="accent-color:var(--accent)">
+                ${p.label}
+              </label>`).join(‘’)}
+            </div>
+            <button class="secondary-btn" type="button" data-action="save-perms" data-username="${esc(account.username)}">Sauvegarder les permissions</button>` : ‘’;
         return `
         <div class="account-row">
           <div class="account-name">${esc(account.username)}${isSelf ? ‘ <span style="color:var(--muted);font-size:.8rem">(moi)</span>’ : ‘’}</div>
@@ -921,6 +943,7 @@
               <button class="secondary-btn" type="button" data-action="save-email" data-username="${esc(account.username)}">Enregistrer l’email</button>
               ${resetBtn}
             </div>
+            ${permsBlock}
             <div class="feedback" id="feedback-${esc(account.username)}"></div>
           </div>
         </div>`;
@@ -977,6 +1000,22 @@
           } else {
             alert(data.message || ‘Erreur lors de la suppression’);
           }
+        });
+      });
+      listEl.querySelectorAll(‘[data-action="save-perms"]’).forEach((button) => {
+        button.addEventListener(‘click’, async () => {
+          const username = button.dataset.username;
+          const detailEl = document.getElementById(`details-${username}`);
+          const checked = [...detailEl.querySelectorAll(‘.perm-checkbox:checked’)].map(cb => cb.dataset.perm);
+          const response = await fetch(`{{ prefix }}/api/accounts/${encodeURIComponent(username)}/permissions`, {
+            method: ‘POST’,
+            headers: { ‘Content-Type’: ‘application/json’ },
+            credentials: ‘same-origin’,
+            body: JSON.stringify({ permissions: checked }),
+          });
+          const data = await response.json().catch(() => ({}));
+          setFeedback(`feedback-${username}`, response.ok ? ‘Permissions mises à jour’ : (data.message || ‘Erreur’), response.ok);
+          if (response.ok) await loadAccounts();
         });
       });
     }

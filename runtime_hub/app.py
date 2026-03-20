@@ -177,6 +177,19 @@ def api_update_account_email(username):
     return jsonify({"ok": True})
 
 
+@app.route(f"{PREFIX}/api/accounts/<username>/permissions", methods=["POST"])
+@auth.require_auth
+@auth.require_perm("manage_accounts")
+def api_update_account_permissions(username):
+    data = request.get_json() or {}
+    ok, err = auth.update_account_permissions(
+        username, data.get("permissions", []), session.get("username", "")
+    )
+    if not ok:
+        return jsonify({"error": "invalid_request", "message": err}), 400
+    return jsonify({"ok": True})
+
+
 @app.route(f"{PREFIX}/api/accounts/<username>/reset-password", methods=["POST"])
 @auth.require_auth
 @auth.require_perm("manage_accounts")
