@@ -1143,6 +1143,24 @@ class DiscordNotifyTests(unittest.TestCase):
         self.assertEqual(message, "existing")
         self.assertEqual(channel_id, "22")
 
+    def test_find_or_create_game_category_ignores_text_channel_with_same_name(self):
+        channels = [
+            {"id": "11", "type": 0, "name": "minecraft"},
+        ]
+        with mock.patch.object(discordnotify, "list_guild_channels", return_value=(True, "ok", channels)), \
+             mock.patch.object(discordnotify, "_discord_api", return_value=(True, "ok", {"id": "cat42"})) as api_mock:
+            ok, message, category_id = discordnotify.find_or_create_game_category("guild", "minecraft", "token")
+        self.assertTrue(ok)
+        self.assertEqual(message, "created")
+        self.assertEqual(category_id, "cat42")
+        api_mock.assert_called_once_with(
+            "POST",
+            "/guilds/guild/channels",
+            "token",
+            data={"name": "minecraft", "type": 4},
+            timeout=10,
+        )
+
     def test_cli_create_channel_reuses_existing_channel_by_name(self):
         cfg = {"bot_token": "token", "guild_id": "guild", "instance_channels": {}}
         with mock.patch.object(discordnotify, "load_config", return_value=cfg), \
