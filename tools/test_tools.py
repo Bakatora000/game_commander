@@ -1055,10 +1055,11 @@ class DiscordNotifyTests(unittest.TestCase):
         self.assertEqual(message, "sent")
         self.assertEqual(post_mock.call_args.args[0], "token")
         self.assertEqual(post_mock.call_args.args[1], "123")
-        self.assertRegex(
-            post_mock.call_args.args[2],
-            r"^valheim2: \d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2} - Redemarrage$",
-        )
+        embed = post_mock.call_args.kwargs.get("embed") or {}
+        self.assertIn("Redémarrage", embed.get("title", ""))
+        self.assertEqual(embed.get("color"), discordnotify.EMBED_COLOR_OK)
+        fields = {f["name"]: f["value"] for f in (embed.get("fields") or [])}
+        self.assertEqual(fields.get("Instance"), "valheim2")
 
     def test_notify_event_adds_default_action_text_when_no_details(self):
         cfg = {"bot_token": "token", "instance_channels": {"ParkAPouet": "123"}}
@@ -1073,10 +1074,10 @@ class DiscordNotifyTests(unittest.TestCase):
             )
         self.assertTrue(ok)
         self.assertEqual(message, "sent")
-        self.assertRegex(
-            post_mock.call_args.args[2],
-            r"^ParkAPouet: \d{2}-\d{2}-\d{4} \d{2}:\d{2}:\d{2} - Arret$",
-        )
+        embed = post_mock.call_args.kwargs.get("embed") or {}
+        self.assertIn("Arrêt", embed.get("title", ""))
+        fields = {f["name"]: f["value"] for f in (embed.get("fields") or [])}
+        self.assertEqual(fields.get("Instance"), "ParkAPouet")
 
     def test_send_test_message_prefixes_test(self):
         cfg = {"enabled": True, "bot_token": "tok", "default_channel_id": "111"}
@@ -1084,8 +1085,8 @@ class DiscordNotifyTests(unittest.TestCase):
             ok, message = discordnotify.send_test_message(instance_id="valheim2", game_id="valheim", config=cfg)
         self.assertTrue(ok)
         self.assertEqual(message, "sent")
-        content = post_mock.call_args.args[2]
-        self.assertTrue(content.startswith("[TEST] "), f"expected [TEST] prefix, got: {content!r}")
+        embed = post_mock.call_args.kwargs.get("embed") or {}
+        self.assertIn("Test", embed.get("title", ""), "expected test title in embed")
 
 
 class HostCliTests(unittest.TestCase):

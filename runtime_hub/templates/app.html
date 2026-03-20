@@ -194,7 +194,7 @@
     }
     .section-title { margin: 0 0 .5rem; font-size: 1.15rem; }
     .section-subtitle { margin: 0; color: var(--muted); line-height: 1.5; }
-    .field-label { display: block; margin: 0 0 .35rem; color: var(--muted); font-size: .92rem; }
+    .field-label { display: block; margin: 0 0 .35rem; color: var(--text); font-size: .92rem; font-weight: 500; }
     .field-input {
       width: 100%;
       padding: .78rem .9rem;
@@ -432,7 +432,11 @@
                 <label class="field-label" for="discordCategoryId">ID de catégorie de secours <span style="font-weight:400;color:var(--muted)">(optionnel)</span></label>
                 <input class="field-input" id="discordCategoryId" placeholder="123456789012345678">
                 <p class="deploy-help">Normalement inutile : une catégorie par jeu est créée automatiquement (<em>valheim</em>, <em>enshrouded</em>…). Ce champ sert de repli uniquement si le jeu n'est pas identifiable.</p>
-                <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.4rem">
+                <label style="display:flex;align-items:center;gap:.55rem;margin-top:.6rem;cursor:pointer">
+                  <input type="checkbox" id="discordEnabled" style="width:1rem;height:1rem;accent-color:var(--accent)">
+                  <span class="field-label" style="margin:0">Notifications actives</span>
+                </label>
+                <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.6rem">
                   <button class="primary-btn" type="button" id="btnSaveDiscordConfig">Enregistrer dans discord.json</button>
                   <button class="monitor-toggle" type="button" id="btnTestDiscord">Tester la connexion</button>
                 </div>
@@ -1142,6 +1146,7 @@
       // Populate datalist
       const datalist = document.getElementById('discordChannelsList');
       datalist.innerHTML = GUILD_CHANNELS.map(ch => `<option value="#${esc(ch.name)}">`).join('');
+      document.getElementById('discordEnabled').checked = d.enabled !== false;
       document.getElementById('discordGuildId').value = d.guild_id || '';
       document.getElementById('discordCategoryId').value = d.category_id || '';
       // Show channel name instead of raw ID
@@ -1256,6 +1261,7 @@
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
         body: JSON.stringify({
+          enabled: document.getElementById('discordEnabled').checked,
           guild_id: document.getElementById('discordGuildId').value.trim(),
           category_id: document.getElementById('discordCategoryId').value.trim(),
           default_channel_id: resolveChannelInput(document.getElementById('discordDefaultChannelId').value),

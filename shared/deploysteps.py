@@ -421,6 +421,14 @@ def deploy_step_game_service(cfg: DeployConfig, script_dir: Path) -> None:
     if cpu_affinity_line:
         console.info(f"Affinité CPU prévue : {cpu_affinity_line.replace('CPUAffinity=', '')}")
 
+    # Install crash-notify systemd template (idempotent, global)
+    try:
+        gameservice.install_crash_notify_template(str(script_dir))
+    except Exception as exc:
+        console.warn(f"crash-notify template non installé : {exc}")
+
+    on_failure_notify = f"game-commander-crash-notify@{cfg.instance_id}.service"
+
     def install_service(exec_start: str) -> None:
         ok, msg = gameservice.install_game_service(
             game_label=cfg.game_label,
@@ -430,6 +438,7 @@ def deploy_step_game_service(cfg: DeployConfig, script_dir: Path) -> None:
             exec_start=exec_start,
             cpu_affinity_line=cpu_affinity_line,
             cpu_weight_line=cpu_weight_line,
+            on_failure_notify=on_failure_notify,
         )
         (console.ok if ok else console.warn)(msg)
 

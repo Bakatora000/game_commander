@@ -18,16 +18,19 @@ def render_game_service(
     exec_start: str,
     cpu_affinity_line: str = "",
     cpu_weight_line: str = "",
+    on_failure_notify: str = "",
 ) -> str:
     extra = ""
     if cpu_affinity_line:
         extra += f"{cpu_affinity_line}\n"
     if cpu_weight_line:
         extra += f"{cpu_weight_line}\n"
+    on_failure_line = f"OnFailure={on_failure_notify}\n" if on_failure_notify else ""
     return (
         "[Unit]\n"
         f"Description={game_label} Dedicated Server\n"
         "After=network.target\n"
+        f"{on_failure_line}"
         "\n"
         "[Service]\n"
         "Type=simple\n"
@@ -50,6 +53,25 @@ def render_game_service(
     )
 
 
+def install_crash_notify_template(script_dir: str) -> None:
+    """Install the game-commander-crash-notify@.service systemd template (once, globally)."""
+    content = (
+        "[Unit]\n"
+        "Description=Game Commander — notification crash pour %i\n"
+        "DefaultDependencies=no\n"
+        "\n"
+        "[Service]\n"
+        "Type=oneshot\n"
+        f"ExecStart=/usr/bin/python3 {script_dir}/shared/crash_notify.py --instance %i\n"
+        "StandardOutput=journal\n"
+        "StandardError=journal\n"
+    )
+    Path("/etc/systemd/system/game-commander-crash-notify@.service").write_text(
+        content, encoding="utf-8"
+    )
+    subprocess.run(["systemctl", "daemon-reload"], check=False, capture_output=True)
+
+
 def install_game_service(
     *,
     game_label: str,
@@ -59,6 +81,7 @@ def install_game_service(
     exec_start: str,
     cpu_affinity_line: str = "",
     cpu_weight_line: str = "",
+    on_failure_notify: str = "",
 ) -> tuple[bool, str]:
     service_path = Path("/etc/systemd/system") / f"{service_name}.service"
     service_path.write_text(
@@ -70,6 +93,7 @@ def install_game_service(
             exec_start=exec_start,
             cpu_affinity_line=cpu_affinity_line,
             cpu_weight_line=cpu_weight_line,
+            on_failure_notify=on_failure_notify,
         ),
         encoding="utf-8",
     )

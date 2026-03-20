@@ -587,6 +587,7 @@ def get_discord_status() -> dict:
         })
     return {
         "configured": bool(cfg.get("bot_token")),
+        "enabled": cfg.get("enabled", True),
         "guild_id": cfg.get("guild_id", ""),
         "category_id": cfg.get("category_id", ""),
         "default_channel_id": default_channel_id,
@@ -600,6 +601,8 @@ def set_discord_config(data: dict) -> tuple[bool, str]:
     for key in ("guild_id", "category_id", "default_channel_id"):
         if key in data:
             cfg[key] = str(data[key]).strip()
+    if "enabled" in data:
+        cfg["enabled"] = bool(data["enabled"])
     return _save_discord_cfg(cfg)
 
 

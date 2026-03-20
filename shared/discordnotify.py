@@ -21,6 +21,11 @@ PERM_VIEW_CHANNEL = 1 << 10       # 1024
 PERM_READ_HISTORY = 1 << 16       # 65536
 PERM_READ_ALLOW   = PERM_VIEW_CHANNEL | PERM_READ_HISTORY
 
+# Embed colors
+EMBED_COLOR_OK   = 0x57F287  # green
+EMBED_COLOR_FAIL = 0xED4245  # red
+EMBED_COLOR_INFO = 0x5865F2  # blurple
+
 
 def _discord_api(
     method: str,
@@ -279,6 +284,41 @@ def resolve_channel_id(cfg: dict, instance_id: str = "", game_id: str = "", even
     return str(cfg.get("default_channel_id", ""))
 
 
+_EVENT_LABELS: dict[str, str] = {
+    "start": "Démarrage",
+    "stop": "Arrêt",
+    "restart": "Redémarrage",
+    "update": "Mise à jour",
+    "deploy": "Déploiement",
+    "redeploy": "Redéploiement",
+    "uninstall": "Désinstallation",
+    "rebalance": "Rééquilibrage CPU",
+    "bootstrap-hub": "Initialisation du Hub",
+    "discord-test": "Test Discord",
+    "crash": "Crash / échec service",
+}
+
+
+def build_embed(
+    *,
+    title: str,
+    description: str = "",
+    color: int,
+    fields: list[dict] | None = None,
+) -> dict:
+    """Build a Discord embed object."""
+    embed: dict = {
+        "title": title,
+        "color": color,
+        "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+    }
+    if description:
+        embed["description"] = description
+    if fields:
+        embed["fields"] = fields
+    return embed
+
+
 def format_event_message(
     *,
     event: str,
@@ -289,29 +329,26 @@ def format_event_message(
     source: str = "",
     details: str = "",
 ) -> str:
+    """Legacy plain-text formatter kept for backwards compatibility."""
     subject = instance_id or game_id or service or "Game Commander"
-    labels = {
-        "start": "Demarrage",
-        "stop": "Arret",
-        "restart": "Redemarrage",
-        "update": "Mise a jour",
-        "deploy": "Deploiement",
-        "redeploy": "Redeploiement",
-        "uninstall": "Desinstallation",
-        "rebalance": "Rebalance",
-        "bootstrap-hub": "Initialisation du Hub",
-        "discord-test": "Test Discord",
-    }
+    action = _EVENT_LABELS.get(event, "Opération")
     stamp = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
-    action = labels.get(event, "Operation")
     origin = f" [{source}]" if source else ""
     return f"{subject}: {stamp} - {action}{origin}"[:1900]
 
 
-def post_channel_message(bot_token: str, channel_id: str, content: str, timeout: int = 10) -> tuple[bool, str]:
+def post_channel_message(
+    bot_token: str,
+    channel_id: str,
+    content: str,
+    timeout: int = 10,
+    *,
+    embed: dict | None = None,
+) -> tuple[bool, str]:
+    payload: dict = {"embeds": [embed]} if embed is not None else {"content": content}
     req = urllib.request.Request(
         f"{DISCORD_API_BASE}/channels/{channel_id}/messages",
-        data=json.dumps({"content": content}).encode("utf-8"),
+        data=json.dumps(payload).encode("utf-8"),
         headers={
             "Authorization": f"Bot {bot_token}",
             "Content-Type": "application/json",
@@ -347,16 +384,24 @@ def notify_event(
     channel_id = resolve_channel_id(cfg, instance_id=instance_id, game_id=game_id, event=event)
     if not channel_id:
         return False, "no-route"
-    content = format_event_message(
-        event=event,
-        ok=ok,
-        instance_id=instance_id,
-        game_id=game_id,
-        service=service,
-        source=source,
-        details=details,
-    )
-    return post_channel_message(str(cfg.get("bot_token", "")), channel_id, content)
+
+    action = _EVENT_LABELS.get(event, "Opération")
+    status_emoji = "✅" if ok else "❌"
+    color = EMBED_COLOR_OK if ok else EMBED_COLOR_FAIL
+    title = f"{status_emoji} {action}"
+
+    fields: list[dict] = []
+    if instance_id:
+        fields.append({"name": "Instance", "value": instance_id, "inline": True})
+    if game_id:
+        fields.append({"name": "Jeu", "value": game_id, "inline": True})
+    if source:
+        fields.append({"name": "Source", "value": source, "inline": True})
+    if details:
+        fields.append({"name": "Détails", "value": details[:1024], "inline": False})
+
+    embed = build_embed(title=title, color=color, fields=fields or None)
+    return post_channel_message(str(cfg.get("bot_token", "")), channel_id, "", embed=embed)
 
 
 def send_test_message(
@@ -374,15 +419,20 @@ def send_test_message(
     channel_id = resolve_channel_id(cfg, instance_id=instance_id, game_id=game_id, event=event)
     if not channel_id:
         return False, "no-route"
-    content = "[TEST] " + format_event_message(
-        event=event,
-        ok=True,
-        instance_id=instance_id,
-        game_id=game_id,
-        source=source,
-        details=details,
+
+    fields: list[dict] = [{"name": "Source", "value": source, "inline": True}]
+    if instance_id:
+        fields.append({"name": "Instance", "value": instance_id, "inline": True})
+    if game_id:
+        fields.append({"name": "Jeu", "value": game_id, "inline": True})
+
+    embed = build_embed(
+        title="🔔 Test de notification Discord",
+        description=details,
+        color=EMBED_COLOR_INFO,
+        fields=fields,
     )
-    return post_channel_message(str(cfg.get("bot_token", "")), channel_id, content)
+    return post_channel_message(str(cfg.get("bot_token", "")), channel_id, "", embed=embed)
 
 
 def _cli_create_channel(instance_id: str, game_id: str = "") -> int:
@@ -431,11 +481,33 @@ if __name__ == "__main__":
     import argparse, sys
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="cmd")
+
     p = sub.add_parser("create-channel")
     p.add_argument("--instance", required=True)
     p.add_argument("--game", default="")
+
+    t = sub.add_parser("send-test", help="Envoyer un message de test Discord")
+    t.add_argument("--instance", default="")
+    t.add_argument("--game", default="")
+    t.add_argument("--event", default="discord-test")
+    t.add_argument("--ok", dest="is_ok", action="store_true", default=True)
+    t.add_argument("--fail", dest="is_ok", action="store_false")
+    t.add_argument("--details", default="Test de notification Discord Game Commander")
+
     args = parser.parse_args()
     if args.cmd == "create-channel":
         sys.exit(_cli_create_channel(args.instance, args.game))
+    if args.cmd == "send-test":
+        if args.event == "discord-test":
+            ok, msg = send_test_message(
+                instance_id=args.instance, game_id=args.game, details=args.details,
+            )
+        else:
+            ok, msg = notify_event(
+                event=args.event, ok=args.is_ok,
+                instance_id=args.instance, game_id=args.game, details=args.details,
+            )
+        print(f"{'OK' if ok else 'ERREUR'}: {msg}")
+        sys.exit(0 if ok else 1)
     parser.print_help()
     sys.exit(1)
