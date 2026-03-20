@@ -2028,7 +2028,7 @@ class HubHostTests(unittest.TestCase):
             self.assertEqual(payload["instances"], [])
             self.assertEqual(
                 run_mock.call_args.args[0],
-                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--main-script", str(script_path), "--instance", "valheim2"],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--main-script", str(script_path), "--instance", "valheim2", "--game-id", "valheim", "--source", "Hub"],
             )
 
     def test_run_instance_uninstall_refuses_when_players_connected(self):
@@ -2083,12 +2083,67 @@ class HubHostTests(unittest.TestCase):
             self.assertEqual(payload["instances"], [])
             self.assertEqual(
                 run_mock.call_args_list[0].args[0],
-                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "service-action", "--service", "terraria-server-terraria", "--action", "stop"],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "service-action", "--service", "terraria-server-terraria", "--action", "stop", "--source", "Hub"],
             )
             self.assertEqual(
                 run_mock.call_args_list[1].args[0],
-                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--main-script", str(script_path), "--instance", "terraria", "--game-id", "terraria"],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--main-script", str(script_path), "--instance", "terraria", "--game-id", "terraria", "--source", "Hub"],
             )
+
+    def test_run_instance_uninstall_deletes_discord_channel_when_requested(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
+            }), encoding="utf-8")
+            script_path = root / "game_commander.sh"
+            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            with app.app_context(), \
+                 mock.patch.object(hostops, "run_command", return_value=(True, "")) as run_mock, \
+                 mock.patch.object(hub_host, "_load_discord_cfg", return_value={"instance_channels": {"valheim2": "123"}}), \
+                 mock.patch.object(hub_host, "delete_discord_channel", return_value=(True, "Channel supprimé")) as delete_mock, \
+                 mock.patch.object(hub_host, "get_hub_payload", side_effect=[
+                     {"instances": [{"name": "valheim2", "state": 0, "players": {"value": 0, "max": 10}}], "monitor": {}},
+                     {"instances": [], "monitor": {}},
+                 ]):
+                ok, message, payload = hub_host.run_instance_uninstall("valheim2", delete_discord_channel=True)
+            self.assertTrue(ok)
+            self.assertIn("canal Discord supprimé", message)
+            self.assertEqual(payload["instances"], [])
+            delete_mock.assert_called_once_with("valheim2")
+            self.assertEqual(
+                run_mock.call_args.args[0],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--main-script", str(script_path), "--instance", "valheim2", "--game-id", "valheim", "--source", "Hub"],
+            )
+
+    def test_run_instance_uninstall_reports_discord_delete_failure_after_successful_uninstall(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
+            }), encoding="utf-8")
+            script_path = root / "game_commander.sh"
+            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            with app.app_context(), \
+                 mock.patch.object(hostops, "run_command", return_value=(True, "")), \
+                 mock.patch.object(hub_host, "_load_discord_cfg", return_value={"instance_channels": {"valheim2": "123"}}), \
+                 mock.patch.object(hub_host, "delete_discord_channel", return_value=(False, "http 403")) as delete_mock, \
+                 mock.patch.object(hub_host, "get_hub_payload", side_effect=[
+                     {"instances": [{"name": "valheim2", "state": 0, "players": {"value": 0, "max": 10}}], "monitor": {}},
+                     {"instances": [], "monitor": {}},
+                 ]):
+                ok, message, payload = hub_host.run_instance_uninstall("valheim2", delete_discord_channel=True)
+            self.assertTrue(ok)
+            self.assertIn("n'a pas pu être supprimé", message)
+            self.assertIn("http 403", message)
+            self.assertEqual(payload["instances"], [])
+            delete_mock.assert_called_once_with("valheim2")
 
     def test_run_instance_admin_password_reset_updates_users_json(self):
         with tempfile.TemporaryDirectory() as d:

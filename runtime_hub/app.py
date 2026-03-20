@@ -254,8 +254,12 @@ def api_instance_redeploy(instance_name):
 @auth.require_auth
 @auth.require_perm("manage_lifecycle")
 def api_instance_uninstall(instance_name):
+    data = request.get_json(silent=True) or {}
     try:
-        ok, message, payload = host.run_instance_uninstall(instance_name)
+        ok, message, payload = host.run_instance_uninstall(
+            instance_name,
+            delete_discord_channel=bool(data.get("delete_discord_channel")),
+        )
     except Exception as exc:
         return jsonify({"ok": False, "message": f"Erreur Hub pendant la désinstallation : {exc}"}), 500
     status = 200 if ok else 400

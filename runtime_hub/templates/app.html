@@ -562,6 +562,7 @@
   <script>
     const STATE_LABELS = { 0: 'Hors ligne', 10: 'Démarrage', 20: 'En ligne', 30: 'Arrêt', 40: 'Busy' };
     let HUB_INSTANCES = [];
+    let DISCORD_INSTANCES = [];
     let LAST_AUTO_INSTANCE = '';
     let LAST_AUTO_PREFIX = '';
     const DEFAULT_GAME_PREFIX = {
@@ -757,10 +758,28 @@
               window.alert(`Impossible de désinstaller ${instance} : ${connectedPlayers} joueur(s) sont encore connectés.`);
               return;
             }
+            let hasDiscordChannel = false;
+            let discordEntry = DISCORD_INSTANCES.find((inst) => inst.name === instance);
+            if (!discordEntry) {
+              try {
+                const discordResponse = await fetch('{{ prefix }}/api/discord', { credentials: 'same-origin' });
+                const discordData = await discordResponse.json().catch(() => ({}));
+                DISCORD_INSTANCES = Array.isArray(discordData.instances) ? discordData.instances : [];
+                discordEntry = DISCORD_INSTANCES.find((inst) => inst.name === instance);
+              } catch (_err) {
+                discordEntry = null;
+              }
+            }
+            hasDiscordChannel = !!discordEntry?.channel_id;
+            let deleteDiscordChannel = false;
+            if (hasDiscordChannel) {
+              deleteDiscordChannel = window.confirm(`Un canal Discord est associé à ${instance}. Le supprimer aussi ?`);
+            }
             const typed = window.prompt(`Confirme la désinstallation de ${instance} en retapant son identifiant :`, '');
             if (typed !== instance) {
               return;
             }
+            requestBody = JSON.stringify({ delete_discord_channel: deleteDiscordChannel });
           }
           const endpointByAction = {
             update: `{{ prefix }}/api/instances/${encodeURIComponent(instance)}/update`,
@@ -1251,6 +1270,7 @@
       const r = await fetch('{{ prefix }}/api/discord', { credentials: 'same-origin' });
       if (!r.ok) { setFeedback('discordConfigFeedback', 'Erreur chargement Discord', false); return; }
       const d = await r.json();
+      DISCORD_INSTANCES = Array.isArray(d.instances) ? d.instances : [];
       GUILD_CHANNELS = d.guild_channels || [];
       // Populate datalist
       const datalist = document.getElementById('discordChannelsList');
