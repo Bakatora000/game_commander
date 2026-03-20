@@ -53,9 +53,8 @@ def verify_password(username, password):
 def get_user_perms(username):
     users = load_users()
     stored = set(users.get(username, {}).get("permissions", []))
-    # Legacy: if only ["view_hub"] is stored (old format), expand to all defaults
     if stored == {"view_hub"}:
-        return sorted(stored | DEFAULT_VIEW_HUB_PERMISSIONS)
+        return sorted(DEFAULT_VIEW_HUB_PERMISSIONS)
     return sorted(stored)
 
 
