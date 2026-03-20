@@ -83,6 +83,14 @@ def cmd_redeploy_instance(args: argparse.Namespace) -> int:
         return 1
     for line in result:
         print(line)
+    try:
+        discord_cfg = discordnotify.load_config()
+        if discordnotify.notifications_enabled(discord_cfg):
+            exit_code = discordnotify._cli_create_channel(instance_id, game_id)
+            if exit_code != 0:
+                print("Discord : création/réutilisation du canal échouée", file=sys.stderr)
+    except Exception as exc:
+        print(f"Discord : {exc}", file=sys.stderr)
     _print_discord_status(_notify('redeploy', True, instance_id=instance_id, game_id=game_id, source=args.source, details=_details_text(result)))
     return 0
 

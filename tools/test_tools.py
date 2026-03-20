@@ -1193,7 +1193,34 @@ class HostCliTests(unittest.TestCase):
                 ])
             self.assertEqual(rc, 0)
             self.assertFalse(sync_hub.called)
-            self.assertIn("core ok", stdout.getvalue())
+
+    def test_redeploy_instance_recreates_discord_channel_when_enabled(self):
+        cfg = ROOT_DIR / "tmp-redeploy-config.env"
+        try:
+            cfg.write_text(
+                'INSTANCE_ID="satisfactory"\nGAME_ID="satisfactory"\nSYS_USER="vhserver"\n',
+                encoding="utf-8",
+            )
+            from tools import host_cli
+            with mock.patch.object(redeploycore, "run_redeploy", return_value=(True, ["redeploy ok"])), \
+                 mock.patch.object(discordnotify, "load_config", return_value={"enabled": True, "bot_token": "tok"}), \
+                 mock.patch.object(discordnotify, "notifications_enabled", return_value=True), \
+                 mock.patch.object(discordnotify, "_cli_create_channel", return_value=0) as channel_mock, \
+                 mock.patch.object(discordnotify, "notify_event", return_value=(True, "sent")), \
+                 mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
+                rc = host_cli.main([
+                    "redeploy-instance",
+                    "--main-script", str(ROOT_DIR / "game_commander.sh"),
+                    "--config", str(cfg),
+                    "--source", "Hub",
+                ])
+            self.assertEqual(rc, 0)
+            self.assertIn("redeploy ok", stdout.getvalue())
+            channel_mock.assert_called_once_with("satisfactory", "satisfactory")
+        finally:
+            if cfg.exists():
+                cfg.unlink()
+            self.assertIn("redeploy ok", stdout.getvalue())
 
     def test_service_action_notifies_discord(self):
         from tools import host_cli
