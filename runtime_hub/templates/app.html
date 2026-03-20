@@ -47,6 +47,18 @@
       text-decoration: none;
       font-weight: 700;
     }
+    .head-actions {
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+    .current-user {
+      color: var(--muted);
+      font-size: .95rem;
+      white-space: nowrap;
+    }
     .layout {
       display: grid;
       grid-template-columns: 240px minmax(0, 1fr);
@@ -292,7 +304,10 @@
         <h1>Game Commander Hub</h1>
         <p class="subtitle">Administration hôte séparée des Commanders d’instance. Cette vue est réservée aux administrateurs du serveur Linux.</p>
       </div>
-      <a class="logout" href="{{ prefix }}/logout">Déconnexion</a>
+      <div class="head-actions">
+        <span class="current-user">Connecté : <strong>{{ current_username }}</strong></span>
+        <a class="logout" href="{{ prefix }}/logout">Déconnexion</a>
+      </div>
     </section>
 
     <div class="layout">

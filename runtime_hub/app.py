@@ -63,7 +63,7 @@ def logout():
 @auth.require_auth
 @auth.require_perm("view_hub")
 def app_page():
-    return render_template("app.html")
+    return render_template("app.html", current_username=session.get("username", ""))
 
 
 @app.route(f"{PREFIX}/api/login", methods=["POST"])
