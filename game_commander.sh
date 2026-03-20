@@ -22,8 +22,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ── Chargement des modules ─────────────────────────────────────────────────────
 source "$SCRIPT_DIR/lib/helpers.sh"
-source "$SCRIPT_DIR/lib/cpu_affinity.sh"
-source "$SCRIPT_DIR/lib/cpu_monitor.sh"
 source "$SCRIPT_DIR/lib/nginx.sh"
 source "$SCRIPT_DIR/lib/cmd_status.sh"
 source "$SCRIPT_DIR/lib/deploy_helpers.sh"

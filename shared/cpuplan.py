@@ -2,11 +2,17 @@
 """Shared CPU affinity planning for Game Commander host actions."""
 from __future__ import annotations
 
+import argparse
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 from . import hostctl, instanceenv
+
+_BOLD = "\033[1m"
+_DIM = "\033[2m"
+_RESET = "\033[0m"
 
 HEAVY_GAMES = {"soulmask", "enshrouded"}
 SYSTEMD_DIR = Path("/etc/systemd/system")
@@ -157,3 +163,169 @@ def apply_plan(plan: list[dict[str, str | int]], restart_running: bool = False) 
     if changed:
         subprocess.run(["systemctl", "daemon-reload"], check=False)
     return messages
+
+
+# ── High-level helpers called by CLI ─────────────────────────────────────────
+
+def affinity_line_for_instance(instance_id: str, game_id: str, service_name: str) -> str:
+    """Return 'CPUAffinity=X Y Z' for the instance within the global plan, or ''."""
+    core_groups = detect_core_groups()
+    if not core_groups:
+        return ""
+    instances = collect_managed_instances()
+    if not any(inst["instance_id"] == instance_id for inst in instances):
+        instances.append({"instance_id": instance_id, "game_id": game_id, "service": service_name})
+    plan = plan_instances(instances, core_groups)
+    for item in plan:
+        if item["instance_id"] == instance_id and item["service"] == service_name:
+            return f"CPUAffinity={item['cpus']}"
+    return ""
+
+
+def install_cpu_monitor(script_dir: str | Path, state_file: str | None = None) -> list[str]:
+    script_path = Path(script_dir) / "tools" / "cpu_monitor.py"
+    if not script_path.is_file():
+        return [f"Monitor CPU introuvable : {script_path}"]
+    state = state_file or "/var/lib/game-commander/cpu-monitor.json"
+    Path(state).parent.mkdir(parents=True, exist_ok=True)
+    Path("/etc/systemd/system/game-commander-cpu-monitor.service").write_text(
+        "[Unit]\n"
+        "Description=Game Commander — CPU imbalance monitor\n"
+        "After=network.target\n\n"
+        "[Service]\n"
+        "Type=oneshot\n"
+        f"ExecStart=/usr/bin/python3 {script_path} --state-file {state}\n",
+        encoding="utf-8",
+    )
+    Path("/etc/systemd/system/game-commander-cpu-monitor.timer").write_text(
+        "[Unit]\n"
+        "Description=Game Commander — CPU imbalance monitor (timer)\n\n"
+        "[Timer]\n"
+        "OnBootSec=2min\n"
+        "OnUnitActiveSec=1min\n"
+        "RandomizedDelaySec=10s\n"
+        "Persistent=true\n\n"
+        "[Install]\n"
+        "WantedBy=timers.target\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["systemctl", "daemon-reload"], check=False, capture_output=True)
+    subprocess.run(
+        ["systemctl", "enable", "--now", "game-commander-cpu-monitor.timer"],
+        check=False, capture_output=True,
+    )
+    subprocess.run(
+        ["systemctl", "start", "game-commander-cpu-monitor.service"],
+        check=False, capture_output=True,
+    )
+    return ["Monitor CPU installé"]
+
+
+# ── CLI ───────────────────────────────────────────────────────────────────────
+
+def _cmd_affinity_line(args: argparse.Namespace) -> int:
+    line = affinity_line_for_instance(args.instance_id, args.game_id, args.game_service)
+    if line:
+        print(line)
+    return 0
+
+
+def _cmd_cpu_weight(args: argparse.Namespace) -> int:
+    print(cpu_weight_for_game(args.game_id))
+    return 0
+
+
+def _cmd_show_current(args: argparse.Namespace) -> int:
+    instances = collect_managed_instances()
+    if not instances:
+        print("  (aucune instance gérée)")
+        return 0
+    for inst in instances:
+        cpus = current_affinity_for_service(inst["service"])
+        print(f"  {_BOLD}{inst['instance_id']}{_RESET} ({inst['game_id']}) : {cpus}")
+    return 0
+
+
+def _cmd_show_plan(args: argparse.Namespace) -> int:
+    core_groups = detect_core_groups()
+    if not core_groups:
+        print("  (topologie CPU introuvable)", file=sys.stderr)
+        return 1
+    instances = collect_managed_instances()
+    plan = plan_instances(instances, core_groups)
+    if not plan:
+        print("  (aucune instance à planifier)")
+        return 0
+    for item in plan:
+        print(
+            f"  {_BOLD}{item['instance_id']}{_RESET} ({item['game_id']}) : "
+            f"{item['cpus']}  {_DIM}[poids {item['weight']}]{_RESET}"
+        )
+    return 0
+
+
+def _cmd_apply(args: argparse.Namespace) -> int:
+    core_groups = detect_core_groups()
+    if not core_groups:
+        print("Topologie CPU introuvable — aucune affinité appliquée", file=sys.stderr)
+        return 1
+    instances = collect_managed_instances()
+    if not instances:
+        print("Aucune instance gérée trouvée", file=sys.stderr)
+        return 1
+    plan = plan_instances(instances, core_groups)
+    messages = apply_plan(plan, restart_running=args.restart)
+    for msg in messages:
+        print(msg)
+    if messages:
+        print("Répartition CPU recalculée")
+    return 0
+
+
+def _cmd_install_monitor(args: argparse.Namespace) -> int:
+    messages = install_cpu_monitor(args.script_dir, args.state_file or None)
+    for msg in messages:
+        print(msg)
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Game Commander CPU affinity helper")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    al = sub.add_parser("affinity-line")
+    al.add_argument("--instance-id", required=True)
+    al.add_argument("--game-id", required=True)
+    al.add_argument("--game-service", required=True)
+    al.set_defaults(func=_cmd_affinity_line)
+
+    cw = sub.add_parser("cpu-weight")
+    cw.add_argument("--game-id", required=True)
+    cw.set_defaults(func=_cmd_cpu_weight)
+
+    sc = sub.add_parser("show-current")
+    sc.set_defaults(func=_cmd_show_current)
+
+    sp = sub.add_parser("show-plan")
+    sp.set_defaults(func=_cmd_show_plan)
+
+    ap = sub.add_parser("apply")
+    ap.add_argument("--restart", action="store_true")
+    ap.set_defaults(func=_cmd_apply)
+
+    im = sub.add_parser("install-monitor")
+    im.add_argument("--script-dir", required=True)
+    im.add_argument("--state-file", default="")
+    im.set_defaults(func=_cmd_install_monitor)
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    return args.func(args)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

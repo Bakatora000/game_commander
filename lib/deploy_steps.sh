@@ -454,8 +454,10 @@ deploy_step_game_service() {
 
     local CPU_AFFINITY_LINE=""
     local CPU_WEIGHT_LINE=""
-    CPU_AFFINITY_LINE="$(cpu_affinity_systemd_line "$INSTANCE_ID" "$GAME_ID" "$GAME_SERVICE" 2>/dev/null || true)"
-    CPU_WEIGHT_LINE="CPUWeight=$(cpu_affinity_cpu_weight_for_game "$GAME_ID")"
+    CPU_AFFINITY_LINE="$(python3 "$SCRIPT_DIR/shared/cpuplan.py" affinity-line \
+        --instance-id "$INSTANCE_ID" --game-id "$GAME_ID" --game-service "$GAME_SERVICE" 2>/dev/null || true)"
+    CPU_WEIGHT_LINE="CPUWeight=$(python3 "$SCRIPT_DIR/shared/cpuplan.py" cpu-weight \
+        --game-id "$GAME_ID")"
     [[ -n "$CPU_AFFINITY_LINE" ]] && info "Affinité CPU prévue : ${CPU_AFFINITY_LINE#CPUAffinity=}"
 
     install_game_service_unit() {
@@ -732,7 +734,8 @@ deploy_step_app_service() {
             err "$GC_SERVICE inactif — journalctl -u $GC_SERVICE -n 30"
         fi
     fi
-    cpu_monitor_install
+    python3 "$SCRIPT_DIR/shared/cpuplan.py" install-monitor --script-dir "$SCRIPT_DIR" \
+        || warn "Monitor CPU non installé"
 }
 
 
@@ -865,7 +868,9 @@ deploy_step_save_config() {
         || die "Échec sauvegarde config : $CONFIG_SAVE"
     ok "Config sauvegardée : $CONFIG_SAVE"
 
-    cpu_affinity_apply_all false
+    while IFS= read -r _line; do
+        [[ -n "$_line" ]] && ok "$_line"
+    done < <(python3 "$SCRIPT_DIR/shared/cpuplan.py" apply 2>/dev/null || true)
 }
 
 deploy_step_discord_channel() {

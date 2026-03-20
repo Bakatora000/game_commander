@@ -39,9 +39,10 @@ test_entrypoint_is_thin() {
     local file="$ROOT_DIR/game_commander.sh"
 
     grep -q 'source "\$SCRIPT_DIR/lib/helpers.sh"' "$file" || return 1
-    grep -q 'source "\$SCRIPT_DIR/lib/cpu_affinity.sh"' "$file" || return 1
-    grep -q 'source "\$SCRIPT_DIR/lib/cpu_monitor.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/nginx.sh"' "$file" || return 1
+    # cpu_affinity.sh and cpu_monitor.sh are replaced by shared/cpuplan.py
+    grep -qv 'source "\$SCRIPT_DIR/lib/cpu_affinity.sh"' "$file" || return 1
+    grep -qv 'source "\$SCRIPT_DIR/lib/cpu_monitor.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_status.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_deploy.sh"' "$file" || return 1
     grep -q 'source "\$SCRIPT_DIR/lib/cmd_uninstall.sh"' "$file" || return 1
@@ -168,25 +169,26 @@ test_update_module_present() {
 }
 
 test_cpu_affinity_module_present() {
-    local file="$ROOT_DIR/lib/cpu_affinity.sh"
+    local file="$ROOT_DIR/shared/cpuplan.py"
 
-    grep -q 'cpu_affinity_detect_core_groups()' "$file" || return 1
-    grep -q 'cpu_affinity_weight_for_game()' "$file" || return 1
-    grep -q 'cpu_affinity_apply_all()' "$file" || return 1
+    grep -q 'def detect_core_groups' "$file" || return 1
+    grep -q 'def weight_for_game' "$file" || return 1
+    grep -q 'def apply_plan' "$file" || return 1
+    grep -q 'def affinity_line_for_instance' "$file" || return 1
 }
 
 test_cpu_monitor_module_present() {
-    local file="$ROOT_DIR/lib/cpu_monitor.sh"
+    local file="$ROOT_DIR/shared/cpuplan.py"
 
-    grep -q 'cpu_monitor_state_file()' "$file" || return 1
-    grep -q 'cpu_monitor_install()' "$file" || return 1
+    grep -q 'def install_cpu_monitor' "$file" || return 1
+    grep -q 'game-commander-cpu-monitor.service' "$file" || return 1
 }
 
 test_rebalance_command_present() {
     local file="$ROOT_DIR/lib/cmd_rebalance.sh"
 
     grep -q 'cmd_rebalance()' "$file" || return 1
-    grep -q 'cpu_affinity_apply_all' "$file" || return 1
+    grep -q 'cpuplan.py" apply' "$file" || return 1
 }
 
 test_nginx_wrappers_call_python_manager() {

@@ -18,11 +18,14 @@ cmd_rebalance() {
 
     echo ""
     echo -e "  ${BOLD}Affectation actuelle :${RESET}"
-    cpu_affinity_show_current || true
+    python3 "$SCRIPT_DIR/shared/cpuplan.py" show-current || true
     echo ""
     echo -e "  ${BOLD}Affectation planifiée :${RESET}"
-    cpu_affinity_show_plan || true
+    python3 "$SCRIPT_DIR/shared/cpuplan.py" show-plan || true
     echo ""
 
-    cpu_affinity_apply_all "$restart_running"
+    while IFS= read -r _line; do
+        [[ -n "$_line" ]] && ok "$_line"
+    done < <(python3 "$SCRIPT_DIR/shared/cpuplan.py" apply \
+        $($restart_running && echo "--restart" || true) 2>/dev/null || true)
 }
