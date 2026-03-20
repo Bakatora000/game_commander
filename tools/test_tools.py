@@ -2314,6 +2314,42 @@ class HubHostTests(unittest.TestCase):
             self.assertEqual(payload["instances"], [])
             delete_mock.assert_called_once_with("valheim2")
 
+    def test_get_discord_status_purges_stale_instance_channel_mapping(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
+            }), encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            cfg = {"bot_token": "tok", "guild_id": "guild", "instance_channels": {"valheim2": "123"}}
+            with app.app_context(), \
+                 mock.patch.object(hub_host, "_load_discord_cfg", return_value=cfg), \
+                 mock.patch.object(discordnotify, "list_guild_channels", return_value=(True, "ok", [])), \
+                 mock.patch.object(hub_host, "_save_discord_cfg", return_value=(True, "/etc/game-commander/discord.json")) as save_mock:
+                status = hub_host.get_discord_status()
+            self.assertEqual(status["instances"][0]["channel_id"], "")
+            self.assertEqual(cfg["instance_channels"]["valheim2"], "123")
+            saved_cfg = save_mock.call_args.args[0]
+            self.assertEqual(saved_cfg["instance_channels"], {})
+
+    def test_get_discord_status_does_not_purge_when_guild_channels_unavailable(self):
+        with tempfile.TemporaryDirectory() as d:
+            root = Path(d)
+            manifest_path = root / "manifest.json"
+            manifest_path.write_text(json.dumps({
+                "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
+            }), encoding="utf-8")
+            app = self._make_app(root, manifest_path)
+            cfg = {"bot_token": "tok", "guild_id": "guild", "instance_channels": {"valheim2": "123"}}
+            with app.app_context(), \
+                 mock.patch.object(hub_host, "_load_discord_cfg", return_value=cfg), \
+                 mock.patch.object(discordnotify, "list_guild_channels", return_value=(False, "http 500", [])), \
+                 mock.patch.object(hub_host, "_save_discord_cfg") as save_mock:
+                status = hub_host.get_discord_status()
+            self.assertEqual(status["instances"][0]["channel_id"], "123")
+            save_mock.assert_not_called()
+
     def test_run_instance_admin_password_reset_updates_users_json(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)

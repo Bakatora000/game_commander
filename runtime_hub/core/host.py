@@ -564,6 +564,23 @@ def test_discord_connection() -> tuple[bool, str]:
     return ok, msg
 
 
+def _purge_stale_instance_channels(cfg: dict, valid_channel_ids: set[str]) -> dict:
+    instance_channels = cfg.get("instance_channels") or {}
+    stale_names = [
+        name for name, channel_id in instance_channels.items()
+        if channel_id and str(channel_id) not in valid_channel_ids
+    ]
+    if not stale_names:
+        return cfg
+    updated = dict(cfg)
+    updated_channels = dict(instance_channels)
+    for name in stale_names:
+        updated_channels.pop(name, None)
+    updated["instance_channels"] = updated_channels
+    _save_discord_cfg(updated)
+    return updated
+
+
 def get_discord_status() -> dict:
     from shared import discordnotify
     cfg = _load_discord_cfg()
@@ -575,15 +592,20 @@ def get_discord_status() -> dict:
     guild_channels = []
     guild_channel_ids: set[str] = set()
     guild_id = cfg.get("guild_id", "").strip()
+    channels_loaded = False
     if guild_id and cfg.get("bot_token"):
         ok_ch, _, channels = discordnotify.list_guild_channels(guild_id, cfg["bot_token"])
         if ok_ch:
+            channels_loaded = True
             guild_channels = [
                 {"id": str(ch["id"]), "name": ch["name"]}
                 for ch in (channels or [])
                 if ch.get("type") == 0  # text channels only
             ]
             guild_channel_ids = {ch["id"] for ch in guild_channels}
+    if channels_loaded:
+        cfg = _purge_stale_instance_channels(cfg, guild_channel_ids)
+        instance_channels = cfg.get("instance_channels") or {}
     result = []
     for inst in instances:
         name = inst.get("name", "")
