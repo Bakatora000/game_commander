@@ -408,6 +408,7 @@ def suggest_free_port_group(
         "ECHO_PORT": str(echo_port),
         "CONFLICT_SPEC": "",
         "CONFLICT_PROTO": "",
+        "CONFLICT_PROTO_LABEL": "",
         "CONFLICT_LABEL": "",
         "CONFLICT_PORT": "",
     }
@@ -417,6 +418,7 @@ def suggest_free_port_group(
             {
                 "CONFLICT_SPEC": spec,
                 "CONFLICT_PROTO": proto,
+                "CONFLICT_PROTO_LABEL": "TCP" if proto == "t" else "UDP",
                 "CONFLICT_LABEL": label,
                 "CONFLICT_PORT": str(port),
             }
@@ -618,7 +620,14 @@ def _cmd_describe_conflicts(args: argparse.Namespace) -> int:
         echo_port=int(args.echo_port or 0),
         game_service=args.game_service,
     ):
-        sys.stdout.write(f"{label}|{proto}|{port}|{owner}\n")
+        proto_label = "TCP" if proto == "t" else "UDP"
+        sys.stdout.write(f"{label} {port}/{proto_label} déjà utilisé par : {owner}\n")
+    return 0
+
+
+def _cmd_check_service(args: argparse.Namespace) -> int:
+    exists = _service_exists(args.service_name)
+    print(_exports({"SERVICE_EXISTS": "true" if exists else "false"}), end="")
     return 0
 
 
@@ -672,6 +681,9 @@ def build_parser() -> argparse.ArgumentParser:
     conflicts.add_argument("--echo-port", default="0")
     conflicts.add_argument("--game-service", default="")
     conflicts.set_defaults(func=_cmd_describe_conflicts)
+    check_svc = sub.add_parser("check-service")
+    check_svc.add_argument("--service-name", required=True)
+    check_svc.set_defaults(func=_cmd_check_service)
     meta = sub.add_parser("game-meta")
     meta.add_argument("--game-id", required=True)
     meta.set_defaults(func=_cmd_game_meta)

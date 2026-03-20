@@ -563,6 +563,7 @@ class DeployPlanTests(unittest.TestCase):
         with mock.patch.object(deployplan, "first_port_group_conflict", side_effect=[
             ("SERVER_PORT", "t", "Port de jeu (TCP)", 7777),
             ("SERVER_PORT", "t", "Port de jeu (TCP)", 7778),
+            ("SERVER_PORT", "t", "Port de jeu (TCP)", 7779),
             None,
         ]):
             payload = deployplan.suggest_free_port_group(
@@ -596,6 +597,40 @@ class DeployPlanTests(unittest.TestCase):
             ],
         )
 
+    def test_describe_conflicts_human_readable_output(self):
+        with (
+            mock.patch.object(deployplan, "_current_service_pid", return_value=""),
+            mock.patch.object(deployplan, "check_port_conflict", side_effect=[True, False]),
+            mock.patch.object(deployplan, "port_owner", return_value="PID 99 (nc)"),
+        ):
+            conflicts = deployplan.describe_port_conflicts(
+                game_id="valheim", server_port=2456, game_service="",
+            )
+        label, proto, port, owner = conflicts[0]
+        proto_label = "TCP" if proto == "t" else "UDP"
+        line = f"{label} {port}/{proto_label} déjà utilisé par : {owner}"
+        self.assertIn("/UDP", line)
+        self.assertIn("2456", line)
+        self.assertIn("PID 99 (nc)", line)
+
+    def test_suggest_free_port_group_includes_proto_label(self):
+        with mock.patch.object(deployplan, "first_port_group_conflict", side_effect=[
+            ("server_port", "u", "Port de jeu (UDP)", 2456), None
+        ]):
+            payload = deployplan.suggest_free_port_group(game_id="valheim", server_port=2456)
+        self.assertEqual(payload["CONFLICT_PROTO_LABEL"], "UDP")
+        self.assertEqual(payload["CONFLICT_PROTO"], "u")
+
+    def test_check_service_existing(self):
+        with mock.patch.object(deployplan, "_service_exists", return_value=True):
+            ok = deployplan._service_exists("game-commander-valheim")
+        self.assertTrue(ok)
+
+    def test_check_service_missing(self):
+        with mock.patch.object(deployplan, "_service_exists", return_value=False):
+            ok = deployplan._service_exists("ghost-service")
+        self.assertFalse(ok)
+
     def test_detect_other_valheim_process_returns_first_line(self):
         with mock.patch("subprocess.run") as run:
             run.return_value = mock.Mock(stdout="1234 valheim_server.x86_64\n5678 valheim_server.x86_64\n")
@@ -614,19 +649,19 @@ class DeployPlanTests(unittest.TestCase):
     def test_get_user_info_existing(self):
         import pwd as _pwd
         fake_pw = _pwd.struct_passwd(("vhserver", "x", 1000, 1000, "", "/home/vhserver", "/bin/bash"))
-        with mock.patch("deployplan.pwd.getpwnam", return_value=fake_pw):
+        with mock.patch("shared.deployplan.pwd.getpwnam", return_value=fake_pw):
             exists, home = deployplan.get_user_info("vhserver")
         self.assertTrue(exists)
         self.assertEqual(home, "/home/vhserver")
 
     def test_get_user_info_missing(self):
-        with mock.patch("deployplan.pwd.getpwnam", side_effect=KeyError("no user")):
+        with mock.patch("shared.deployplan.pwd.getpwnam", side_effect=KeyError("no user")):
             exists, home = deployplan.get_user_info("nobody")
         self.assertFalse(exists)
         self.assertEqual(home, "")
 
     def test_create_system_user_success(self):
-        with mock.patch("deployplan.subprocess.run") as m:
+        with mock.patch("shared.deployplan.subprocess.run") as m:
             m.return_value = mock.Mock(returncode=0, stderr="")
             ok, msg = deployplan.create_system_user("newuser")
         self.assertTrue(ok)
@@ -637,15 +672,15 @@ class DeployPlanTests(unittest.TestCase):
         )
 
     def test_create_system_user_failure(self):
-        with mock.patch("deployplan.subprocess.run") as m:
+        with mock.patch("shared.deployplan.subprocess.run") as m:
             m.return_value = mock.Mock(returncode=1, stderr="user exists")
             ok, msg = deployplan.create_system_user("newuser")
         self.assertFalse(ok)
         self.assertEqual(msg, "user exists")
 
     def test_set_user_password_stdin_success(self):
-        with mock.patch("deployplan.subprocess.run") as m, \
-             mock.patch("deployplan.sys.stdin") as stdin:
+        with mock.patch("shared.deployplan.subprocess.run") as m, \
+             mock.patch("shared.deployplan.sys.stdin") as stdin:
             stdin.readline.return_value = "newuser:secret\n"
             m.return_value = mock.Mock(returncode=0, stderr="")
             ok, msg = deployplan.set_user_password_stdin()
@@ -655,8 +690,8 @@ class DeployPlanTests(unittest.TestCase):
         )
 
     def test_set_user_password_stdin_failure(self):
-        with mock.patch("deployplan.subprocess.run") as m, \
-             mock.patch("deployplan.sys.stdin") as stdin:
+        with mock.patch("shared.deployplan.subprocess.run") as m, \
+             mock.patch("shared.deployplan.sys.stdin") as stdin:
             stdin.readline.return_value = "newuser:bad\n"
             m.return_value = mock.Mock(returncode=1, stderr="auth error")
             ok, msg = deployplan.set_user_password_stdin()
@@ -4550,6 +4585,7 @@ if __name__ == "__main__":
         DiscordNotifyTests,
         HostCliTests,
         BootstrapHubTests,
+        DeployPlanTests,
     ]
     if len(sys.argv) > 1:
         names = sys.argv[1:]

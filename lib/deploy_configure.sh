@@ -2,12 +2,8 @@
 # Étape 2 interactive / config du déploiement
 
 deploy_warn_port_group_conflicts() {
-    local line label proto port owner proto_label
-    while IFS='|' read -r label proto port owner; do
-        [[ -n "$label" ]] || continue
-        proto_label="UDP"
-        [[ "$proto" == "t" ]] && proto_label="TCP"
-        warn "${label} ${port}/${proto_label} déjà utilisé par : ${owner}"
+    while IFS= read -r line; do
+        [[ -n "$line" ]] && warn "$line"
     done < <(
         python3 "$SCRIPT_DIR/shared/deployplan.py" describe-conflicts \
             --game-id "$GAME_ID" \
@@ -150,7 +146,8 @@ deploy_configure_paths() {
     if [[ "$DEPLOY_MODE" == "attach" ]]; then
         prompt "Nom du service systemd existant" "${GAME_SERVICE}"
         GAME_SERVICE="$REPLY"
-        systemctl list-unit-files "${GAME_SERVICE}.service" 2>/dev/null | grep -qv "not-found" \
+        source <(python3 "$SCRIPT_DIR/shared/deployplan.py" check-service --service-name "$GAME_SERVICE")
+        [[ "$SERVICE_EXISTS" == "true" ]] \
             && ok "Service existant détecté : $GAME_SERVICE" \
             || warn "Service systemd non détecté : $GAME_SERVICE"
     fi
@@ -176,7 +173,7 @@ deploy_configure_server() {
                 --game-service "$GAME_SERVICE"
         )
         if [[ -n "${CONFLICT_LABEL:-}" ]]; then
-            warn "${CONFLICT_LABEL} ${CONFLICT_PORT}/$([[ "$CONFLICT_PROTO" == "t" ]] && echo TCP || echo UDP) déjà utilisé — groupe de ports suggéré mis à jour"
+            warn "${CONFLICT_LABEL} ${CONFLICT_PORT}/${CONFLICT_PROTO_LABEL} déjà utilisé — groupe de ports suggéré mis à jour"
         fi
     fi
 
