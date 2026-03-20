@@ -650,13 +650,18 @@ def create_discord_channel(instance_name: str) -> tuple[bool, str]:
         category_id=category_id,
     )
     if found and channel_id:
+        moved = False
+        if category_id:
+            ok_move, _ = discordnotify.move_channel_to_category(channel_id, category_id, cfg["bot_token"])
+            moved = ok_move
         instance_channels = cfg.setdefault("instance_channels", {})
         instance_channels[instance_name] = channel_id
         saved, save_msg = _save_discord_cfg(cfg)
         if not saved:
             return False, f"Channel existant détecté ({channel_id}) mais discord.json non mis à jour : {save_msg}"
         game_label = f" [{game_id}]" if game_id else ""
-        return True, f"Channel existant #{channel_name} réutilisé (id: {channel_id}){game_label}"
+        moved_label = " et déplacé dans la catégorie" if moved else ""
+        return True, f"Channel existant #{channel_name} réutilisé{moved_label} (id: {channel_id}){game_label}"
     ok, msg, channel_id = discordnotify.create_channel(
         guild_id, channel_name, cfg["bot_token"],
         category_id=category_id,

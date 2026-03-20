@@ -145,6 +145,24 @@ def create_channel(
     return True, "ok", channel_id
 
 
+def move_channel_to_category(
+    channel_id: str,
+    category_id: str,
+    bot_token: str,
+    *,
+    timeout: int = 10,
+) -> tuple[bool, str]:
+    """Move an existing text channel into a category."""
+    ok, msg, _ = _discord_api(
+        "PATCH",
+        f"/channels/{channel_id}",
+        bot_token,
+        data={"parent_id": category_id},
+        timeout=timeout,
+    )
+    return ok, msg
+
+
 def find_text_channel_by_name(
     guild_id: str,
     name: str,
@@ -546,6 +564,10 @@ def _cli_create_channel(instance_id: str, game_id: str = "") -> int:
         category_id=category_id,
     )
     if found and channel_id:
+        moved = False
+        if category_id:
+            ok_move, _ = move_channel_to_category(channel_id, category_id, cfg["bot_token"])
+            moved = ok_move
         cfg.setdefault("instance_channels", {})[instance_id] = channel_id
         saved, save_msg = save_config(cfg)
         if not saved:
@@ -553,7 +575,8 @@ def _cli_create_channel(instance_id: str, game_id: str = "") -> int:
                   file=sys.stderr)
             return 1
         game_label = f" [{game_id}]" if game_id else ""
-        print(f"Channel existant #{channel_name} réutilisé (id: {channel_id}){game_label}")
+        moved_label = " et déplacé dans la catégorie" if moved else ""
+        print(f"Channel existant #{channel_name} réutilisé{moved_label} (id: {channel_id}){game_label}")
         return 0
     ok, msg, channel_id = create_channel(
         guild_id, channel_name, cfg["bot_token"],

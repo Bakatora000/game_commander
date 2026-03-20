@@ -1146,7 +1146,9 @@ class DiscordNotifyTests(unittest.TestCase):
     def test_cli_create_channel_reuses_existing_channel_by_name(self):
         cfg = {"bot_token": "token", "guild_id": "guild", "instance_channels": {}}
         with mock.patch.object(discordnotify, "load_config", return_value=cfg), \
+             mock.patch.object(discordnotify, "find_or_create_game_category", return_value=(True, "existing", "cat42")), \
              mock.patch.object(discordnotify, "find_text_channel_by_name", return_value=(True, "existing", "123")), \
+             mock.patch.object(discordnotify, "move_channel_to_category", return_value=(True, "ok")) as move_mock, \
              mock.patch.object(discordnotify, "save_config", return_value=(True, "/etc/game-commander/discord.json")) as save_mock, \
              mock.patch.object(discordnotify, "create_channel") as create_mock, \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
@@ -1154,6 +1156,7 @@ class DiscordNotifyTests(unittest.TestCase):
         self.assertEqual(rc, 0)
         self.assertIn("réutilisé", stdout.getvalue())
         self.assertEqual(cfg["instance_channels"]["satisfactory"], "123")
+        self.assertTrue(move_mock.called)
         self.assertFalse(create_mock.called)
         self.assertTrue(save_mock.called)
 
@@ -1161,6 +1164,7 @@ class DiscordNotifyTests(unittest.TestCase):
         cfg = {"bot_token": "token", "guild_id": "guild", "instance_channels": {"satisfactory": "999"}}
         with mock.patch.object(discordnotify, "load_config", return_value=cfg), \
              mock.patch.object(discordnotify, "channel_exists", return_value=(False, "http 404")), \
+             mock.patch.object(discordnotify, "find_or_create_game_category", return_value=(True, "existing", "cat42")), \
              mock.patch.object(discordnotify, "find_text_channel_by_name", return_value=(True, "existing", "123")), \
              mock.patch.object(discordnotify, "save_config", return_value=(True, "/etc/game-commander/discord.json")) as save_mock, \
              mock.patch.object(discordnotify, "create_channel") as create_mock, \
