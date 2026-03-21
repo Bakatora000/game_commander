@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -22,6 +23,9 @@ from shared.deployconfig import DeployConfig
 
 
 # ── Step 3: Dependencies ──────────────────────────────────────────────────────
+
+def _command_path(name: str) -> str:
+    return shutil.which(name) or ""
 
 def deploy_step_dependencies(cfg: DeployConfig, script_dir: Path) -> None:
     console.hdr("ÉTAPE 3 : Dépendances")
@@ -107,12 +111,9 @@ def deploy_step_dependencies(cfg: DeployConfig, script_dir: Path) -> None:
             console.ok("Wine64 déjà présent")
 
         # Ensure wine64 is in PATH
-        r = subprocess.run(["command", "-v", "wine64"], shell=True, capture_output=True)
-        if r.returncode != 0:
+        if not _command_path("wine64"):
             if ens.get("wine_in_path"):
-                wine_bin = subprocess.run(
-                    ["command", "-v", "wine"], shell=True, capture_output=True, text=True
-                ).stdout.strip()
+                wine_bin = _command_path("wine")
                 Path("/usr/local/bin/wine64").symlink_to(wine_bin)
                 console.ok("Symlink wine64 → wine créé dans /usr/local/bin")
             elif Path("/usr/lib/wine/wine64").exists():

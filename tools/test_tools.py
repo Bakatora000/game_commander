@@ -2537,6 +2537,11 @@ class DeployHelpersTests(unittest.TestCase):
         self.assertIn('ADMIN_FILES = ["server.properties", "ops.json", "whitelist.json"', content)
         self.assertIn('PREFIX = "minecraft-fabric"', content)
 
+    def test_deploysteps_command_path_uses_shutil_which(self):
+        with mock.patch("shared.deploysteps.shutil.which", return_value="/usr/bin/wine64") as which_mock:
+            self.assertEqual(deploysteps._command_path("wine64"), "/usr/bin/wine64")
+        which_mock.assert_called_once_with("wine64")
+
     def test_resolve_runtime_src_dir_accepts_repo_root(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
