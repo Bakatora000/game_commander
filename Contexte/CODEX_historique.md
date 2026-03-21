@@ -106,9 +106,8 @@ gc/
 - Les opérations hôte déclenchées par le Hub et `tools/host_cli.py` utilisent maintenant
   `--repo-root` et invoquent `gcctl` au lieu de relancer `game_commander.sh`.
 - `shared/hubsync.py` écrit désormais `GC_HUB_REPO_ROOT` dans le service Hub.
-- Compatibilité transitoire restante :
-  - `tools/host_cli.py` accepte encore `--main-script` pour ne pas casser d'anciens appels
-  - la suppression finale de cette compatibilité reste à faire
+- `tools/host_cli.py` n'accepte plus `--main-script` ; `--repo-root` est maintenant obligatoire
+  pour les commandes hôte qui ont besoin du dépôt.
 - Ne pas réintroduire :
   - dépendance du Hub à `GC_HUB_MAIN_SCRIPT`
   - relance des opérations hôte via `bash game_commander.sh ...`

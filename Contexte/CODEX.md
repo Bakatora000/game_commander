@@ -169,8 +169,9 @@ Migration status note:
 - host operations triggered by the Hub and by `tools/host_cli.py` now use `--repo-root`
   and invoke `gcctl`, not `game_commander.sh`
 - `shared/hubsync.py` now writes `GC_HUB_REPO_ROOT` into the Hub service environment
-- a temporary compatibility layer for `--main-script` still exists in `tools/host_cli.py`
-  but `game_commander.sh` is no longer on the critical internal path
+- `tools/host_cli.py` no longer accepts `--main-script`; `--repo-root` is now mandatory
+  for host operations that need repository context
+- `game_commander.sh` is no longer on the critical internal path
 
 Nginx management is also split out into `tools/nginx_manager.py`, which maintains a
 manifest and a generated locations file rather than repeatedly editing inline blocks for

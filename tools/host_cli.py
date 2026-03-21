@@ -26,10 +26,7 @@ def _repo_root_from_args(args: argparse.Namespace) -> Path:
     repo_root = getattr(args, "repo_root", None)
     if repo_root:
         return Path(repo_root).resolve()
-    main_script = getattr(args, "main_script", None)
-    if main_script:
-        return Path(main_script).resolve().parent
-    raise ValueError("repo_root or main_script required")
+    raise ValueError("repo_root required")
 
 
 def cmd_service_action(args: argparse.Namespace) -> int:
@@ -333,7 +330,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     update = sub.add_parser("update-instance")
     update.add_argument("--repo-root", type=_existing_path)
-    update.add_argument("--main-script", type=_existing_path)
     update.add_argument("--instance", required=True)
     update.add_argument("--skip-hub-sync", action="store_true")
     update.add_argument("--source", default="")
@@ -341,14 +337,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     redeploy = sub.add_parser("redeploy-instance")
     redeploy.add_argument("--repo-root", type=_existing_path)
-    redeploy.add_argument("--main-script", type=_existing_path)
     redeploy.add_argument("--config", required=True, type=_existing_path)
     redeploy.add_argument("--source", default="")
     redeploy.set_defaults(func=cmd_redeploy_instance)
 
     deploy = sub.add_parser("deploy-instance")
     deploy.add_argument("--repo-root", type=_existing_path)
-    deploy.add_argument("--main-script", type=_existing_path)
     deploy.add_argument("--game-id", required=True)
     deploy.add_argument("--instance", required=True)
     deploy.add_argument("--domain", required=True)
@@ -365,7 +359,6 @@ def build_parser() -> argparse.ArgumentParser:
 
     uninstall = sub.add_parser("uninstall-instance")
     uninstall.add_argument("--repo-root", type=_existing_path)
-    uninstall.add_argument("--main-script", type=_existing_path)
     uninstall.add_argument("--instance", required=True)
     uninstall.add_argument("--game-id", default="")
     uninstall.add_argument("--source", default="")
@@ -373,14 +366,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     rebalance = sub.add_parser("rebalance")
     rebalance.add_argument("--repo-root", type=_existing_path)
-    rebalance.add_argument("--main-script", type=_existing_path)
     rebalance.add_argument("--restart", action="store_true")
     rebalance.add_argument("--source", default="")
     rebalance.set_defaults(func=cmd_rebalance)
 
     bootstrap = sub.add_parser("bootstrap-hub")
     bootstrap.add_argument("--repo-root", type=_existing_path)
-    bootstrap.add_argument("--main-script", type=_existing_path)
     bootstrap.add_argument("--sys-user", default="")
     bootstrap.add_argument("--domain", default="")
     bootstrap.add_argument("--admin-login", default="admin")
@@ -417,9 +408,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if hasattr(args, "root") and not args.root:
         args.root = list(hostctl.DEFAULT_SEARCH_ROOTS)
-    if hasattr(args, "repo_root") or hasattr(args, "main_script"):
-        if not getattr(args, "repo_root", None) and not getattr(args, "main_script", None):
-            parser.error("one of --repo-root or --main-script is required")
+    if hasattr(args, "repo_root") and not getattr(args, "repo_root", None):
+        parser.error("--repo-root is required")
     return args.func(args)
 
 

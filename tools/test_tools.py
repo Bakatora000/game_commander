@@ -1364,6 +1364,14 @@ class HostCliTests(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertIn("Répartition CPU recalculée", stdout.getvalue())
 
+    def test_rebalance_requires_repo_root(self):
+        from tools import host_cli
+        with self.assertRaises(SystemExit) as ctx, \
+             mock.patch("sys.stderr", new_callable=io.StringIO) as stderr:
+            host_cli.main(["rebalance"])
+        self.assertEqual(ctx.exception.code, 2)
+        self.assertIn("--repo-root is required", stderr.getvalue())
+
     def test_update_instance_can_skip_hub_sync(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
