@@ -112,6 +112,20 @@ gc/
   - dépendance du Hub à `GC_HUB_MAIN_SCRIPT`
   - relance des opérations hôte via `bash game_commander.sh ...`
 
+### [2026-03-21] Backups — scripts générés convertis en Python
+- Les scripts `backup_<game>.sh` générés dans les instances ne sont plus des scripts bash ;
+  ils sont maintenant générés en Python tout en gardant le même chemin de fichier pour ne
+  pas casser le cron ni l'uninstall.
+- `shared/updatehooks.py` ne maintient plus sa propre logique de génération backup/cron :
+  il réutilise désormais `shared/deploybackups.py` comme source unique.
+- Compatibilité retenue :
+  - `runtime/core/saves.py` sait encore exécuter les anciens scripts shell déjà présents
+    sur des instances existantes
+  - les nouvelles instances et les régénérations passent par le script Python
+- Ne pas réintroduire :
+  - duplication entre `shared/updatehooks.py` et `shared/deploybackups.py`
+  - dépendance obligatoire à `bash` pour exécuter les scripts de backup générés
+
 ### [2026-03-21] Discord — `http 403` après action Hub = permissions Discord, pas mapping
 - Symptôme observé :
   - `OK [Hub] <instance> start|stop`

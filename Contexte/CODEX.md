@@ -188,8 +188,14 @@ Discord operations note:
 Recent validated fixes:
 - `gcctl` introduced as official CLI entrypoint
 - Hub/host operations migrated from `--main-script` to `--repo-root`
+- `game_commander.sh` removed from the repository after migrating installer, docs and tests
 - Terraria deploy regression fixed: `deploy_step_game_service()` must pass `start_script=...`
   to `render_terraria_wrapper_script()`
+- backup hook generation deduplicated: `shared/updatehooks.py` now reuses
+  `shared/deploybackups.py` as the single source of truth
+- generated backup scripts are now Python scripts (same `backup_<game>.sh` path kept for
+  cron/uninstall compatibility), and `runtime/core/saves.py` remains compatible with both
+  the new Python-generated scripts and older shell-generated scripts already deployed
 
 Operational note: deployed instances are copies of the runtime app. Repository fixes do
 not update existing instances automatically. The `update` command is now the supported way
