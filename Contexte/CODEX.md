@@ -162,16 +162,15 @@ sudo ./gcctl update --instance testfabric
 sudo ./gcctl uninstall --dry-run
 ```
 
-`gcctl` is now the official CLI entrypoint. `game_commander.sh` remains only as a thin
-legacy shim delegating to `gcctl`.
+`gcctl` is now the official CLI entrypoint.
 
 Migration status note:
 - host operations triggered by the Hub and by `tools/host_cli.py` now use `--repo-root`
-  and invoke `gcctl`, not `game_commander.sh`
+  and invoke `gcctl`
 - `shared/hubsync.py` now writes `GC_HUB_REPO_ROOT` into the Hub service environment
 - `tools/host_cli.py` no longer accepts `--main-script`; `--repo-root` is now mandatory
   for host operations that need repository context
-- `game_commander.sh` is no longer on the critical internal path
+- `game_commander.sh` has been removed from the repository
 
 Nginx management is also split out into `tools/nginx_manager.py`, which maintains a
 manifest and a generated locations file rather than repeatedly editing inline blocks for
@@ -281,7 +280,8 @@ Jinja2 context always has: `game` (full config dict), `prefix`, `game_id`, `modu
 
 ## Versioning
 
-At each milestone, create a git commit and push to `origin/main`. Bump the version in the `game_commander.sh` header (line 3, `v2.x`) accordingly.
+At each milestone, create a git commit and push to `origin/main`. Keep the validated
+milestone/version notes aligned with the actual CLI/runtime state.
 
 Current validated milestone: `v3.0`
 
@@ -338,7 +338,7 @@ Validated `v3.0` status update after the first real Hub deploy tests:
 
 Validated bootstrap note:
 - a new `bootstrap-hub` entrypoint now exists for Ubuntu hosts
-- it is available both through `sudo bash game_commander.sh bootstrap-hub ...` and through the repository bootstrap script `install_hub.sh`
+- it is available through `sudo ./gcctl bootstrap-hub ...` and through the repository bootstrap script `install_hub.sh`
 - the intended end-state is a simple `curl | bash` installation path for the Hub Admin on a fresh server
 - public documentation and the Hub deploy form no longer expose static default passwords
 - the documented bootstrap flow now defaults to generating an admin password when none is supplied explicitly

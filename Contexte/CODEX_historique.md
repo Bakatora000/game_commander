@@ -101,13 +101,13 @@ gc/
 
 ### [2026-03-21] Migration Python — `gcctl` officiel, `game_commander.sh` sorti du chemin interne
 - `gcctl` est désormais l'entrée CLI officielle du projet.
-- `game_commander.sh` reste présent uniquement comme shim legacy et ne doit plus redevenir
-  le point d'entrée produit recommandé.
 - Les opérations hôte déclenchées par le Hub et `tools/host_cli.py` utilisent maintenant
   `--repo-root` et invoquent `gcctl` au lieu de relancer `game_commander.sh`.
 - `shared/hubsync.py` écrit désormais `GC_HUB_REPO_ROOT` dans le service Hub.
 - `tools/host_cli.py` n'accepte plus `--main-script` ; `--repo-root` est maintenant obligatoire
   pour les commandes hôte qui ont besoin du dépôt.
+- `game_commander.sh` a finalement été supprimé du dépôt après migration des docs, tests,
+  installer Hub et chemins internes.
 - Ne pas réintroduire :
   - dépendance du Hub à `GC_HUB_MAIN_SCRIPT`
   - relance des opérations hôte via `bash game_commander.sh ...`

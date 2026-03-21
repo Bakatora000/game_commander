@@ -6,7 +6,7 @@ un serveur de jeu avec `gc_2.1.0.zip`, sans etre a l'aise avec SSH au depart.
 Le principe est simple :
 - vous vous connectez a votre serveur
 - vous copiez l'archive `gc_2.1.0.zip`
-- vous lancez `game_commander.sh`
+- vous lancez `gcctl`
 - le script installe et configure le serveur de jeu et l'interface web
 
 ## 1. Ce qu'il vous faut
@@ -122,7 +122,7 @@ Puis par exemple :
 cd gc
 ```
 
-Si vous voyez `game_commander.sh`, vous etes au bon endroit :
+Si vous voyez `gcctl`, vous etes au bon endroit :
 
 ```bash
 ls
@@ -133,7 +133,7 @@ ls
 Le mode le plus simple est le mode interactif :
 
 ```bash
-sudo bash game_commander.sh
+sudo ./gcctl
 ```
 
 Un menu vous proposera :
@@ -265,7 +265,7 @@ Si tout se passe bien, vous aurez :
 Exemples de verification :
 
 ```bash
-sudo bash game_commander.sh status
+sudo ./gcctl status
 sudo systemctl status game-commander-moninstance
 ```
 
@@ -291,19 +291,19 @@ Connectez-vous avec le login et le mot de passe admin definis pendant le deploy.
 Afficher l'etat des instances :
 
 ```bash
-sudo bash game_commander.sh status
+sudo ./gcctl status
 ```
 
 Desinstaller une instance :
 
 ```bash
-sudo bash game_commander.sh uninstall
+sudo ./gcctl uninstall
 ```
 
 Relancer l'outil :
 
 ```bash
-sudo bash game_commander.sh
+sudo ./gcctl
 ```
 
 ## 11. Si vous preferez preparer un fichier de config
@@ -311,13 +311,13 @@ sudo bash game_commander.sh
 Vous pouvez generer un modele :
 
 ```bash
-sudo bash game_commander.sh deploy --generate-config
+sudo ./gcctl deploy --generate-config
 ```
 
 Cela cree un fichier d'exemple que vous pourrez editer, puis reutiliser avec :
 
 ```bash
-sudo bash game_commander.sh deploy --config env/deploy_config.env
+sudo ./gcctl deploy --config env/deploy_config.env
 ```
 
 Pratique si vous voulez refaire un deploiement sans repondre a toutes les questions.
@@ -344,7 +344,7 @@ pwd
 ls
 cd /root
 cd /root/gc
-sudo bash game_commander.sh
+sudo ./gcctl
 ```
 
 `pwd` affiche le dossier courant.  
@@ -358,7 +358,7 @@ sudo bash game_commander.sh
 - notez l'URL choisie
 - utilisez un mot de passe admin fort
 - ne supprimez pas manuellement des fichiers systemd ou Nginx si vous debutez
-- utilisez plutot `game_commander.sh uninstall`
+- utilisez plutot `gcctl uninstall`
 
 ## 15. Resume ultra-court
 
@@ -377,7 +377,7 @@ apt update
 apt install -y unzip
 unzip gc_2.1.0.zip
 cd gc
-sudo bash game_commander.sh
+sudo ./gcctl
 ```
 
 Ensuite :

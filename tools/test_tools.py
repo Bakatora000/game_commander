@@ -2309,8 +2309,6 @@ class HubHostTests(unittest.TestCase):
             manifest_path.write_text(json.dumps({
                 "instances": [{"name": "terraria", "prefix": "/terraria", "flask_port": 5007, "game": "terraria"}]
             }), encoding="utf-8")
-            script_path = root / "game_commander.sh"
-            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
             (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
             instance_dir = root / "game-commander-terraria"
             instance_dir.mkdir()

@@ -163,19 +163,14 @@ Le Hub peut créer automatiquement un canal Discord par instance et envoyer des 
 ## Structure du projet
 
 ```
-game_commander.sh          ← Point d'entrée
-
-lib/
-  cmd_deploy.sh            ← Orchestration déploiement
-  deploy_steps.sh          ← Étapes 3 à 12
-  deploy_helpers.sh        ← Defaults, config file, logging
-  deploy_configure.sh      ← Configuration interactive
-  cmd_uninstall.sh         ← Orchestration désinstallation
-  cmd_update.sh            ← Mise à jour runtime instance
-  cmd_status.sh            ← Statut instances
-  helpers.sh / nginx.sh    ← Helpers shell partagés
+gcctl                      ← Point d'entrée CLI officiel
 
 shared/
+  cmd_main.py              ← Dispatch CLI principal
+  cmd_deploy.py            ← Orchestration déploiement/attach
+  cmd_update.py            ← Mise à jour runtime instance
+  uninstall_interactive.py ← Désinstallation guidée
+  hostops.py               ← Commandes hôte construites autour de gcctl
   discordnotify.py         ← Notifications et gestion canaux Discord
   hubsync.py               ← Synchronisation Hub Admin
   deploycore.py            ← Déploiement piloté depuis le Hub

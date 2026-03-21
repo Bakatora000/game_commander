@@ -46,7 +46,7 @@ else
   git clone --branch "$REPO_BRANCH" --depth 1 "$REPO_URL" "$REPO_DIR"
 fi
 
-CMD=(bash "$REPO_DIR/game_commander.sh" bootstrap-hub --sys-user "$SYS_USER" --domain "$DOMAIN" --admin-login "$ADMIN_LOGIN" --ssl-mode "$SSL_MODE")
+CMD=("$REPO_DIR/gcctl" bootstrap-hub --sys-user "$SYS_USER" --domain "$DOMAIN" --admin-login "$ADMIN_LOGIN" --ssl-mode "$SSL_MODE")
 if [[ -n "$ADMIN_PASSWORD" ]]; then
   CMD+=(--admin-password "$ADMIN_PASSWORD")
 fi

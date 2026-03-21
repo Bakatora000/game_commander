@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Main entry point — replaces game_commander.sh menu + dispatch logic.
+Main entry point for Game Commander CLI.
 
 Usage:
-    python3 shared/cmd_main.py --script-dir /path/to/gc [command] [args...]
+    ./gcctl [command] [args...]
 """
 from __future__ import annotations
 
@@ -69,8 +69,6 @@ def _help() -> None:
     sudo ./gcctl rebalance --restart
     sudo ./gcctl bootstrap-hub --domain gaming.example.com --admin-password '...'
 
-  COMPATIBILITÉ :
-    game_commander.sh reste disponible temporairement comme shim legacy.
 """)
 
 
