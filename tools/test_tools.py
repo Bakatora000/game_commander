@@ -2533,9 +2533,9 @@ class DeployHelpersTests(unittest.TestCase):
             world_dir="/srv/mc/world",
             server_dir="/srv/mc",
         )
-        self.assertIn('SERVER_DIR="/srv/mc"', content)
-        self.assertIn('for f in server.properties ops.json whitelist.json', content)
-        self.assertIn('PREFIX="minecraft-fabric"', content)
+        self.assertIn('SERVER_DIR = Path(r"/srv/mc")', content)
+        self.assertIn('ADMIN_FILES = ["server.properties", "ops.json", "whitelist.json"', content)
+        self.assertIn('PREFIX = "minecraft-fabric"', content)
 
     def test_resolve_runtime_src_dir_accepts_repo_root(self):
         with tempfile.TemporaryDirectory() as d:
@@ -3285,7 +3285,7 @@ class ValheimWorldSelectionTests(unittest.TestCase):
         self.assertEqual(self.app.config["GAME"]["server"]["world_name"], "Monde2")
         self.assertIn('"world_name": "Monde2"', (Path(self.app.root_path) / "game.json").read_text())
         self.assertIn('WORLD_NAME="Monde2"', (Path(self.app.root_path) / "deploy_config.env").read_text())
-        self.assertIn('WORLD_NAME="Monde2"', (Path(self.app.root_path) / "backup_valheim.sh").read_text())
+        self.assertIn('WORLD_NAME = "Monde2"', (Path(self.app.root_path) / "backup_valheim.sh").read_text())
         self.assertIn('-world "Monde2"', (self.root / "server" / "start_server.sh").read_text())
 
     def test_list_worlds_keeps_missing_current_world_marked_absent(self):
@@ -3899,7 +3899,7 @@ class TerrariaWorldsTests(unittest.TestCase):
                 self.assertEqual(cfg["worldname"], "bossrush")
                 self.assertEqual(app.config["GAME"]["server"]["world_name"], "bossrush")
                 self.assertIn('WORLD_NAME="bossrush"', Path(os.path.join(app_dir, "deploy_config.env")).read_text(encoding="utf-8"))
-                self.assertIn('WORLD_NAME="bossrush"', Path(os.path.join(app_dir, "backup_terraria.sh")).read_text(encoding="utf-8"))
+                self.assertIn('WORLD_NAME = "bossrush"', Path(os.path.join(app_dir, "backup_terraria.sh")).read_text(encoding="utf-8"))
 
 
 class TerrariaPlayersTests(unittest.TestCase):

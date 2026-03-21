@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import zipfile
@@ -74,6 +75,16 @@ def _backup_dir() -> Path:
 
 def _backup_script_path() -> Path:
     return _app_dir() / f'backup_{_game()["id"]}.sh'
+
+
+def _backup_script_cmd(script: Path) -> list[str]:
+    try:
+        first_line = script.read_text(encoding="utf-8", errors="ignore").splitlines()[0]
+    except Exception:
+        first_line = ""
+    if "python" in first_line.lower():
+        return [sys.executable, str(script)]
+    return ["bash", str(script)]
 
 
 def _backup_pattern() -> str:
@@ -413,7 +424,7 @@ def run_safety_backup(reason: str):
     backup_dir = _backup_dir()
     backup_dir.mkdir(parents=True, exist_ok=True)
     before = {p.name for p in backup_dir.glob(_backup_pattern()) if p.is_file()}
-    result = subprocess.run(["bash", str(script)], capture_output=True, text=True, timeout=300)
+    result = subprocess.run(_backup_script_cmd(script), capture_output=True, text=True, timeout=300)
     if result.returncode != 0:
         return None, (result.stderr or result.stdout).strip() or "backup_failed"
 
@@ -498,7 +509,7 @@ def run_backup():
     script = _backup_script_path()
     if not script.is_file():
         return None, "backup_script_missing"
-    result = subprocess.run(["bash", str(script)], capture_output=True, text=True, timeout=300)
+    result = subprocess.run(_backup_script_cmd(script), capture_output=True, text=True, timeout=300)
     if result.returncode != 0:
         return None, (result.stderr or result.stdout).strip() or "backup_failed"
     backups, _err = list_backups()

@@ -157,7 +157,7 @@ def _update_backup_script(world_name: str):
     path = _app_dir() / "backup_valheim.sh"
     if not path.exists():
         return
-    _replace_or_append_line(path, r'^WORLD_NAME=".*"$', f'WORLD_NAME="{world_name}"')
+    _replace_or_append_line(path, r'^WORLD_NAME(\s*=\s*|=)".*"$', f'WORLD_NAME = "{world_name}"')
 
 
 def select_world(world_name: str):

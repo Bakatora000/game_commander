@@ -43,66 +43,179 @@ def render_backup_script(
     server_dir: str = "",
 ) -> str:
     if game_id == "valheim":
-        return f"""#!/usr/bin/env bash
-BACKUP_DIR="{backup_dir}"
-WORLD_DIR="{world_dir}"
-WORLD_NAME="{world_name}"
-RETENTION=7
-TS=$(date +%Y%m%d_%H%M%S)
-ARC="${{BACKUP_DIR}}/${{WORLD_NAME}}_${{TS}}.zip"
-FILES=()
-for f in "${{WORLD_DIR}}/${{WORLD_NAME}}.db" "${{WORLD_DIR}}/${{WORLD_NAME}}.fwl" \\
-          "${{WORLD_DIR}}/${{WORLD_NAME}}.db.old" "${{WORLD_DIR}}/${{WORLD_NAME}}.fwl.old"; do
-    [[ -f "$f" ]] && FILES+=("$f")
-done
-[[ ${{#FILES[@]}} -eq 0 ]] && {{ echo "[$(date)] WARN: aucun fichier monde" >&2; exit 1; }}
-mkdir -p "$BACKUP_DIR"
-zip -j "$ARC" "${{FILES[@]}}" -q \\
-    && echo "[$(date)] OK: $(basename "$ARC") ($(du -sh "$ARC"|cut -f1))" \\
-    || {{ echo "[$(date)] ERROR: zip échoué" >&2; exit 1; }}
-find "$BACKUP_DIR" -name "${{WORLD_NAME}}_*.zip" -mtime +${{RETENTION}} -delete
-"""
+        return f'''#!/usr/bin/env python3
+from __future__ import annotations
+
+import os
+import sys
+import time
+import zipfile
+from pathlib import Path
+
+BACKUP_DIR = Path(r"{backup_dir}")
+WORLD_DIR = Path(r"{world_dir}")
+WORLD_NAME = "{world_name}"
+RETENTION = 7
+
+
+def _log(level: str, message: str, *, err: bool = False) -> None:
+    stream = sys.stderr if err else sys.stdout
+    print(f"[{{time.strftime('%Y-%m-%d %H:%M:%S')}}] {{level}}: {{message}}", file=stream)
+
+
+def _cleanup_old() -> None:
+    cutoff = time.time() - (RETENTION * 86400)
+    pattern = f"{{WORLD_NAME}}_*.zip"
+    for path in BACKUP_DIR.glob(pattern):
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def main() -> int:
+    files = []
+    for candidate in (
+        WORLD_DIR / f"{{WORLD_NAME}}.db",
+        WORLD_DIR / f"{{WORLD_NAME}}.fwl",
+        WORLD_DIR / f"{{WORLD_NAME}}.db.old",
+        WORLD_DIR / f"{{WORLD_NAME}}.fwl.old",
+    ):
+        if candidate.is_file():
+            files.append(candidate)
+    if not files:
+        _log("WARN", "aucun fichier monde", err=True)
+        return 1
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    archive = BACKUP_DIR / f"{{WORLD_NAME}}_{{time.strftime('%Y%m%d_%H%M%S')}}.zip"
+    try:
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for path in files:
+                zf.write(path, arcname=path.name)
+    except Exception:
+        _log("ERROR", "zip échoué", err=True)
+        return 1
+    _log("OK", archive.name)
+    _cleanup_old()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+'''
     if game_id in {"minecraft", "minecraft-fabric"}:
-        return f"""#!/usr/bin/env bash
-BACKUP_DIR="{backup_dir}"
-SERVER_DIR="{server_dir}"
-WORLD_DIR="{world_dir}"
-PREFIX="{game_id}"
-RETENTION=7
-TS=$(date +%Y%m%d_%H%M%S)
-ARC="${{BACKUP_DIR}}/${{PREFIX}}_save_${{TS}}.zip"
-[[ ! -d "$WORLD_DIR" ]] && {{ echo "[$(date)] WARN: $WORLD_DIR introuvable" >&2; exit 1; }}
-mkdir -p "$BACKUP_DIR"
-FILES=("$(basename "$WORLD_DIR")")
-for f in server.properties ops.json whitelist.json banned-players.json banned-ips.json usercache.json; do
-    [[ -f "$SERVER_DIR/$f" ]] && FILES+=("$f")
-done
-(
-    cd "$SERVER_DIR"
-    zip -r "$ARC" "${{FILES[@]}}" -q
-) && echo "[$(date)] OK: $(basename "$ARC") ($(du -sh "$ARC"|cut -f1))" \\
-  || {{ echo "[$(date)] ERROR" >&2; exit 1; }}
-find "$BACKUP_DIR" -name "${{PREFIX}}_save_*.zip" -mtime +${{RETENTION}} -delete
-"""
-    return f"""#!/usr/bin/env bash
-BACKUP_DIR="{backup_dir}"
-WORLD_DIR="{world_dir}"
-PREFIX="{game_id}"
-RETENTION=7
-TS=$(date +%Y%m%d_%H%M%S)
-ARC="${{BACKUP_DIR}}/${{PREFIX}}_save_${{TS}}.zip"
-[[ ! -d "$WORLD_DIR" ]] && {{ echo "[$(date)] WARN: $WORLD_DIR introuvable" >&2; exit 1; }}
-mkdir -p "$BACKUP_DIR"
-ROOT_PARENT="$(dirname "$WORLD_DIR")"
-ROOT_NAME="$(basename "$WORLD_DIR")"
-(
-    cd "$ROOT_PARENT"
-    zip -r "$ARC" "$ROOT_NAME" -q
-) \\
-    && echo "[$(date)] OK: $(basename "$ARC") ($(du -sh "$ARC"|cut -f1))" \\
-    || {{ echo "[$(date)] ERROR" >&2; exit 1; }}
-find "$BACKUP_DIR" -name "${{PREFIX}}_save_*.zip" -mtime +${{RETENTION}} -delete
-"""
+        return f'''#!/usr/bin/env python3
+from __future__ import annotations
+
+import sys
+import time
+import zipfile
+from pathlib import Path
+
+BACKUP_DIR = Path(r"{backup_dir}")
+SERVER_DIR = Path(r"{server_dir}")
+WORLD_DIR = Path(r"{world_dir}")
+PREFIX = "{game_id}"
+RETENTION = 7
+ADMIN_FILES = ["server.properties", "ops.json", "whitelist.json", "banned-players.json", "banned-ips.json", "usercache.json"]
+
+
+def _log(level: str, message: str, *, err: bool = False) -> None:
+    stream = sys.stderr if err else sys.stdout
+    print(f"[{{time.strftime('%Y-%m-%d %H:%M:%S')}}] {{level}}: {{message}}", file=stream)
+
+
+def _cleanup_old() -> None:
+    cutoff = time.time() - (RETENTION * 86400)
+    pattern = f"{{PREFIX}}_save_*.zip"
+    for path in BACKUP_DIR.glob(pattern):
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def main() -> int:
+    if not WORLD_DIR.is_dir():
+        _log("WARN", f"{{WORLD_DIR}} introuvable", err=True)
+        return 1
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    archive = BACKUP_DIR / f"{{PREFIX}}_save_{{time.strftime('%Y%m%d_%H%M%S')}}.zip"
+    try:
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for path in sorted(WORLD_DIR.rglob("*")):
+                if path.is_file():
+                    zf.write(path, arcname=str(path.relative_to(SERVER_DIR)))
+            for name in ADMIN_FILES:
+                path = SERVER_DIR / name
+                if path.is_file():
+                    zf.write(path, arcname=name)
+    except Exception:
+        _log("ERROR", "zip échoué", err=True)
+        return 1
+    _log("OK", archive.name)
+    _cleanup_old()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+'''
+    return f'''#!/usr/bin/env python3
+from __future__ import annotations
+
+import sys
+import time
+import zipfile
+from pathlib import Path
+
+BACKUP_DIR = Path(r"{backup_dir}")
+WORLD_DIR = Path(r"{world_dir}")
+WORLD_NAME = "{world_name}"
+PREFIX = "{game_id}"
+RETENTION = 7
+
+
+def _log(level: str, message: str, *, err: bool = False) -> None:
+    stream = sys.stderr if err else sys.stdout
+    print(f"[{{time.strftime('%Y-%m-%d %H:%M:%S')}}] {{level}}: {{message}}", file=stream)
+
+
+def _cleanup_old() -> None:
+    cutoff = time.time() - (RETENTION * 86400)
+    pattern = f"{{PREFIX}}_save_*.zip"
+    for path in BACKUP_DIR.glob(pattern):
+        try:
+            if path.stat().st_mtime < cutoff:
+                path.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def main() -> int:
+    if not WORLD_DIR.is_dir():
+        _log("WARN", f"{{WORLD_DIR}} introuvable", err=True)
+        return 1
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    archive = BACKUP_DIR / f"{{PREFIX}}_save_{{time.strftime('%Y%m%d_%H%M%S')}}.zip"
+    try:
+        with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+            for path in sorted(WORLD_DIR.rglob("*")):
+                if path.is_file():
+                    zf.write(path, arcname=str(path.relative_to(WORLD_DIR.parent)))
+    except Exception:
+        _log("ERROR", "zip échoué", err=True)
+        return 1
+    _log("OK", archive.name)
+    _cleanup_old()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+'''
 
 
 def install_backup_assets(
@@ -151,7 +264,7 @@ def install_backup_assets(
         messages.append("Test sauvegarde ignoré pour cette mise à jour")
     else:
         test_run = subprocess.run(
-            ["sudo", "-u", sys_user, "bash", str(backup_script)],
+            ["sudo", "-u", sys_user, "/usr/bin/python3", str(backup_script)],
             capture_output=True,
             text=True,
             check=False,
@@ -161,7 +274,7 @@ def install_backup_assets(
         else:
             messages.append("Test sauvegarde : aucun fichier trouvé (normal avant le premier lancement)")
 
-    cron_line = f"0 3 * * * {backup_script} >> {app_path}/backup_{game_id}.log 2>&1"
+    cron_line = f"0 3 * * * /usr/bin/python3 {backup_script} >> {app_path}/backup_{game_id}.log 2>&1"
     existing = subprocess.run(["crontab", "-u", sys_user, "-l"], capture_output=True, text=True, check=False).stdout
     if cron_line in existing:
         messages.append("Cron déjà configuré")
