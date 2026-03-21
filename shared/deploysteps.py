@@ -466,7 +466,7 @@ def deploy_step_game_service(cfg: DeployConfig, script_dir: Path) -> None:
         content = startscripts.render_terraria_start_script(server_dir=cfg.server_dir)
         startscripts.write_start_script(out_path=start_script, content=content, sys_user=cfg.sys_user)
         from shared.startscripts import render_terraria_wrapper_script
-        wrapper_content = render_terraria_wrapper_script(server_dir=cfg.server_dir)
+        wrapper_content = render_terraria_wrapper_script(start_script=start_script)
         startscripts.write_start_script(out_path=wrapper_script, content=wrapper_content, sys_user=cfg.sys_user)
         console.ok(f"Script de démarrage : {start_script}")
         console.ok(f"Wrapper service : {wrapper_script}")

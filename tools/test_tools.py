@@ -31,7 +31,7 @@ sys.path.insert(0, str(ROOT_DIR))
 
 import nginx_manager
 import config_gen
-from shared import appfiles, appservice, bootstraphub, console, cpuplan, deploybackups, deploycore, deploydeps, deployenv, deploynginx, deployplan, deploypost, deployssl, deploysudo, discordnotify, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, sysutil, uninstallcore, updatecore, updatehooks
+from shared import appfiles, appservice, bootstraphub, console, cpuplan, deploybackups, deploycore, deploydeps, deployenv, deploynginx, deployplan, deploypost, deployssl, deploysudo, discordnotify, gameinstall, gameservice, hostctl, hostops, hubsync, instanceenv, redeploycore, startscripts, sysutil, uninstallcore, updatecore, updatehooks, deploysteps
 from shared import deployconfigure
 from runtime.games.minecraft import config as minecraft_config
 from runtime.games.minecraft import admins as minecraft_admins
@@ -982,6 +982,38 @@ class StartScriptsTests(unittest.TestCase):
     def test_render_terraria_wrapper_script_uses_script_wrapper(self):
         content = startscripts.render_terraria_wrapper_script(start_script="/srv/terraria/start_server.sh")
         self.assertIn('exec /usr/bin/script -qefc "/srv/terraria/start_server.sh" /dev/null', content)
+
+
+class DeployStepsTests(unittest.TestCase):
+
+    def test_deploy_step_game_service_terraria_writes_wrapper_from_start_script(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            server_dir = Path(tmpdir) / "terraria_server"
+            cfg = deployconfigure.DeployConfig(
+                game_id="terraria",
+                instance_id="terraria1",
+                game_label="Terraria",
+                sys_user=pwd.getpwuid(os.getuid()).pw_name,
+                server_dir=str(server_dir),
+                game_service="terraria-server-terraria1",
+            )
+            script_dir = ROOT_DIR
+
+            with mock.patch.object(startscripts, "write_start_script") as write_script, \
+                 mock.patch.object(gameservice, "install_game_service", return_value=(True, "ok")) as install_service:
+                deploysteps.deploy_step_game_service(cfg, script_dir)
+
+            start_script = str(server_dir / "start_server.sh")
+            wrapper_script = str(server_dir / "start_server_service.sh")
+
+            self.assertEqual(write_script.call_count, 2)
+            self.assertEqual(write_script.call_args_list[0].kwargs["out_path"], start_script)
+            self.assertEqual(write_script.call_args_list[1].kwargs["out_path"], wrapper_script)
+            self.assertIn(
+                f'exec /usr/bin/script -qefc "{start_script}" /dev/null',
+                write_script.call_args_list[1].kwargs["content"],
+            )
+            self.assertEqual(install_service.call_args.kwargs["exec_start"], wrapper_script)
 
     def test_render_soulmask_start_script_uses_json_config(self):
         content = startscripts.render_soulmask_start_script(
