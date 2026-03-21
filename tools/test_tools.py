@@ -1123,15 +1123,15 @@ class DiscordNotifyTests(unittest.TestCase):
     def test_load_config_missing_returns_empty(self):
         self.assertEqual(discordnotify.load_config("/tmp/definitely_missing_gc_discord.json"), {})
 
-    def test_resolve_channel_prefers_instance_then_default(self):
+    def test_resolve_channel_prefers_instance_then_event_then_default(self):
         cfg = {
             "bot_token": "token",
             "default_channel_id": "999",
             "instance_channels": {"valheim2": "123"},
-            "game_channels": {"valheim": "456"},
+            "event_channels": {"restart": "456"},
         }
         self.assertEqual(discordnotify.resolve_channel_id(cfg, instance_id="valheim2", game_id="valheim"), "123")
-        self.assertEqual(discordnotify.resolve_channel_id(cfg, instance_id="other", game_id="valheim"), "456")
+        self.assertEqual(discordnotify.resolve_channel_id(cfg, instance_id="other", game_id="valheim", event="restart"), "456")
         self.assertEqual(discordnotify.resolve_channel_id(cfg, instance_id="other", game_id="other"), "999")
 
     def test_notify_event_posts_to_discord_when_configured(self):

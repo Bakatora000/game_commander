@@ -371,12 +371,9 @@ def notifications_enabled(cfg: dict) -> bool:
 
 def resolve_channel_id(cfg: dict, instance_id: str = "", game_id: str = "", event: str = "") -> str:
     instance_channels = cfg.get("instance_channels") or {}
-    game_channels = cfg.get("game_channels") or {}
     event_channels = cfg.get("event_channels") or {}
     if instance_id and instance_id in instance_channels:
         return str(instance_channels[instance_id])
-    if game_id and game_id in game_channels:
-        return str(game_channels[game_id])
     if event and event in event_channels:
         return str(event_channels[event])
     return str(cfg.get("default_channel_id", ""))

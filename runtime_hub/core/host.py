@@ -586,7 +586,6 @@ def get_discord_status() -> dict:
     cfg = _load_discord_cfg()
     instances = _load_manifest().get("instances", [])
     instance_channels = cfg.get("instance_channels") or {}
-    game_channels = cfg.get("game_channels") or {}
     default_channel_id = cfg.get("default_channel_id", "")
     # Fetch guild text channels for name resolution
     guild_channels = []
@@ -609,21 +608,18 @@ def get_discord_status() -> dict:
     result = []
     for inst in instances:
         name = inst.get("name", "")
-        game = inst.get("game", "")
         channel_id = instance_channels.get(name, "")
         if channel_id and guild_channel_ids and str(channel_id) not in guild_channel_ids:
             channel_id = ""
         if channel_id:
             notif_source = "instance"
-        elif game and game in game_channels:
-            notif_source = "game"
         elif default_channel_id:
             notif_source = "default"
         else:
             notif_source = ""
         result.append({
             "name": name,
-            "game": game,
+            "game": inst.get("game", ""),
             "channel_id": channel_id,
             "notif_source": notif_source,
         })
