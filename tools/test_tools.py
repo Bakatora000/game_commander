@@ -16,6 +16,7 @@ import sys
 import tempfile
 import time
 import types
+import urllib.error
 import unittest
 import zipfile
 from pathlib import Path
@@ -1154,6 +1155,39 @@ class DiscordNotifyTests(unittest.TestCase):
         self.assertEqual(embed.get("color"), discordnotify.EMBED_COLOR_OK)
         fields = {f["name"]: f["value"] for f in (embed.get("fields") or [])}
         self.assertEqual(fields.get("Instance"), "valheim2")
+
+    def test_post_channel_message_falls_back_to_plain_text_when_embed_forbidden(self):
+        class FakeHTTPError(urllib.error.HTTPError):
+            def __init__(self):
+                super().__init__("https://discord.test", 403, "Forbidden", hdrs=None, fp=None)
+
+        calls = []
+
+        def fake_urlopen(req, timeout=10):
+            payload = json.loads(req.data.decode("utf-8"))
+            calls.append(payload)
+            if "embeds" in payload:
+                raise FakeHTTPError()
+            class _Resp:
+                status = 200
+                def __enter__(self):
+                    return self
+                def __exit__(self, exc_type, exc, tb):
+                    return False
+            return _Resp()
+
+        with mock.patch("urllib.request.urlopen", side_effect=fake_urlopen):
+            ok, message = discordnotify.post_channel_message(
+                "token",
+                "123",
+                "",
+                embed={"title": "✅ Redémarrage", "fields": [{"name": "Instance", "value": "valheim2"}]},
+            )
+        self.assertTrue(ok)
+        self.assertEqual(message, "sent")
+        self.assertEqual(len(calls), 2)
+        self.assertIn("embeds", calls[0])
+        self.assertEqual(calls[1]["content"], "✅ Redémarrage\nInstance: valheim2")
 
     def test_notify_event_adds_default_action_text_when_no_details(self):
         cfg = {"bot_token": "token", "instance_channels": {"ParkAPouet": "123"}}

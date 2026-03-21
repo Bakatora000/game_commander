@@ -457,9 +457,33 @@ def post_channel_message(
                 return True, "sent"
             return False, f"http {response.status}"
     except urllib.error.HTTPError as exc:
+        if exc.code == 403 and embed is not None:
+            fallback = _embed_to_text(embed)
+            if fallback:
+                return post_channel_message(bot_token, channel_id, fallback, timeout=timeout, embed=None)
         return False, f"http {exc.code}"
     except Exception as exc:
         return False, str(exc)
+
+
+def _embed_to_text(embed: dict | None) -> str:
+    if not embed:
+        return ""
+    parts: list[str] = []
+    title = str(embed.get("title") or "").strip()
+    description = str(embed.get("description") or "").strip()
+    if title:
+        parts.append(title)
+    if description:
+        parts.append(description)
+    for field in embed.get("fields") or []:
+        name = str(field.get("name") or "").strip()
+        value = str(field.get("value") or "").strip()
+        if name and value:
+            parts.append(f"{name}: {value}")
+        elif value:
+            parts.append(value)
+    return "\n".join(parts)[:1900]
 
 
 def notify_event(

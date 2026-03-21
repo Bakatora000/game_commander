@@ -182,8 +182,10 @@ Discord operations note:
 - this is a Discord permission issue on the server/category/channel side, not a Game Commander
   channel mapping issue
 - when `@everyone` is restricted, the `GameCommander` bot role must be added explicitly to
-  the affected categories/channels with at least `View Channels`, `Send Messages`, and
-  `Read Message History`
+  the affected categories/channels with at least `View Channels`, `Send Messages`,
+  `Read Message History`, and `Embed Links`
+- Game Commander posts embeds by default; if Discord refuses embeds with `403`, it now
+  falls back automatically to a plain-text notification
 
 Recent validated fixes:
 - `gcctl` introduced as official CLI entrypoint
