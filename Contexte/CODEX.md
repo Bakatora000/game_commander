@@ -5,7 +5,7 @@ This file provides guidance to Codex when working with code in this repository.
 ## Overview
 
 **Game Commander** is now both:
-- a deployment/operations shell tool (`game_commander.sh`)
+- a deployment/operations Python CLI (`gcctl`)
 - a per-instance Flask web UI
 - and a shared Nginx hub entrypoint at `/commander`
 
@@ -143,7 +143,7 @@ Observed behavior during real validation:
 The normal product flow is no longer “copy a template game JSON and run Flask manually”.
 
 Operationally:
-- instances are deployed through `game_commander.sh`
+- instances are deployed through `gcctl`
 - `runtime/game.json` and `runtime/users.json` are generated per instance
 - repository changes are propagated to an installed instance through `update --instance ...`
 
@@ -154,23 +154,42 @@ lists available instances and links to each instance UI.
 ## Deployment Script
 
 ```bash
-sudo bash game_commander.sh              # interactive menu
-sudo bash game_commander.sh deploy       # guided deploy
-sudo bash game_commander.sh attach       # attach Commander to an existing service
-sudo bash game_commander.sh status       # show all instances
-sudo bash game_commander.sh update --instance testfabric
-sudo bash game_commander.sh uninstall --dry-run
+sudo ./gcctl              # interactive menu
+sudo ./gcctl deploy       # guided deploy
+sudo ./gcctl attach       # attach Commander to an existing service
+sudo ./gcctl status       # show all instances
+sudo ./gcctl update --instance testfabric
+sudo ./gcctl uninstall --dry-run
 ```
 
-`game_commander.sh` is now a thin entrypoint that sources the bash modules under `lib/`
-(`cmd_deploy.sh`, `deploy_helpers.sh`, `deploy_configure.sh`, `deploy_steps.sh`,
-`cmd_uninstall.sh`, `uninstall_gc.sh`, `uninstall_flask.sh`, `uninstall_orphans.sh`,
-`cmd_update.sh`,
-`cmd_status.sh`, `nginx.sh`).
+`gcctl` is now the official CLI entrypoint. `game_commander.sh` remains only as a thin
+legacy shim delegating to `gcctl`.
+
+Migration status note:
+- host operations triggered by the Hub and by `tools/host_cli.py` now use `--repo-root`
+  and invoke `gcctl`, not `game_commander.sh`
+- `shared/hubsync.py` now writes `GC_HUB_REPO_ROOT` into the Hub service environment
+- a temporary compatibility layer for `--main-script` still exists in `tools/host_cli.py`
+  but `game_commander.sh` is no longer on the critical internal path
 
 Nginx management is also split out into `tools/nginx_manager.py`, which maintains a
 manifest and a generated locations file rather than repeatedly editing inline blocks for
 each instance. It also generates the shared static hub page served at `/commander`.
+
+Discord operations note:
+- `Discord : http 403` after an otherwise successful Hub action now typically means the
+  bot still resolves the mapped channel correctly but no longer has permission to post in it
+- this is a Discord permission issue on the server/category/channel side, not a Game Commander
+  channel mapping issue
+- when `@everyone` is restricted, the `GameCommander` bot role must be added explicitly to
+  the affected categories/channels with at least `View Channels`, `Send Messages`, and
+  `Read Message History`
+
+Recent validated fixes:
+- `gcctl` introduced as official CLI entrypoint
+- Hub/host operations migrated from `--main-script` to `--repo-root`
+- Terraria deploy regression fixed: `deploy_step_game_service()` must pass `start_script=...`
+  to `render_terraria_wrapper_script()`
 
 Operational note: deployed instances are copies of the runtime app. Repository fixes do
 not update existing instances automatically. The `update` command is now the supported way

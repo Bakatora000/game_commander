@@ -99,6 +99,51 @@ gc/
   - redéploiement qui recrée un canal à la racine alors qu'une catégorie cible existe
   - suppression de canal qui laisse inutilement une catégorie vide derrière
 
+### [2026-03-21] Migration Python — `gcctl` officiel, `game_commander.sh` sorti du chemin interne
+- `gcctl` est désormais l'entrée CLI officielle du projet.
+- `game_commander.sh` reste présent uniquement comme shim legacy et ne doit plus redevenir
+  le point d'entrée produit recommandé.
+- Les opérations hôte déclenchées par le Hub et `tools/host_cli.py` utilisent maintenant
+  `--repo-root` et invoquent `gcctl` au lieu de relancer `game_commander.sh`.
+- `shared/hubsync.py` écrit désormais `GC_HUB_REPO_ROOT` dans le service Hub.
+- Compatibilité transitoire restante :
+  - `tools/host_cli.py` accepte encore `--main-script` pour ne pas casser d'anciens appels
+  - la suppression finale de cette compatibilité reste à faire
+- Ne pas réintroduire :
+  - dépendance du Hub à `GC_HUB_MAIN_SCRIPT`
+  - relance des opérations hôte via `bash game_commander.sh ...`
+
+### [2026-03-21] Discord — `http 403` après action Hub = permissions Discord, pas mapping
+- Symptôme observé :
+  - `OK [Hub] <instance> start|stop`
+  - puis `Discord : http 403`
+- Interprétation retenue :
+  - l'action système a réussi
+  - le canal Discord ciblé existe toujours et son mapping est correct
+  - l'écriture du bot est refusée par Discord
+- Cause probable validée :
+  - permissions `@everyone` restreintes côté serveur/catégorie/canal
+  - rôle `GameCommander` non ajouté explicitement sur la catégorie ou le salon concerné
+- À retenir :
+  - ce n'est pas un bug Game Commander tant que le mapping de canal est bon
+  - vérifier côté Discord que le rôle du bot a au minimum :
+    - `View Channels`
+    - `Send Messages`
+    - `Read Message History`
+  - si Game Commander doit continuer à gérer catégories/salons :
+    - `Manage Channels`
+
+### [2026-03-21] Terraria — régression déploiement wrapper corrigée
+- Symptôme :
+  - déploiement Hub `terraria` casse avec
+    `TypeError: render_terraria_wrapper_script() got an unexpected keyword argument 'server_dir'`
+- Cause :
+  - `shared/deploysteps.py` appelait `render_terraria_wrapper_script(server_dir=...)`
+  - la fonction attend `start_script=...`
+- Correctif :
+  - passer le chemin réel de `start_server.sh` à `render_terraria_wrapper_script()`
+  - test de non-régression ajouté
+
 ### [2026-03-19] Observation Discord encore à surveiller
 - Une notification Discord fantôme a encore été observée sous la forme :
   - `minecraft-fabric: 19-03-2026 ... - Mise a jour [Hub]`
