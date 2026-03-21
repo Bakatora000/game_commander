@@ -395,6 +395,30 @@ class UpdateHooksTests(unittest.TestCase):
             self.assertFalse(ok)
             self.assertIn("Config d'instance incomplète", message)
 
+    def test_run_post_update_hooks_reuses_deploybackups_installer(self):
+        with tempfile.TemporaryDirectory() as d:
+            cfg = Path(d) / "deploy_config.env"
+            cfg.write_text(
+                'INSTANCE_ID="valheim2"\n'
+                'GAME_ID="valheim"\n'
+                'SYS_USER="vhserver"\n'
+                f'APP_DIR="{d}/app"\n'
+                f'BACKUP_DIR="{d}/backups"\n'
+                f'SERVER_DIR="{d}/server"\n'
+                f'DATA_DIR="{d}/data"\n'
+                'WORLD_NAME="Monde1"\n',
+                encoding="utf-8",
+            )
+            with mock.patch.object(deploybackups, "install_backup_assets", return_value=(True, ["Script de sauvegarde : /tmp/backup_valheim.sh", "Cron déjà configuré"])) as install_backups, \
+                 mock.patch.object(cpuplan, "detect_core_groups", return_value=[]), \
+                 mock.patch.object(updatehooks, "_install_cpu_monitor") as install_monitor, \
+                 mock.patch.object(hostops, "run_command", return_value=(True, "")):
+                ok, messages = updatehooks.run_post_update_hooks(cfg, d)
+            self.assertTrue(ok)
+            install_backups.assert_called_once()
+            self.assertIn("Script de sauvegarde : /tmp/backup_valheim.sh", messages)
+            self.assertIn("Cron déjà configuré", messages)
+
 
 class UninstallCoreTests(unittest.TestCase):
 
