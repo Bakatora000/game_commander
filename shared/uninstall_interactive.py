@@ -65,7 +65,7 @@ def main() -> None:
         r = subprocess.run(
             ["python3", str(script_dir / "tools" / "host_cli.py"),
              "uninstall-instance",
-             "--main-script", str(script_dir / "game_commander.sh"),
+             "--repo-root", str(script_dir),
              "--instance", instance],
             check=False,
         )

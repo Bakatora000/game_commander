@@ -21,7 +21,6 @@ def _write_temp_deploy_config(env: dict[str, str]) -> Path:
 
 def run_deploy_instance(
     *,
-    main_script: str | Path,
     game_id: str,
     instance_id: str,
     sys_user: str,
@@ -35,6 +34,7 @@ def run_deploy_instance(
     server_port: str = "",
     max_players: str = "",
 ) -> tuple[bool, list[str] | str]:
+    repo_root = Path(repo_root).resolve()
     env = deployenv.prepare_managed_instance_env(
         game_id=game_id,
         instance_id=instance_id,
@@ -51,7 +51,7 @@ def run_deploy_instance(
     )
     temp_config = _write_temp_deploy_config(env)
     try:
-        cmd = ["/bin/bash", str(Path(main_script).resolve()), "deploy", "--config", str(temp_config)]
+        cmd = ["/usr/bin/python3", str(repo_root / "gcctl"), "deploy", "--config", str(temp_config)]
         if os.geteuid() != 0:
             cmd.insert(0, "sudo")
         ok, message = hostops.run_command(

@@ -113,7 +113,7 @@ def _run(script_dir: Path, command: str, remaining: list[str], dry_run: bool) ->
         return subprocess.run(
             [exe, str(script_dir / "tools" / "host_cli.py"),
              "bootstrap-hub",
-             "--main-script", str(script_dir / "game_commander.sh"),
+             "--repo-root", str(script_dir),
              *remaining],
         ).returncode
     _help()

@@ -38,23 +38,29 @@ def service_action_cmd(service_name: str, action: str) -> list[str]:
     return ["sudo", "/usr/bin/systemctl", action, service_name]
 
 
-def update_instance_cmd(main_script: str | Path, instance_name: str) -> list[str]:
-    return ["sudo", "/bin/bash", str(main_script), "update", "--instance", instance_name]
-
-
-def redeploy_instance_cmd(main_script: str | Path, config_file: str | Path) -> list[str]:
-    return ["sudo", "/bin/bash", str(main_script), "deploy", "--config", str(config_file)]
-
-
-def uninstall_instance_cmd(main_script: str | Path, instance_name: str) -> list[str]:
+def update_instance_cmd(repo_root: str | Path, instance_name: str) -> list[str]:
     return [
-        "sudo", "/bin/bash", str(main_script),
+        "sudo", "/usr/bin/python3", str(Path(repo_root).resolve() / "gcctl"),
+        "update", "--instance", instance_name,
+    ]
+
+
+def redeploy_instance_cmd(repo_root: str | Path, config_file: str | Path) -> list[str]:
+    return [
+        "sudo", "/usr/bin/python3", str(Path(repo_root).resolve() / "gcctl"),
+        "deploy", "--config", str(config_file),
+    ]
+
+
+def uninstall_instance_cmd(repo_root: str | Path, instance_name: str) -> list[str]:
+    return [
+        "sudo", "/usr/bin/python3", str(Path(repo_root).resolve() / "gcctl"),
         "uninstall", "--instance", instance_name, "--full", "--yes",
     ]
 
 
-def rebalance_cmd(main_script: str | Path, restart: bool = False) -> list[str]:
-    cmd = ["sudo", "/bin/bash", str(main_script), "rebalance"]
+def rebalance_cmd(repo_root: str | Path, restart: bool = False) -> list[str]:
+    cmd = ["sudo", "/usr/bin/python3", str(Path(repo_root).resolve() / "gcctl"), "rebalance"]
     if restart:
         cmd.append("--restart")
     return cmd

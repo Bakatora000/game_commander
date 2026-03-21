@@ -527,18 +527,18 @@ class RedeployCoreTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             cfg = Path(d) / "deploy_config.env"
             cfg.write_text('GAME_ID="valheim"\n', encoding="utf-8")
-            ok, message = redeploycore.run_redeploy(cfg, ROOT_DIR / "game_commander.sh")
+            ok, message = redeploycore.run_redeploy(cfg, ROOT_DIR)
             self.assertFalse(ok)
             self.assertIn("Config de déploiement incomplète", message)
 
 
 class DeployCoreTests(unittest.TestCase):
 
-    def test_run_deploy_instance_writes_temp_config_and_runs_shell_deploy(self):
+    def test_run_deploy_instance_writes_temp_config_and_runs_gcctl(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
-            script = root / "game_commander.sh"
-            script.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+            gcctl_path = root / "gcctl"
+            gcctl_path.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
             captured = {}
 
             def fake_run(cmd, timeout=300):
@@ -550,7 +550,6 @@ class DeployCoreTests(unittest.TestCase):
 
             with mock.patch.object(hostops, "run_command", side_effect=fake_run):
                 ok, result = deploycore.run_deploy_instance(
-                    main_script=script,
                     game_id="minecraft",
                     instance_id="minecraft2",
                     sys_user="vhserver",
@@ -567,7 +566,7 @@ class DeployCoreTests(unittest.TestCase):
 
             self.assertTrue(ok)
             self.assertIn("Déploiement terminé", result[0])
-            self.assertEqual(captured["cmd"][:3], ["/bin/bash", str(script.resolve()), "deploy"])
+            self.assertEqual(captured["cmd"][:4], ["/usr/bin/python3", str(gcctl_path.resolve()), "deploy", "--config"])
             self.assertIn('GAME_ID="minecraft"', captured["cfg_text"])
             self.assertIn('INSTANCE_ID="minecraft2"', captured["cfg_text"])
             self.assertIn('APP_DIR="/home/vhserver/game-commander-minecraft2"', captured["cfg_text"])
@@ -1040,26 +1039,26 @@ class HostOpsTests(unittest.TestCase):
             hostops.service_action_cmd("svc", "reload")
 
     def test_instance_command_builders(self):
-        script = "/home/vhserver/gc/game_commander.sh"
+        repo_root = "/home/vhserver/gc"
         self.assertEqual(
-            hostops.update_instance_cmd(script, "valheim2"),
-            ["sudo", "/bin/bash", script, "update", "--instance", "valheim2"],
+            hostops.update_instance_cmd(repo_root, "valheim2"),
+            ["sudo", "/usr/bin/python3", f"{repo_root}/gcctl", "update", "--instance", "valheim2"],
         )
         self.assertEqual(
-            hostops.redeploy_instance_cmd(script, "/tmp/deploy_config.env"),
-            ["sudo", "/bin/bash", script, "deploy", "--config", "/tmp/deploy_config.env"],
+            hostops.redeploy_instance_cmd(repo_root, "/tmp/deploy_config.env"),
+            ["sudo", "/usr/bin/python3", f"{repo_root}/gcctl", "deploy", "--config", "/tmp/deploy_config.env"],
         )
         self.assertEqual(
-            hostops.uninstall_instance_cmd(script, "valheim2"),
-            ["sudo", "/bin/bash", script, "uninstall", "--instance", "valheim2", "--full", "--yes"],
+            hostops.uninstall_instance_cmd(repo_root, "valheim2"),
+            ["sudo", "/usr/bin/python3", f"{repo_root}/gcctl", "uninstall", "--instance", "valheim2", "--full", "--yes"],
         )
         self.assertEqual(
-            hostops.rebalance_cmd(script, restart=False),
-            ["sudo", "/bin/bash", script, "rebalance"],
+            hostops.rebalance_cmd(repo_root, restart=False),
+            ["sudo", "/usr/bin/python3", f"{repo_root}/gcctl", "rebalance"],
         )
         self.assertEqual(
-            hostops.rebalance_cmd(script, restart=True),
-            ["sudo", "/bin/bash", script, "rebalance", "--restart"],
+            hostops.rebalance_cmd(repo_root, restart=True),
+            ["sudo", "/usr/bin/python3", f"{repo_root}/gcctl", "rebalance", "--restart"],
         )
 
 
@@ -1329,7 +1328,7 @@ class HostCliTests(unittest.TestCase):
              mock.patch.object(cpuplan, "apply_plan", return_value=["CPU valheim2 (valheim) -> 0 4 [poids 200]"]), \
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             from tools import host_cli
-            rc = host_cli.main(["rebalance", "--main-script", str(ROOT_DIR / "game_commander.sh")])
+            rc = host_cli.main(["rebalance", "--repo-root", str(ROOT_DIR)])
             self.assertEqual(rc, 0)
             self.assertIn("Répartition CPU recalculée", stdout.getvalue())
 
@@ -1351,7 +1350,7 @@ class HostCliTests(unittest.TestCase):
                  mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
                 rc = host_cli.main([
                     "update-instance",
-                    "--main-script", str(ROOT_DIR / "game_commander.sh"),
+                    "--repo-root", str(ROOT_DIR),
                     "--instance", "minecraft-fabric",
                     "--skip-hub-sync",
                     "--source", "Hub",
@@ -1360,8 +1359,8 @@ class HostCliTests(unittest.TestCase):
             self.assertFalse(sync_hub.called)
 
     def test_redeploy_instance_recreates_discord_channel_when_enabled(self):
-        cfg = ROOT_DIR / "tmp-redeploy-config.env"
-        try:
+        with tempfile.TemporaryDirectory() as d:
+            cfg = Path(d) / "tmp-redeploy-config.env"
             cfg.write_text(
                 'INSTANCE_ID="satisfactory"\nGAME_ID="satisfactory"\nSYS_USER="vhserver"\n',
                 encoding="utf-8",
@@ -1375,7 +1374,7 @@ class HostCliTests(unittest.TestCase):
                  mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
                 rc = host_cli.main([
                     "redeploy-instance",
-                    "--main-script", str(ROOT_DIR / "game_commander.sh"),
+                    "--repo-root", str(ROOT_DIR),
                     "--config", str(cfg),
                     "--source", "Hub",
                 ])
@@ -1383,10 +1382,6 @@ class HostCliTests(unittest.TestCase):
             self.assertIn("redeploy ok", stdout.getvalue())
             channel_mock.assert_called_once_with("satisfactory", "satisfactory")
             self.assertEqual(notify_mock.call_args.kwargs["details"], "redeploy ok")
-        finally:
-            if cfg.exists():
-                cfg.unlink()
-            self.assertIn("redeploy ok", stdout.getvalue())
 
     def test_service_action_notifies_discord(self):
         from tools import host_cli
@@ -1407,7 +1402,7 @@ class HostCliTests(unittest.TestCase):
              mock.patch("sys.stdout", new_callable=io.StringIO) as stdout:
             rc = host_cli.main([
                 "deploy-instance",
-                "--main-script", str(ROOT_DIR / "game_commander.sh"),
+                "--repo-root", str(ROOT_DIR),
                 "--game-id", "minecraft",
                 "--instance", "minecraft2",
                 "--domain", "gaming.example.com",
@@ -2110,7 +2105,7 @@ class HubHostTests(unittest.TestCase):
         app = Flask(__name__, root_path=str(root))
         app.config["HUB_MANIFEST"] = str(manifest_path)
         app.config["CPU_MONITOR_STATE"] = str(root / "cpu.json")
-        app.config["MAIN_SCRIPT"] = str(root / "game_commander.sh")
+        app.config["REPO_ROOT"] = str(root)
         app.config["HOST_CLI"] = str(root / "host_cli.py")
         app.config["ACTION_LOG_DIR"] = str(root / "action-logs")
         return app
@@ -2140,15 +2135,13 @@ class HubHostTests(unittest.TestCase):
                 ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "service-action", "--service", "valheim-server-valheim2", "--action", "restart"],
             )
 
-    def test_run_instance_update_uses_main_script(self):
+    def test_run_instance_update_uses_repo_root(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d)
             manifest_path = root / "manifest.json"
             manifest_path.write_text(json.dumps({
                 "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
             }), encoding="utf-8")
-            script_path = root / "game_commander.sh"
-            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
             (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
             app = self._make_app(root, manifest_path)
             with app.app_context(), \
@@ -2160,7 +2153,7 @@ class HubHostTests(unittest.TestCase):
             self.assertEqual(card["name"], "valheim2")
             self.assertEqual(
                 run_mock.call_args.args[0],
-                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "update-instance", "--main-script", str(script_path), "--instance", "valheim2"],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "update-instance", "--repo-root", str(root), "--instance", "valheim2", "--skip-hub-sync", "--source", "Hub"],
             )
 
     def test_run_instance_redeploy_uses_saved_config(self):
@@ -2170,8 +2163,6 @@ class HubHostTests(unittest.TestCase):
             manifest_path.write_text(json.dumps({
                 "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
             }), encoding="utf-8")
-            script_path = root / "game_commander.sh"
-            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
             (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
             instance_dir = root / "game-commander-valheim2"
             instance_dir.mkdir()
@@ -2188,7 +2179,7 @@ class HubHostTests(unittest.TestCase):
             self.assertEqual(card["name"], "valheim2")
             self.assertEqual(
                 run_mock.call_args.args[0],
-                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "redeploy-instance", "--main-script", str(script_path), "--config", str(config_path)],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "redeploy-instance", "--repo-root", str(root), "--config", str(config_path), "--source", "Hub"],
             )
 
     def test_run_instance_deploy_uses_host_cli(self):
@@ -2196,8 +2187,6 @@ class HubHostTests(unittest.TestCase):
             root = Path(d)
             manifest_path = root / "manifest.json"
             manifest_path.write_text(json.dumps({"instances": []}), encoding="utf-8")
-            script_path = root / "game_commander.sh"
-            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
             (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
             app = self._make_app(root, manifest_path)
             with app.app_context(), \
@@ -2218,7 +2207,7 @@ class HubHostTests(unittest.TestCase):
                 run_mock.call_args.args[0],
                 [
                     "sudo", "/usr/bin/python3", str(root / "host_cli.py"), "deploy-instance",
-                    "--main-script", str(script_path),
+                    "--repo-root", str(root),
                     "--game-id", "minecraft",
                     "--instance", "minecraft2",
                     "--domain", "gaming.example.com",
@@ -2235,8 +2224,6 @@ class HubHostTests(unittest.TestCase):
             manifest_path.write_text(json.dumps({
                 "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
             }), encoding="utf-8")
-            script_path = root / "game_commander.sh"
-            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
             (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
             app = self._make_app(root, manifest_path)
             with app.app_context(), \
@@ -2251,7 +2238,7 @@ class HubHostTests(unittest.TestCase):
             self.assertEqual(payload["instances"], [])
             self.assertEqual(
                 run_mock.call_args.args[0],
-                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--main-script", str(script_path), "--instance", "valheim2", "--game-id", "valheim", "--source", "Hub"],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--repo-root", str(root), "--instance", "valheim2", "--game-id", "valheim", "--source", "Hub"],
             )
 
     def test_run_instance_uninstall_refuses_when_players_connected(self):
@@ -2261,8 +2248,6 @@ class HubHostTests(unittest.TestCase):
             manifest_path.write_text(json.dumps({
                 "instances": [{"name": "terraria", "prefix": "/terraria", "flask_port": 5007, "game": "terraria"}]
             }), encoding="utf-8")
-            script_path = root / "game_commander.sh"
-            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
             (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
             app = self._make_app(root, manifest_path)
             with app.app_context(), \
@@ -2310,7 +2295,7 @@ class HubHostTests(unittest.TestCase):
             )
             self.assertEqual(
                 run_mock.call_args_list[1].args[0],
-                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--main-script", str(script_path), "--instance", "terraria", "--game-id", "terraria", "--source", "Hub"],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--repo-root", str(root), "--instance", "terraria", "--game-id", "terraria", "--source", "Hub"],
             )
 
     def test_run_instance_uninstall_deletes_discord_channel_when_requested(self):
@@ -2320,8 +2305,6 @@ class HubHostTests(unittest.TestCase):
             manifest_path.write_text(json.dumps({
                 "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
             }), encoding="utf-8")
-            script_path = root / "game_commander.sh"
-            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
             (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
             app = self._make_app(root, manifest_path)
             with app.app_context(), \
@@ -2339,7 +2322,7 @@ class HubHostTests(unittest.TestCase):
             delete_mock.assert_called_once_with("valheim2")
             self.assertEqual(
                 run_mock.call_args.args[0],
-                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--main-script", str(script_path), "--instance", "valheim2", "--game-id", "valheim", "--source", "Hub"],
+                ["sudo", "/usr/bin/python3", str(root / "host_cli.py"), "uninstall-instance", "--repo-root", str(root), "--instance", "valheim2", "--game-id", "valheim", "--source", "Hub"],
             )
 
     def test_run_instance_uninstall_reports_discord_delete_failure_after_successful_uninstall(self):
@@ -2349,8 +2332,6 @@ class HubHostTests(unittest.TestCase):
             manifest_path.write_text(json.dumps({
                 "instances": [{"name": "valheim2", "prefix": "/valheim2", "flask_port": 5002, "game": "valheim"}]
             }), encoding="utf-8")
-            script_path = root / "game_commander.sh"
-            script_path.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
             (root / "host_cli.py").write_text("#!/usr/bin/env python3\n", encoding="utf-8")
             app = self._make_app(root, manifest_path)
             with app.app_context(), \

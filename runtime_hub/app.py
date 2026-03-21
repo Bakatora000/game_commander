@@ -32,7 +32,7 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["HUB_MANIFEST"] = os.environ.get("GC_HUB_MANIFEST", "/etc/nginx/game-commander-manifest.json")
 app.config["CPU_MONITOR_STATE"] = os.environ.get("GC_HUB_CPU_MONITOR_STATE", "/var/lib/game-commander/cpu-monitor.json")
-app.config["MAIN_SCRIPT"] = os.environ.get("GC_HUB_MAIN_SCRIPT", "/home/vhserver/gc/game_commander.sh")
+app.config["REPO_ROOT"] = os.environ.get("GC_HUB_REPO_ROOT", "/home/vhserver/gc")
 app.config["HOST_CLI"] = os.environ.get("GC_HUB_HOST_CLI", "/home/vhserver/gc/tools/host_cli.py")
 app.config["ACTION_LOG_DIR"] = os.environ.get("GC_HUB_ACTION_LOG_DIR", str(Path(app.root_path) / "action-logs"))
 

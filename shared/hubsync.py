@@ -111,7 +111,7 @@ def _write_hub_service(repo_root: Path, hub_app_dir: Path, sys_user: str) -> Non
         f'Environment="GC_HUB_PORT={GC_HUB_PORT}"\n'
         f'Environment="GC_HUB_MANIFEST={GC_NGINX_MANIFEST}"\n'
         f'Environment="GC_HUB_CPU_MONITOR_STATE={GC_CPU_MONITOR_STATE}"\n'
-        f'Environment="GC_HUB_MAIN_SCRIPT={repo_root / "game_commander.sh"}"\n'
+        f'Environment="GC_HUB_REPO_ROOT={repo_root}"\n'
         f'Environment="GC_HUB_HOST_CLI={repo_root / "tools" / "host_cli.py"}"\n'
         f"ExecStart=/usr/bin/python3 {hub_app_dir / 'app.py'}\n"
         "Restart=on-failure\n"
@@ -130,12 +130,12 @@ def _write_hub_sudoers(repo_root: Path, sys_user: str) -> None:
     sudoers_file.write_text(
         "# Game Commander — Hub actions\n"
         f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} service-action --service * --action *\n"
-        f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} update-instance --main-script * --instance *\n"
-        f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} deploy-instance --main-script * --game-id * --instance * --domain * --admin-login * --admin-password * --sys-user *\n"
-        f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} redeploy-instance --main-script * --config *\n"
-        f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} uninstall-instance --main-script * --instance *\n"
-        f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} rebalance --main-script *\n"
-        f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} rebalance --main-script * --restart\n",
+        f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} update-instance --repo-root * --instance *\n"
+        f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} deploy-instance --repo-root * --game-id * --instance * --domain * --admin-login * --admin-password * --sys-user *\n"
+        f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} redeploy-instance --repo-root * --config *\n"
+        f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} uninstall-instance --repo-root * --instance *\n"
+        f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} rebalance --repo-root *\n"
+        f"{sys_user} ALL=(ALL) NOPASSWD: /usr/bin/python3 {host_cli} rebalance --repo-root * --restart\n",
         encoding="utf-8",
     )
     sudoers_file.chmod(0o440)

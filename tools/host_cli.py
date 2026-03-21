@@ -22,6 +22,16 @@ def _existing_path(value: str) -> Path:
     return path
 
 
+def _repo_root_from_args(args: argparse.Namespace) -> Path:
+    repo_root = getattr(args, "repo_root", None)
+    if repo_root:
+        return Path(repo_root).resolve()
+    main_script = getattr(args, "main_script", None)
+    if main_script:
+        return Path(main_script).resolve().parent
+    raise ValueError("repo_root or main_script required")
+
+
 def cmd_service_action(args: argparse.Namespace) -> int:
     ok, message = hostops.run_command(
         hostops.service_action_cmd(args.service, args.action),
@@ -46,14 +56,15 @@ def cmd_update_instance(args: argparse.Namespace) -> int:
         return 1
     env = hostctl.parse_env_file(config_file)
     game_id = env.get("GAME_ID", "")
-    ok, result = updatecore.run_core_update(config_file, Path(args.main_script).resolve().parent)
+    repo_root = _repo_root_from_args(args)
+    ok, result = updatecore.run_core_update(config_file, repo_root)
     if not ok:
         _print_discord_status(_notify('update', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_compact_discord_details('update', False, result)))
         print(result, file=sys.stderr)
         return 1
     for line in result:
         print(line)
-    ok, hooks = updatehooks.run_post_update_hooks(config_file, Path(args.main_script).resolve().parent)
+    ok, hooks = updatehooks.run_post_update_hooks(config_file, repo_root)
     if not ok:
         _print_discord_status(_notify('update', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_compact_discord_details('update', False, hooks)))
         print(hooks, file=sys.stderr)
@@ -61,7 +72,7 @@ def cmd_update_instance(args: argparse.Namespace) -> int:
     for line in hooks:
         print(line)
     if not args.skip_hub_sync:
-        ok, hub = hubsync.sync_hub_service(config_file, Path(args.main_script).resolve().parent)
+        ok, hub = hubsync.sync_hub_service(config_file, repo_root)
         if not ok:
             _print_discord_status(_notify('update', False, instance_id=args.instance, game_id=game_id, source=args.source, details=_compact_discord_details('update', False, hub)))
             print(hub, file=sys.stderr)
@@ -76,7 +87,7 @@ def cmd_redeploy_instance(args: argparse.Namespace) -> int:
     env = hostctl.parse_env_file(args.config)
     instance_id = env.get("INSTANCE_ID", "")
     game_id = env.get("GAME_ID", "")
-    ok, result = redeploycore.run_redeploy(args.config, args.main_script)
+    ok, result = redeploycore.run_redeploy(args.config, _repo_root_from_args(args))
     if not ok:
         _print_discord_status(_notify('redeploy', False, instance_id=instance_id, game_id=game_id, source=args.source, details=_compact_discord_details('redeploy', False, result)))
         print(result, file=sys.stderr)
@@ -95,8 +106,8 @@ def cmd_redeploy_instance(args: argparse.Namespace) -> int:
     return 0
 
 
-def _default_sys_user(main_script: Path) -> str:
-    return pwd.getpwuid(main_script.stat().st_uid).pw_name
+def _default_sys_user(repo_root: Path) -> str:
+    return pwd.getpwuid(repo_root.stat().st_uid).pw_name
 
 
 def _default_domain() -> str:
@@ -182,12 +193,11 @@ def _notify(event: str, ok: bool, *, instance_id: str = "", game_id: str = "", s
 
 
 def cmd_deploy_instance(args: argparse.Namespace) -> int:
-    main_script = Path(args.main_script).resolve()
+    repo_root = _repo_root_from_args(args)
     ok, result = deploycore.run_deploy_instance(
-        main_script=main_script,
         game_id=args.game_id,
-        sys_user=args.sys_user or _default_sys_user(main_script),
-        repo_root=main_script.parent,
+        sys_user=args.sys_user or _default_sys_user(repo_root),
+        repo_root=repo_root,
         domain=args.domain,
         instance_id=args.instance,
         url_prefix=args.url_prefix,
@@ -210,7 +220,7 @@ def cmd_deploy_instance(args: argparse.Namespace) -> int:
 
 def cmd_uninstall_instance(args: argparse.Namespace) -> int:
     config_file = hostctl.resolve_instance_config(args.instance)
-    repo_root = Path(args.main_script).resolve().parent
+    repo_root = _repo_root_from_args(args)
     if config_file:
         env = hostctl.parse_env_file(config_file)
         game_id = env.get("GAME_ID", args.game_id)
@@ -253,9 +263,10 @@ def cmd_rebalance(args: argparse.Namespace) -> int:
 
 
 def cmd_bootstrap_hub(args: argparse.Namespace) -> int:
+    repo_root = _repo_root_from_args(args)
     ok, result = bootstraphub.run_bootstrap_hub(
-        repo_root=Path(args.main_script).resolve().parent,
-        sys_user=args.sys_user or _default_sys_user(Path(args.main_script).resolve()),
+        repo_root=repo_root,
+        sys_user=args.sys_user or _default_sys_user(repo_root),
         domain=args.domain or _default_domain(),
         admin_login=args.admin_login or "admin",
         admin_password=args.admin_password,
@@ -321,20 +332,23 @@ def build_parser() -> argparse.ArgumentParser:
     service.set_defaults(func=cmd_service_action)
 
     update = sub.add_parser("update-instance")
-    update.add_argument("--main-script", required=True, type=_existing_path)
+    update.add_argument("--repo-root", type=_existing_path)
+    update.add_argument("--main-script", type=_existing_path)
     update.add_argument("--instance", required=True)
     update.add_argument("--skip-hub-sync", action="store_true")
     update.add_argument("--source", default="")
     update.set_defaults(func=cmd_update_instance)
 
     redeploy = sub.add_parser("redeploy-instance")
-    redeploy.add_argument("--main-script", required=True, type=_existing_path)
+    redeploy.add_argument("--repo-root", type=_existing_path)
+    redeploy.add_argument("--main-script", type=_existing_path)
     redeploy.add_argument("--config", required=True, type=_existing_path)
     redeploy.add_argument("--source", default="")
     redeploy.set_defaults(func=cmd_redeploy_instance)
 
     deploy = sub.add_parser("deploy-instance")
-    deploy.add_argument("--main-script", required=True, type=_existing_path)
+    deploy.add_argument("--repo-root", type=_existing_path)
+    deploy.add_argument("--main-script", type=_existing_path)
     deploy.add_argument("--game-id", required=True)
     deploy.add_argument("--instance", required=True)
     deploy.add_argument("--domain", required=True)
@@ -350,20 +364,23 @@ def build_parser() -> argparse.ArgumentParser:
     deploy.set_defaults(func=cmd_deploy_instance)
 
     uninstall = sub.add_parser("uninstall-instance")
-    uninstall.add_argument("--main-script", required=True, type=_existing_path)
+    uninstall.add_argument("--repo-root", type=_existing_path)
+    uninstall.add_argument("--main-script", type=_existing_path)
     uninstall.add_argument("--instance", required=True)
     uninstall.add_argument("--game-id", default="")
     uninstall.add_argument("--source", default="")
     uninstall.set_defaults(func=cmd_uninstall_instance)
 
     rebalance = sub.add_parser("rebalance")
-    rebalance.add_argument("--main-script", required=True, type=_existing_path)
+    rebalance.add_argument("--repo-root", type=_existing_path)
+    rebalance.add_argument("--main-script", type=_existing_path)
     rebalance.add_argument("--restart", action="store_true")
     rebalance.add_argument("--source", default="")
     rebalance.set_defaults(func=cmd_rebalance)
 
     bootstrap = sub.add_parser("bootstrap-hub")
-    bootstrap.add_argument("--main-script", required=True, type=_existing_path)
+    bootstrap.add_argument("--repo-root", type=_existing_path)
+    bootstrap.add_argument("--main-script", type=_existing_path)
     bootstrap.add_argument("--sys-user", default="")
     bootstrap.add_argument("--domain", default="")
     bootstrap.add_argument("--admin-login", default="admin")
@@ -400,6 +417,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if hasattr(args, "root") and not args.root:
         args.root = list(hostctl.DEFAULT_SEARCH_ROOTS)
+    if hasattr(args, "repo_root") or hasattr(args, "main_script"):
+        if not getattr(args, "repo_root", None) and not getattr(args, "main_script", None):
+            parser.error("one of --repo-root or --main-script is required")
     return args.func(args)
 
 

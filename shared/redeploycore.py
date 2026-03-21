@@ -7,8 +7,9 @@ from pathlib import Path
 from . import deployenv, hostops
 
 
-def run_redeploy(config_file: str | Path, main_script: str | Path) -> tuple[bool, list[str] | str]:
+def run_redeploy(config_file: str | Path, repo_root: str | Path) -> tuple[bool, list[str] | str]:
     cfg = Path(config_file).resolve()
+    repo_root = Path(repo_root).resolve()
     if not cfg.is_file():
         return False, f"Fichier de config introuvable : {cfg}"
 
@@ -18,7 +19,7 @@ def run_redeploy(config_file: str | Path, main_script: str | Path) -> tuple[bool
         return False, f"Config de déploiement incomplète : {', '.join(missing)}"
 
     ok, message = hostops.run_command(
-        hostops.redeploy_instance_cmd(main_script, cfg),
+        hostops.redeploy_instance_cmd(repo_root, cfg),
         timeout=1200,
     )
     if not ok:

@@ -197,7 +197,7 @@ def main() -> None:
         cmd = [
             "python3", str(script_dir / "tools" / "host_cli.py"),
             "update-instance",
-            "--main-script", str(script_dir / "game_commander.sh"),
+            "--repo-root", str(script_dir),
             "--instance", instance_id,
         ]
         if batch:

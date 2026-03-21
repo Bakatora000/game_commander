@@ -17,8 +17,8 @@ import bcrypt
 import requests
 from flask import current_app
 
-MAIN_SCRIPT_ENV = os.environ.get("GC_HUB_MAIN_SCRIPT", "/home/vhserver/gc/game_commander.sh")
-ROOT_DIR = Path(MAIN_SCRIPT_ENV).resolve().parent
+REPO_ROOT_ENV = os.environ.get("GC_HUB_REPO_ROOT", "/home/vhserver/gc")
+ROOT_DIR = Path(REPO_ROOT_ENV).resolve()
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
@@ -33,8 +33,8 @@ def _cpu_monitor_path() -> Path:
     return Path(current_app.config["CPU_MONITOR_STATE"])
 
 
-def _main_script_path() -> Path:
-    return Path(current_app.config["MAIN_SCRIPT"])
+def _repo_root_path() -> Path:
+    return Path(current_app.config["REPO_ROOT"])
 
 
 def _host_cli_path() -> Path:
@@ -172,7 +172,7 @@ def _instance_game_json(instance_name: str) -> Path:
 
 
 def _default_sys_user() -> str:
-    return pwd.getpwuid(_main_script_path().stat().st_uid).pw_name
+    return pwd.getpwuid(_repo_root_path().stat().st_uid).pw_name
 
 
 def _build_instance_card(inst: dict, cpu_monitor: dict, alerts_by_instance: dict, cpu_instances: dict) -> dict:
@@ -290,14 +290,14 @@ def run_instance_update(instance_name: str) -> tuple[bool, str, dict | None]:
     instance = _instance_entry(instance_name)
     if not instance:
         return False, "Instance introuvable", None
-    script_path = _main_script_path()
-    if not script_path.is_file():
-        return False, "Script principal introuvable", None
+    repo_root = _repo_root_path()
+    if not repo_root.is_dir():
+        return False, "Dépôt Game Commander introuvable", None
     host_cli = _host_cli_path()
     if not host_cli.is_file():
         return False, "CLI hôte introuvable", None
     ok, message = hostops.run_command(
-        ["sudo", "/usr/bin/python3", str(host_cli), "update-instance", "--main-script", str(script_path), "--instance", instance_name, "--skip-hub-sync", "--source", "Hub"],
+        ["sudo", "/usr/bin/python3", str(host_cli), "update-instance", "--repo-root", str(repo_root), "--instance", instance_name, "--skip-hub-sync", "--source", "Hub"],
         timeout=900,
     )
     _append_action_log(instance_name, "update", ok, message or f"Instance {instance_name} mise à jour")
@@ -312,9 +312,9 @@ def run_instance_redeploy(instance_name: str) -> tuple[bool, str, dict | None]:
     instance = _instance_entry(instance_name)
     if not instance:
         return False, "Instance introuvable", None
-    script_path = _main_script_path()
-    if not script_path.is_file():
-        return False, "Script principal introuvable", None
+    repo_root = _repo_root_path()
+    if not repo_root.is_dir():
+        return False, "Dépôt Game Commander introuvable", None
     host_cli = _host_cli_path()
     if not host_cli.is_file():
         return False, "CLI hôte introuvable", None
@@ -322,7 +322,7 @@ def run_instance_redeploy(instance_name: str) -> tuple[bool, str, dict | None]:
     if not config_file.is_file():
         return False, "deploy_config.env introuvable pour cette instance", None
     ok, message = hostops.run_command(
-        ["sudo", "/usr/bin/python3", str(host_cli), "redeploy-instance", "--main-script", str(script_path), "--config", str(config_file), "--source", "Hub"],
+        ["sudo", "/usr/bin/python3", str(host_cli), "redeploy-instance", "--repo-root", str(repo_root), "--config", str(config_file), "--source", "Hub"],
         timeout=1200,
     )
     _append_action_log(instance_name, "redeploy", ok, message or f"Instance {instance_name} redéployée")
@@ -337,9 +337,9 @@ def run_instance_uninstall(instance_name: str, *, delete_discord_channel_request
     instance = _instance_entry(instance_name)
     if not instance:
         return False, "Instance introuvable", get_hub_payload()
-    script_path = _main_script_path()
-    if not script_path.is_file():
-        return False, "Script principal introuvable", get_hub_payload()
+    repo_root = _repo_root_path()
+    if not repo_root.is_dir():
+        return False, "Dépôt Game Commander introuvable", get_hub_payload()
     host_cli = _host_cli_path()
     if not host_cli.is_file():
         return False, "CLI hôte introuvable", get_hub_payload()
@@ -378,7 +378,7 @@ def run_instance_uninstall(instance_name: str, *, delete_discord_channel_request
         details.append("Serveur arrêté, désinstallation en cours")
     game_label = (instance.get("game") or "").strip()
     game_id = next((gid for gid, meta in instanceenv.GAME_META.items() if meta.get("label") == game_label), "")
-    cmd = ["sudo", "/usr/bin/python3", str(host_cli), "uninstall-instance", "--main-script", str(script_path), "--instance", instance_name, "--source", "Hub"]
+    cmd = ["sudo", "/usr/bin/python3", str(host_cli), "uninstall-instance", "--repo-root", str(repo_root), "--instance", instance_name, "--source", "Hub"]
     if game_id:
         cmd.extend(["--game-id", game_id])
     ok, message = hostops.run_command(
@@ -424,15 +424,15 @@ def run_instance_deploy(data: dict) -> tuple[bool, str, dict]:
         for item in _load_manifest().get("instances", []):
             if (item.get("prefix") or "").strip() == normalized_prefix:
                 return False, "Ce chemin web Commander est déjà utilisé", get_hub_payload()
-    script_path = _main_script_path()
-    if not script_path.is_file():
-        return False, "Script principal introuvable", get_hub_payload()
+    repo_root = _repo_root_path()
+    if not repo_root.is_dir():
+        return False, "Dépôt Game Commander introuvable", get_hub_payload()
     host_cli = _host_cli_path()
     if not host_cli.is_file():
         return False, "CLI hôte introuvable", get_hub_payload()
     cmd = [
         "sudo", "/usr/bin/python3", str(host_cli), "deploy-instance",
-        "--main-script", str(script_path),
+        "--repo-root", str(repo_root),
         "--game-id", game_id,
         "--instance", instance_name,
         "--domain", domain,
@@ -768,13 +768,13 @@ def remove_discord_permission(instance_name: str, target_id: str) -> tuple[bool,
 
 
 def run_rebalance(restart: bool = False) -> tuple[bool, str, dict]:
-    script_path = _main_script_path()
-    if not script_path.is_file():
-        return False, "Script principal introuvable", get_hub_payload()
+    repo_root = _repo_root_path()
+    if not repo_root.is_dir():
+        return False, "Dépôt Game Commander introuvable", get_hub_payload()
     host_cli = _host_cli_path()
     if not host_cli.is_file():
         return False, "CLI hôte introuvable", get_hub_payload()
-    cmd = ["sudo", "/usr/bin/python3", str(host_cli), "rebalance", "--main-script", str(script_path), "--source", "Hub"]
+    cmd = ["sudo", "/usr/bin/python3", str(host_cli), "rebalance", "--repo-root", str(repo_root), "--source", "Hub"]
     if restart:
         cmd.append("--restart")
     ok, message = hostops.run_command(cmd, timeout=900)
