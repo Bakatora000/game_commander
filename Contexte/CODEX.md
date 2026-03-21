@@ -42,6 +42,19 @@ Discord channel creation (on deploy and from Hub): `find_or_create_game_category
 the guild channels for an existing category named after the game (`valheim`, `enshrouded`,
 `terraria`…), creates it if absent, then creates the instance text channel inside it.
 `send_test_message()` always prefixes `[TEST]` to distinguish test messages from real ones.
+Category normalization rule:
+- `minecraft`, `minecraftjava`, `minecraft-java`, `minecraftfabric`, `minecraft-fabric`
+  must all use the single Discord category `minecraft`
+- `terraria`, `terrariatshock`, `terraria-tshock` must all use the single Discord category
+  `terraria`
+Operational rule:
+- if an instance channel is deleted manually on Discord but its ID remains in
+  `/etc/game-commander/discord.json`, the Hub now purges the stale mapping automatically
+  when loading the Discord status panel
+- if an existing text channel is reused for an instance and the target game category exists
+  (or is created), the channel must be moved into that category rather than left at guild root
+- deleting an instance channel through Game Commander must also delete its parent category if
+  that category becomes empty
 
 Hub Discord panel (`/commander` → Discord tab):
 - configures guild_id and category_id (fallback) from the UI

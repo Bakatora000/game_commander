@@ -76,6 +76,29 @@ gc/
 
 ## Bugs résolus — NE PAS RÉINTRODUIRE
 
+### [2026-03-20] Discord — règles de catégories et mappings orphelins stabilisés
+- Les canaux Discord d'instance ne doivent plus créer une catégorie séparée pour chaque
+  variante de jeu quand elles appartiennent au même univers produit.
+- Règles retenues :
+  - `minecraft`, `minecraftjava`, `minecraft-java`, `minecraftfabric`,
+    `minecraft-fabric` => catégorie unique `minecraft`
+  - `terraria`, `terrariatshock`, `terraria-tshock` => catégorie unique `terraria`
+- Comportement à conserver :
+  - au déploiement/redéploiement, on cherche d'abord la vraie catégorie cible du jeu ;
+    si elle n'existe pas, on la crée ; puis le canal de l'instance est créé dedans
+  - si un canal d'instance homonyme existe déjà, il est réutilisé puis déplacé dans la
+    bonne catégorie au lieu de rester à la racine du serveur Discord
+  - si un `channel_id` reste dans `discord.json` alors que le canal a été supprimé à la
+    main sur Discord, le Hub purge automatiquement ce mapping orphelin au chargement
+    de l'onglet Discord
+  - lors d'une suppression via Game Commander, si la catégorie du canal devient vide,
+    cette catégorie doit être supprimée aussi
+- Ne pas réintroduire :
+  - création de catégories `minecraft-java`, `minecraft-fabric`, `terraria-tshock`
+  - affichage Hub d'un canal associé alors que l'ID Discord ne répond plus
+  - redéploiement qui recrée un canal à la racine alors qu'une catégorie cible existe
+  - suppression de canal qui laisse inutilement une catégorie vide derrière
+
 ### [2026-03-19] Observation Discord encore à surveiller
 - Une notification Discord fantôme a encore été observée sous la forme :
   - `minecraft-fabric: 19-03-2026 ... - Mise a jour [Hub]`
