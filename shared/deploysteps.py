@@ -888,7 +888,7 @@ def deploy_step_validation(cfg: DeployConfig, script_dir: Path) -> None:
         print(f"    sudo journalctl -u {cfg.gc_service} -f")
     print()
     print("  \033[1mRedéploiement rapide :\033[0m")
-    print(f"    sudo bash game_commander.sh deploy --config {cfg.config_save}")
+    print(f"    sudo ./gcctl deploy --config {cfg.config_save}")
     print()
     print("  \033[1mPorts à ouvrir (firewall) :\033[0m")
     _print_firewall_info(cfg)

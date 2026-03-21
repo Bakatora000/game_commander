@@ -30,7 +30,7 @@ COMMANDS = ("deploy", "attach", "uninstall", "status", "update", "rebalance", "b
 
 def _help() -> None:
     print("""
-  game_commander.sh — Déploiement et gestion des instances Game Commander
+  gcctl — Déploiement et gestion des instances Game Commander
 
   COMMANDES :
     deploy                   Nouvelle instance complète gérée par Game Commander
@@ -59,15 +59,18 @@ def _help() -> None:
     [0] quit       Quitter
 
   EXEMPLES :
-    sudo bash game_commander.sh
-    sudo bash game_commander.sh deploy
-    sudo bash game_commander.sh attach
-    sudo bash game_commander.sh deploy --config env/deploy_config.env
-    sudo bash game_commander.sh uninstall
-    sudo bash game_commander.sh status
-    sudo bash game_commander.sh update --instance testfabric
-    sudo bash game_commander.sh rebalance --restart
-    sudo bash game_commander.sh bootstrap-hub --domain gaming.example.com --admin-password '...'
+    sudo ./gcctl
+    sudo ./gcctl deploy
+    sudo ./gcctl attach
+    sudo ./gcctl deploy --config env/deploy_config.env
+    sudo ./gcctl uninstall
+    sudo ./gcctl status
+    sudo ./gcctl update --instance testfabric
+    sudo ./gcctl rebalance --restart
+    sudo ./gcctl bootstrap-hub --domain gaming.example.com --admin-password '...'
+
+  COMPATIBILITÉ :
+    game_commander.sh reste disponible temporairement comme shim legacy.
 """)
 
 
@@ -119,7 +122,7 @@ def _run(script_dir: Path, command: str, remaining: list[str], dry_run: bool) ->
 
 def _interactive_menu(script_dir: Path) -> None:
     if os.geteuid() != 0:
-        console.die("Lancez en root : sudo bash game_commander.sh")
+        console.die("Lancez en root : sudo ./gcctl")
 
     menu = [
         ("0", "quit",       "Quitter"),
@@ -160,14 +163,14 @@ def _interactive_menu(script_dir: Path) -> None:
         _run(script_dir, command, [], False)
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--script-dir", required=True)
     parser.add_argument("--help", "-h", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("command", nargs="?", default="")
     parser.add_argument("remaining", nargs=argparse.REMAINDER)
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     if args.help:
         _help()
@@ -180,7 +183,7 @@ def main() -> int:
 
     command = args.command
     # If the first "remaining" arg looks like a known flag, keep it
-    # (e.g. game_commander.sh deploy --config FILE → command=deploy, remaining=[--config, FILE])
+    # (e.g. gcctl deploy --config FILE → command=deploy, remaining=[--config, FILE])
 
     if not command:
         _interactive_menu(script_dir)

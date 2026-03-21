@@ -36,7 +36,7 @@ def render_saved_config(env: dict[str, str], config_path: str | Path) -> str:
     config_path = Path(config_path)
     lines = [
         f"# Game Commander — Config sauvegardée le {datetime.now():%Y-%m-%d %H:%M:%S}",
-        f"# Redéploiement : sudo bash game_commander.sh deploy --config {config_path}",
+        f"# Redéploiement : sudo ./gcctl deploy --config {config_path}",
         "",
         f'GAME_ID="{env.get("GAME_ID", "")}"',
         f'DEPLOY_MODE="{env.get("DEPLOY_MODE", "managed")}"',
@@ -158,7 +158,7 @@ def validation_report(env: dict[str, str], config_path: str | Path) -> tuple[int
     summary = "\n".join(
         [
             f"Accès : {access_url}",
-            f"Redéploiement : sudo bash game_commander.sh deploy --config {Path(config_path)}",
+            f"Redéploiement : sudo ./gcctl deploy --config {Path(config_path)}",
         ]
     )
     return errors, lines, summary

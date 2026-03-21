@@ -150,7 +150,7 @@ def main() -> None:
     hub_only: bool   = args.hub_only
 
     if os.geteuid() != 0:
-        console.die("Lancez en root : sudo bash game_commander.sh update")
+        console.die("Lancez en root : sudo ./gcctl update")
 
     console.hdr("Mise à jour des instances Game Commander")
 

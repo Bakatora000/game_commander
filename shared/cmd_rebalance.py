@@ -25,7 +25,7 @@ def main() -> None:
     args = parser.parse_args()
 
     if os.geteuid() != 0:
-        console.die("Lancez en root : sudo bash game_commander.sh rebalance")
+        console.die("Lancez en root : sudo ./gcctl rebalance")
 
     console.hdr("Répartition CPU")
     console.info("Calcul de l'affinité par cœur physique")

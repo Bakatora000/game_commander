@@ -38,8 +38,8 @@ test_python_tools() {
 test_entrypoint_is_thin() {
     local file="$ROOT_DIR/game_commander.sh"
 
-    # Must delegate to Python
-    grep -q 'shared/cmd_main.py' "$file" || return 1
+    # Must delegate to the Python CLI, directly or through the gcctl shim
+    grep -qE 'shared/cmd_main.py|gcctl' "$file" || return 1
 
     # Must not source any lib/ bash modules
     if grep -q 'source.*lib/' "$file"; then
@@ -47,6 +47,17 @@ test_entrypoint_is_thin() {
     fi
 
     # Must not contain any system commands directly
+    if grep -qE 'apt-get|steamcmd|systemctl reload nginx|certbot|journalctl -u' "$file"; then
+        return 1
+    fi
+}
+
+test_gcctl_entrypoint_is_thin() {
+    local file="$ROOT_DIR/gcctl"
+
+    grep -q 'from shared import cmd_main' "$file" || return 1
+    grep -q 'cmd_main.main' "$file" || return 1
+
     if grep -qE 'apt-get|steamcmd|systemctl reload nginx|certbot|journalctl -u' "$file"; then
         return 1
     fi
@@ -233,6 +244,7 @@ PYEOF
 main() {
     run_test "Python tool tests" test_python_tools
     run_test "Thin game_commander.sh entrypoint" test_entrypoint_is_thin
+    run_test "Thin gcctl entrypoint" test_gcctl_entrypoint_is_thin
     run_test "Deploy delegates to modular steps" test_deploy_uses_nginx_module
     run_test "Deploy helper and step modules present" test_deploy_modules_present
     run_test "Attach mode is wired through deploy and update" test_attach_mode_present

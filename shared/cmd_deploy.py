@@ -37,7 +37,7 @@ def _print_banner(cfg: DeployConfig) -> None:
     if cfg.config_mode:
         console.info(f"Mode : FICHIER DE CONFIG ({cfg.config_file_deploy})")
     if os.geteuid() != 0:
-        console.die(f"Lancez en root : sudo bash game_commander.sh deploy")
+        console.die("Lancez en root : sudo ./gcctl deploy")
     console.ok("Droits root confirmés")
 
 
@@ -66,7 +66,7 @@ def main() -> None:
             console.die(err_t)
         print(f"\033[0;32m  ✓  Modèle généré : {outfile}\033[0m")
         print(f"\033[0;36m  →  Éditez puis lancez :\033[0m")
-        print(f"      sudo bash game_commander.sh deploy --config {outfile}")
+        print(f"      sudo ./gcctl deploy --config {outfile}")
         return
 
     # ── Build initial config ──────────────────────────────────────────────────

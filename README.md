@@ -78,17 +78,17 @@ Le Hub Admin est ensuite accessible à `https://gaming.example.com/commander`.
 Alternative une fois le dépôt présent localement :
 
 ```bash
-sudo bash game_commander.sh bootstrap-hub --domain gaming.example.com
+sudo ./gcctl bootstrap-hub --domain gaming.example.com
 ```
 
 ### Déployer une instance de jeu
 
 ```bash
 # Interactif (guidé)
-sudo bash game_commander.sh deploy
+sudo ./gcctl deploy
 
 # Depuis un fichier de config
-sudo bash game_commander.sh deploy --config env/deploy_config.env
+sudo ./gcctl deploy --config env/deploy_config.env
 
 # Depuis le Hub : onglet Dashboard → bouton Déployer
 ```
@@ -96,10 +96,10 @@ sudo bash game_commander.sh deploy --config env/deploy_config.env
 ### Autres commandes
 
 ```bash
-sudo bash game_commander.sh update --instance valheim2   # mise à jour runtime
-sudo bash game_commander.sh status                       # état de toutes les instances
-sudo bash game_commander.sh uninstall                    # désinstallation guidée
-sudo bash game_commander.sh attach                       # brancher sur un service existant
+sudo ./gcctl update --instance valheim2   # mise à jour runtime
+sudo ./gcctl status                       # état de toutes les instances
+sudo ./gcctl uninstall                    # désinstallation guidée
+sudo ./gcctl attach                       # brancher sur un service existant
 ```
 
 ---

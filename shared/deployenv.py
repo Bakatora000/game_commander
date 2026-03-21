@@ -114,7 +114,7 @@ GAME_DEFAULTS: dict[str, dict[str, str]] = {
 
 TEMPLATE_TEXT = """# ═══════════════════════════════════════════════════════════════════════════════
 #  Game Commander — Fichier de configuration de déploiement
-#  Usage : sudo bash game_commander.sh deploy --config env/deploy_config.env
+#  Usage : sudo ./gcctl deploy --config env/deploy_config.env
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # Jeu : valheim | enshrouded | minecraft | minecraft-fabric | terraria | soulmask | satisfactory
