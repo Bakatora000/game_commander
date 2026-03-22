@@ -125,14 +125,22 @@ Le Hub peut créer automatiquement un canal Discord par instance et envoyer des 
 }
 ```
 
-**Permissions bot requises** : `Manage Channels`, `Send Messages`, `View Channels`
+**Permissions bot requises** :
+- `View Channels`
+- `Send Messages`
+- `Read Message History`
+- `Embed Links`
+- `Manage Channels`
 
 **Fonctionnement automatique** :
-- À chaque déploiement, une catégorie Discord par jeu est créée si absente (`valheim`, `enshrouded`…), puis le canal de l'instance est créé à l'intérieur
+- À chaque déploiement, une catégorie Discord par jeu est créée si absente (`valheim`, `enshrouded`, `minecraft`, `terraria`…), puis le canal de l'instance est créé à l'intérieur
+- Les variantes `minecraft`, `minecraft-java`, `minecraft-fabric`, `minecraftjava` et `minecraftfabric` sont regroupées sous la catégorie `minecraft`
+- Les variantes `terraria`, `terraria-tshock` et `terrariatshock` sont regroupées sous la catégorie `terraria`
+- Si un canal du bon nom existe déjà, il est réutilisé puis déplacé dans la bonne catégorie si nécessaire
 - Les actions `start / stop / restart / update / deploy / uninstall / rebalance` notifient le canal de l'instance concernée
 
 **Gestion depuis le Hub** (`/commander` → onglet Discord) :
-- Guild ID et Category ID configurables depuis l'interface
+- Guild ID et catégorie globale de fallback configurables depuis l'interface
 - Création et suppression manuelle de canal par instance
 - Droits lecture seule par utilisateur ou rôle Discord
 

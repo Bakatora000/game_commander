@@ -1,20 +1,20 @@
 # Guide De Demarrage
 
 Ce guide s'adresse a une personne qui vient de louer un serveur Linux et veut deployer
-un serveur de jeu avec `gc_2.1.0.zip`, sans etre a l'aise avec SSH au depart.
+un serveur de jeu avec le projet Game Commander, sans etre a l'aise avec SSH au depart.
 
 Le principe est simple :
 - vous vous connectez a votre serveur
-- vous copiez l'archive `gc_2.1.0.zip`
+- vous copiez le depot ou une archive du projet
 - vous lancez `gcctl`
-- le script installe et configure le serveur de jeu et l'interface web
+- l'outil installe et configure le serveur de jeu et l'interface web
 
 ## 1. Ce qu'il vous faut
 
 - un serveur Linux Ubuntu 24.04 ou proche
 - l'adresse IP du serveur
 - le mot de passe `root` ou une cle SSH fournie par l'hebergeur
-- l'archive `gc_2.1.0.zip`
+- une copie du projet Game Commander (archive ou depot Git)
 - optionnel mais recommande : un nom de domaine
 
 Sans nom de domaine, vous pouvez quand meme tester Game Commander en HTTP.
@@ -65,7 +65,7 @@ ssh root@203.0.113.10
 
 Au premier acces, validez la cle du serveur puis saisissez le mot de passe si demande.
 
-## 3. Transferer le fichier `gc_2.1.0.zip`
+## 3. Transferer le projet Game Commander
 
 Vous pouvez le faire de 3 manieres.
 
@@ -79,13 +79,13 @@ le plus simple est souvent d'utiliser SSH depuis votre PC.
 Depuis votre ordinateur :
 
 ```bash
-scp gc_2.1.0.zip root@IP_DU_SERVEUR:/root/
+scp game_commander.zip root@IP_DU_SERVEUR:/root/
 ```
 
 Exemple :
 
 ```bash
-scp gc_2.1.0.zip root@203.0.113.10:/root/
+scp game_commander.zip root@203.0.113.10:/root/
 ```
 
 ### Methode graphique
@@ -95,7 +95,14 @@ Vous pouvez aussi utiliser un client SFTP :
 - macOS : Cyberduck
 - Linux : FileZilla ou un client SFTP equivalent
 
-Dans ce cas, envoyez `gc_2.1.0.zip` dans `/root/`.
+Dans ce cas, envoyez l'archive du projet dans `/root/`.
+
+Si vous preferez Git et que le serveur a acces a GitHub, vous pouvez aussi cloner directement :
+
+```bash
+cd /root
+git clone https://github.com/Bakatora000/game_commander.git gc
+```
 
 ## 4. Preparer les fichiers sur le serveur
 
@@ -105,10 +112,10 @@ Une fois connecte au serveur :
 cd /root
 apt update
 apt install -y unzip
-unzip gc_2.1.0.zip
+unzip game_commander.zip
 ```
 
-Entrez ensuite dans le dossier extrait. Selon l'archive, le nom peut varier.
+Entrez ensuite dans le dossier extrait. Selon l'archive ou le clone, le nom peut varier.
 
 Pour voir les dossiers presents :
 
@@ -153,6 +160,10 @@ Choisissez le jeu a deployer :
 - Valheim
 - Enshrouded
 - Minecraft Java
+- Minecraft Fabric
+- Terraria
+- Soulmask
+- Satisfactory
 
 ### Utilisateur systeme Linux
 
